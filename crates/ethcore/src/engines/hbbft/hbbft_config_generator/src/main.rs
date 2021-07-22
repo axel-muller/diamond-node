@@ -415,11 +415,12 @@ fn main() {
 mod tests {
     use super::*;
     use hbbft::{
-        crypto::{PublicKeySet, SecretKeyShare},
-        sync_key_gen::{AckOutcome, PartOutcome},
+        crypto::{serde_impl::SerdeSecret, PublicKeySet, SecretKeyShare},
+        sync_key_gen::{AckOutcome, PartOutcome, SyncKeyGen},
     };
+    use keygen_history_helpers::KeyPairWrapper;
     use rand;
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
     use std::{collections::BTreeMap, sync::Arc};
 
     #[derive(Deserialize)]

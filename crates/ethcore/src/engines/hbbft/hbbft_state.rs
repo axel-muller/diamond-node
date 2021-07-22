@@ -123,8 +123,8 @@ impl HbbftState {
                     return None;
                 }
             }
-            Err(_) => {
-                trace!(target: "engine", "replay_cached_messages: Could not query posdao epoch at parent block#{}, re-trying later. Probably due to the block not being imported yet.", parent_block);
+            Err(e) => {
+                trace!(target: "engine", "replay_cached_messages: Could not query posdao epoch at parent block#{}, re-trying later. Probably due to the block not being imported yet. {:?}", parent_block, e);
                 return None;
             }
         }
@@ -253,7 +253,7 @@ impl HbbftState {
             .ok()?
             .low_u64();
         if self.current_posdao_epoch != posdao_epoch {
-            trace!(target: "consensus", "hbbft_state epoch mismatch: hbbft_state epoch is {}, honey badger instance epoch is: {}.", 
+            trace!(target: "consensus", "hbbft_state epoch mismatch: hbbft_state epoch is {}, honey badger instance epoch is: {}.",
 				   self.current_posdao_epoch, posdao_epoch);
             return None;
         }
