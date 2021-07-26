@@ -1,12 +1,3 @@
-use std::{
-    cmp::{max, min},
-    collections::BTreeMap,
-    convert::TryFrom,
-    ops::BitXor,
-    sync::{atomic::AtomicBool, Arc, Weak},
-    time::Duration,
-};
-
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing, TransactionRequest};
@@ -26,6 +17,14 @@ use parking_lot::RwLock;
 use rlp;
 use serde::Deserialize;
 use serde_json;
+use std::{
+    cmp::{max, min},
+    collections::BTreeMap,
+    convert::TryFrom,
+    ops::BitXor,
+    sync::{atomic::AtomicBool, Arc, Weak},
+    time::Duration,
+};
 use types::{
     header::{ExtendedHeader, Header},
     ids::BlockId,
@@ -326,6 +325,9 @@ impl HoneyBadgerBFT {
     ) -> Result<(), EngineError> {
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
         trace!(target: "consensus", "Received message of idx {}  {:?} from {}", msg_idx, message, sender_id);
+
+        // store received messages here.
+
         let step = self.hbbft_state.write().process_message(
             client.clone(),
             &self.signer,
