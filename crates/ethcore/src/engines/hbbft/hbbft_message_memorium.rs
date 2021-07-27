@@ -4,6 +4,9 @@ use hbbft::honey_badger::{self};
 use engines::hbbft::NodeId;
 use hbbft::honey_badger::Message;
 use std::{borrow::Borrow, collections::BTreeMap};
+use serde_json::{Result, Value};
+use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 pub type HbMessage = honey_badger::Message<NodeId>;
 
@@ -42,10 +45,35 @@ impl HbbftMessageMemorium {
         }
     }
 
-    fn on_message_received(&self, message: &HbMessage) {
+	pub fn on_message_string_received(&self, message: String, epoch: u64) {
+
+		// if (message.contains("")
+
+	}
+
+    pub fn on_message_received(&self, message: &HbMessage) {
+
+
+		//performance: dispatcher pattern could improve performance a lot.
+		let message_string = format!("{:?}", message);
+
+		let epoch = message.epoch();
+
+		match serde_json::to_string(message) {
+			Ok(jsonString) => { debug!(target: "consensus", "{}", jsonString); }
+			Err(e) => { error!(target: "consensus", "could not create json."); }
+		}
+
+		// how to figure out proposer ?
+
+		self.on_message_string_received(message_string, epoch);
+
+
+		//the details are imprisionated
 		// todo implementation.
-        // let epoch = message.epoch();
-        // let Message(share) = message;
-        // let bytes = share.to_bytes();
+
+
+		// let Message(share) = message;
+		// let bytes = share.to_bytes();
     }
 }
