@@ -3,10 +3,9 @@ use hbbft::honey_badger::{self};
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::NodeId;
 use hbbft::honey_badger::Message;
-use std::{borrow::Borrow, collections::BTreeMap};
-use serde_json::{Result, Value};
-use serde_json::json;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Result, Value};
+use std::{borrow::Borrow, collections::BTreeMap};
 
 pub type HbMessage = honey_badger::Message<NodeId>;
 
@@ -45,35 +44,34 @@ impl HbbftMessageMemorium {
         }
     }
 
-	pub fn on_message_string_received(&self, message: String, epoch: u64) {
+    pub fn on_message_string_received(&self, message: String, epoch: u64) {
 
-		// if (message.contains("")
-
-	}
+        // if (message.contains("")
+    }
 
     pub fn on_message_received(&self, message: &HbMessage) {
+        //performance: dispatcher pattern could improve performance a lot.
+        let message_string = format!("{:?}", message);
 
+        let epoch = message.epoch();
 
-		//performance: dispatcher pattern could improve performance a lot.
-		let message_string = format!("{:?}", message);
+        match serde_json::to_string(message) {
+            Ok(jsonString) => {
+                debug!(target: "consensus", "{}", jsonString);
+            }
+            Err(e) => {
+                error!(target: "consensus", "could not create json.");
+            }
+        }
 
-		let epoch = message.epoch();
+        // how to figure out proposer ?
 
-		match serde_json::to_string(message) {
-			Ok(jsonString) => { debug!(target: "consensus", "{}", jsonString); }
-			Err(e) => { error!(target: "consensus", "could not create json."); }
-		}
+        self.on_message_string_received(message_string, epoch);
 
-		// how to figure out proposer ?
+        //the details are imprisionated
+        // todo implementation.
 
-		self.on_message_string_received(message_string, epoch);
-
-
-		//the details are imprisionated
-		// todo implementation.
-
-
-		// let Message(share) = message;
-		// let bytes = share.to_bytes();
+        // let Message(share) = message;
+        // let bytes = share.to_bytes();
     }
 }

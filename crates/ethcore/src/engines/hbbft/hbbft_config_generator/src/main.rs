@@ -373,8 +373,16 @@ fn main() {
 
         let file_name = format!("hbbft_validator_key_{}", i);
         fs::write(file_name, enode.secret.to_hex()).expect("Unable to write key file");
-		fs::write(format!("hbbft_validator_public_{}.txt", i), format!("{:?}",enode.public)).expect("Unable to write public key file");
-		fs::write(format!("hbbft_validator_address_{}.txt", i), format!("{:?}",enode.address)).expect("Unable to write address file");
+        fs::write(
+            format!("hbbft_validator_public_{}.txt", i),
+            format!("{:?}", enode.public),
+        )
+        .expect("Unable to write public key file");
+        fs::write(
+            format!("hbbft_validator_address_{}.txt", i),
+            format!("{:?}", enode.address),
+        )
+        .expect("Unable to write address file");
 
         write_json_for_secret(
             enode.secret.clone(),

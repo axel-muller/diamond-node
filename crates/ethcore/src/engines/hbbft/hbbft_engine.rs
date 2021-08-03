@@ -44,11 +44,13 @@ use super::{
     sealing::{self, RlpSig, Sealing},
     NodeId,
 };
-use engines::hbbft::contracts::validator_set::{
-    get_validator_available_since, send_tx_announce_availability, staking_by_mining_address,
+use engines::hbbft::{
+    contracts::validator_set::{
+        get_validator_available_since, send_tx_announce_availability, staking_by_mining_address,
+    },
+    hbbft_message_memorium::HbbftMessageMemorium,
 };
 use std::{ops::Deref, sync::atomic::Ordering};
-use engines::hbbft::hbbft_message_memorium::HbbftMessageMemorium;
 
 type TargetedMessage = hbbft::TargetedMessage<Message, NodeId>;
 
@@ -68,7 +70,7 @@ pub struct HoneyBadgerBFT {
     signer: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     machine: EthereumMachine,
     hbbft_state: RwLock<HbbftState>,
-	hbbft_message_memorial: RwLock<HbbftMessageMemorium>,
+    hbbft_message_memorial: RwLock<HbbftMessageMemorium>,
     sealing: RwLock<BTreeMap<BlockNumber, Sealing>>,
     params: HbbftParams,
     message_counter: RwLock<usize>,
@@ -208,7 +210,7 @@ impl HoneyBadgerBFT {
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-			hbbft_message_memorial: RwLock::new(HbbftMessageMemorium::new()),
+            hbbft_message_memorial: RwLock::new(HbbftMessageMemorium::new()),
             sealing: RwLock::new(BTreeMap::new()),
             params,
             message_counter: RwLock::new(0),
@@ -330,8 +332,9 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Received message of idx {}  {:?} from {}", msg_idx, message, sender_id);
 
         // store received messages here.
-		self.hbbft_message_memorial.write()
-			.on_message_received(&message);
+        self.hbbft_message_memorial
+            .write()
+            .on_message_received(&message);
 
         let step = self.hbbft_state.write().process_message(
             client.clone(),
