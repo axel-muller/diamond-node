@@ -173,9 +173,9 @@ impl HbbftState {
         let honey_badger = self.honey_badger.as_mut()?;
 
         let next_block = latest_block_number + 1;
-        if next_block != honey_badger.epoch() {
-            trace!(target: "consensus", "Skipping honey_badger forward to epoch(block) {}, was at epoch(block) {}.", next_block, honey_badger.epoch());
-        }
+        // if next_block != honey_badger.epoch() {
+        //trace!(target: "consensus", "Skipping honey_badger forward to epoch(block) {}, was at epoch(block) {}.", next_block, honey_badger.epoch());
+        // }
         honey_badger.skip_to_epoch(next_block);
 
         Some(())
