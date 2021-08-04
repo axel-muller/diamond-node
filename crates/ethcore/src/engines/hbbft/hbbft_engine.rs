@@ -1,6 +1,6 @@
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
-use client::traits::{EngineClient, ForceUpdateSealing, TransactionRequest};
+use client::traits::{EngineClient, ForceUpdateSealing};
 use crypto::publickey::Signature;
 use engines::{
     default_system_or_code_call, signer::EngineSigner, Engine, EngineError, ForkChoice, Seal,
