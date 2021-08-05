@@ -57,7 +57,7 @@ impl HbbftMessageMemorium {
         self.message_tracking_id += 1;
         let mut path_buf = PathBuf::from(format!(
             "data/messages/{}/message_{}.json",
-            epoch, message_tracking_id
+            epoch,  self.message_tracking_id
         ));
         if let Err(e) = create_dir_all(path_buf.as_path()) {
             warn!("Error creating key directory: {:?}", e);
