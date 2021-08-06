@@ -1,4 +1,4 @@
-use hbbft::honey_badger::{self};
+use hbbft::honey_badger::{self, Message, MessageContent};
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::NodeId;
@@ -33,6 +33,7 @@ pub(crate) struct HbbftMessageMemorium {
     // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
 
+    decryption_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     //*
     // u64: epoch
     // NodeId: proposer
@@ -48,6 +49,7 @@ impl HbbftMessageMemorium {
     pub fn new() -> Self {
         HbbftMessageMemorium {
             signature_shares: BTreeMap::new(),
+            decryption_shares: BTreeMap::new(),
             agreements: BTreeMap::new(),
             message_tracking_id: 0,
         }
@@ -92,6 +94,25 @@ impl HbbftMessageMemorium {
             }
             Err(e) => {
                 error!(target: "consensus", "could not create json.");
+            }
+        }
+
+        let content = message.content();
+
+        match content {
+            MessageContent::Subset(subset) => {}
+
+            MessageContent::DecryptionShare { proposer_id, share } => {
+                // debug!("got decryption share from {} {:?}", proposer_id, share);
+
+                if !self.decryption_shares.contains_key(&epoch) {
+                    match self.decryption_shares.insert(epoch, Vec::new()) {
+                        None => {}
+                        Some(vec) => {
+                            //Vec<(NodeId, message)
+                        }
+                    }
+                }
             }
         }
     }
