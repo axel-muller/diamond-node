@@ -142,6 +142,9 @@ fn to_toml(
         }
     }
 
+	network.insert("min_peers".into(), Value::Integer(50));
+	network.insert("max_peers".into(), Value::Integer(50));
+
     match external_ip {
         Some(extip) => {
             network.insert("allow_ips".into(), Value::String("public".into()));
