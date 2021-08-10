@@ -159,7 +159,7 @@ impl SyncHandler {
                 Some(session) => ip_addr = session.remote_address.to_string(),
                 None => {}
             }
-            info!(target:"sync", "Disabling Peer (this Software Version not whitelisted) {} ip:{} ", peer_version, ip_addr);
+            trace!(target:"sync", "Disabling Peer (this Software Version not whitelisted) {} ip:{} ", peer_version, ip_addr);
             io.disable_peer(peer);
         } else if let Err(e) = sync.send_status(io, peer) {
             debug!(target:"sync", "Error sending status request: {:?}", e);
