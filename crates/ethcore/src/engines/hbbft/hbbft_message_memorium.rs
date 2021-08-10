@@ -43,6 +43,10 @@ pub(crate) struct HbbftMessageMemorium {
     agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
 
     message_tracking_id: u64,
+
+	config_blocks_to_keep_on_disk: u64,
+
+	last_block_deleted_from_disk: u64,
 }
 
 impl HbbftMessageMemorium {
@@ -52,34 +56,68 @@ impl HbbftMessageMemorium {
             decryption_shares: BTreeMap::new(),
             agreements: BTreeMap::new(),
             message_tracking_id: 0,
+			config_blocks_to_keep_on_disk: 10,
+			last_block_deleted_from_disk: 0
+
         }
     }
 
     pub fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
         self.message_tracking_id += 1;
-        let mut path_buf = PathBuf::from(format!(
-            "data/messages/{}/message_{}.json",
-            epoch, self.message_tracking_id
-        ));
-        if let Err(e) = create_dir_all(path_buf.as_path()) {
-            warn!("Error creating key directory: {:?}", e);
-            return;
-        };
 
-        path_buf.push(format!("{}", self.message_tracking_id));
+		//don't pick up messages if we do not keep any.
+		// and don't pick up old delayed messages for blocks already
+		// decided to not to keep.
+		if  self.config_blocks_to_keep_on_disk > 0 && epoch > self.last_block_deleted_from_disk {
 
-        let path = path_buf.as_path();
-        let mut file = match File::create(&path) {
-            Ok(file) => file,
-            Err(e) => {
-                warn!(target: "consensus", "Error creating hbbft memorial file: {:?}", e);
-                return;
-            }
-        };
 
-        if let Err(e) = file.write(message_json.as_bytes()) {
-            warn!(target: "consensus", "Error writing hbbft memorial file: {:?}", e);
-        }
+			let mut path_buf = PathBuf::from(format!(
+				"data/messages/{}",
+				epoch
+			));
+			if let Err(e) = create_dir_all(path_buf.as_path()) {
+				warn!("Error creating key directory: {:?}", e);
+				return;
+			};
+
+			path_buf.push(format!("{}.json", self.message_tracking_id));
+			let path = path_buf.as_path();
+			let mut file = match File::create(&path) {
+				Ok(file) => file,
+				Err(e) => {
+					warn!(target: "consensus", "Error creating hbbft memorial file: {:?}", e);
+					return;
+				}
+			};
+
+			if let Err(e) = file.write(message_json.as_bytes()) {
+				warn!(target: "consensus", "Error writing hbbft memorial file: {:?}", e);
+			}
+
+			//figure out if we have to delete a old block
+			// 1. protect against integer underflow.
+			// 2. block is so new, that we have to trigger a cleanup
+			if epoch > self.config_blocks_to_keep_on_disk && epoch > self.last_block_deleted_from_disk + self.config_blocks_to_keep_on_disk {
+
+				let mut path_to_delete = PathBuf::from(format!(
+					"data/messages/{}",
+					epoch));
+
+				let path = path_to_delete.as_path();
+
+				if path.exists() {
+					debug!(target: "consensus", "deleting old consensus messages from disk",  );
+					match fs::remove_dir_all(path) {
+						Ok(_) => {
+							self.last_block_deleted_from_disk = epoch;
+						}
+						Err(e) => {
+							warn!(target: "consensus", "could not delete old directories reason: {:?}", e);
+						}
+					}
+				}
+			}
+		}
     }
 
     pub fn on_message_received(&mut self, message: &HbMessage) {
