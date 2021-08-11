@@ -127,7 +127,7 @@ impl HbbftMessageMemorium {
 
         match serde_json::to_string(message) {
             Ok(json_string) => {
-                debug!(target: "consensus", "{}", json_string);
+                // debug!(target: "consensus", "{}", json_string);
                 self.on_message_string_received(json_string, epoch);
             }
             Err(e) => {
