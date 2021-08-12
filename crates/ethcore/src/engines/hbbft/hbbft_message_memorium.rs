@@ -56,7 +56,7 @@ impl HbbftMessageMemorium {
             decryption_shares: BTreeMap::new(),
             agreements: BTreeMap::new(),
             message_tracking_id: 0,
-			config_blocks_to_keep_on_disk: 10,
+			config_blocks_to_keep_on_disk: 200,
 			last_block_deleted_from_disk: 0
 
         }
@@ -99,22 +99,40 @@ impl HbbftMessageMemorium {
 			// 2. block is so new, that we have to trigger a cleanup
 			if epoch > self.config_blocks_to_keep_on_disk && epoch > self.last_block_deleted_from_disk + self.config_blocks_to_keep_on_disk {
 
-				let mut path_to_delete = PathBuf::from(format!(
-					"data/messages/{}",
-					epoch));
+				let paths = fs::read_dir("data/messages/").unwrap();
 
-				let path = path_to_delete.as_path();
+				for dir_entry_result in paths {
+					//println!("Name: {}", path.unwrap().path().display())
 
-				if path.exists() {
-					debug!(target: "consensus", "deleting old consensus messages from disk",  );
-					match fs::remove_dir_all(path) {
-						Ok(_) => {
-							self.last_block_deleted_from_disk = epoch;
+					match dir_entry_result {
+						Ok(dir_entry) => {
+
+							let path_buf = dir_entry.path();
+
+							if path_buf.is_dir() {
+								let dir_name = path_buf.file_name().unwrap().to_str().unwrap();
+
+								match dir_name.parse::<u64>() {
+									Ok(dir_epoch) => {
+										if dir_epoch <= epoch - self.config_blocks_to_keep_on_disk {
+
+											match fs::remove_dir_all(path_buf.clone()) {
+												Ok(_) => {
+													info!(target: "consensus", "deleted old message directory: {:?}", path_buf);
+												}
+												Err(e) => {
+													warn!(target: "consensus", "could not delete old directories reason: {:?}", e);
+												}
+											}
+										}
+									}
+									Err(_) => {}
+								}
+							}
 						}
-						Err(e) => {
-							warn!(target: "consensus", "could not delete old directories reason: {:?}", e);
-						}
+						Err(_) => {}
 					}
+					self.last_block_deleted_from_disk = epoch;;
 				}
 			}
 		}
