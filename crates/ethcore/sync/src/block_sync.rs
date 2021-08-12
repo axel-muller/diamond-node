@@ -487,7 +487,13 @@ impl BlockDownloader {
     fn start_sync_round(&mut self, io: &mut dyn SyncIo) {
         self.state = State::ChainHead;
 
-        let config_is_instant_finality = true;
+        // todo: experimential.
+        // maybe this was a terribly idea,
+        // because a MOC just moves forward to block 1, 2, 3...
+        // since it cannot sync.
+        // will the reintroduction lead to "Header not found, bottom line reached"
+        // problems on a real network again ? or is it protected by client version whitelisting)
+        let config_is_instant_finality = false;
 
         // on a chain with instant finality,
         // we dont need to do any retractions.
