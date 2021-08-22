@@ -3,49 +3,85 @@ use engines::{
     hbbft::{
         contracts::{
             keygen_history::{
-                engine_signer_to_synckeygen, has_acks_of_address_data, has_part_of_address_data,
-                key_history_contract, part_of_address, PublicWrapper, KEYGEN_HISTORY_ADDRESS,
+                engine_signer_to_synckeygen, has_acks_of_address_data, key_history_contract,
+                part_of_address, PublicWrapper, KEYGEN_HISTORY_ADDRESS,
             },
             staking::get_posdao_epoch,
-            validator_set::{get_validator_pubkeys, ValidatorType},
+            validator_set::{
+                get_pending_validator_key_generation_mode, get_validator_pubkeys, KeyGenMode,
+                ValidatorType,
+            },
         },
         utils::bound_contract::CallError,
     },
     signer::EngineSigner,
 };
-use ethereum_types::U256;
+use ethereum_types::{Address, U256};
 use itertools::Itertools;
 use parking_lot::RwLock;
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::{collections::BTreeMap, sync::Arc};
 use types::ids::BlockId;
 
 pub struct KeygenTransactionSender {
-    last_part_sent: u64,
-    last_acks_sent: u64,
-    resend_delay: u64,
+    last_keygen_mode: KeyGenMode,
+    keygen_mode_counter: u64,
 }
+
+static KEYGEN_TRANSACTION_SEND_DELAY: u64 = 3;
+static KEYGEN_TRANSACTION_RESEND_DELAY: u64 = 10;
 
 impl KeygenTransactionSender {
     pub fn new() -> Self {
         KeygenTransactionSender {
-            last_part_sent: 0,
-            last_acks_sent: 0,
-            resend_delay: 10,
+            last_keygen_mode: KeyGenMode::Other,
+            keygen_mode_counter: 0,
         }
     }
 
-    fn part_threshold_reached(&self, block_number: u64) -> bool {
-        self.last_part_sent == 0 || block_number > (self.last_part_sent + self.resend_delay)
+    fn should_send(
+        &mut self,
+        client: &dyn EngineClient,
+        mining_address: &Address,
+        mode_to_check: KeyGenMode,
+    ) -> Result<bool, CallError> {
+        let keygen_mode = get_pending_validator_key_generation_mode(client, mining_address)?;
+        if keygen_mode == mode_to_check {
+            if self.last_keygen_mode == mode_to_check {
+                self.keygen_mode_counter += 1;
+                if self.keygen_mode_counter == KEYGEN_TRANSACTION_SEND_DELAY {
+                    return Ok(true);
+                } else if self.keygen_mode_counter > KEYGEN_TRANSACTION_SEND_DELAY {
+                    // Part should have been sent already,
+                    // give the chain time to include the transaction before trying a re-send.
+                    if (self.keygen_mode_counter - KEYGEN_TRANSACTION_SEND_DELAY)
+                        % KEYGEN_TRANSACTION_RESEND_DELAY
+                        == 0
+                    {
+                        return Ok(true);
+                    }
+                }
+            } else {
+                self.last_keygen_mode = mode_to_check;
+                self.keygen_mode_counter = 1;
+            }
+        }
+        Ok(false)
     }
 
-    fn acks_threshold_reached(&self, block_number: u64) -> bool {
-        self.last_acks_sent == 0 || block_number > (self.last_acks_sent + self.resend_delay)
+    fn should_send_part(
+        &mut self,
+        client: &dyn EngineClient,
+        mining_address: &Address,
+    ) -> Result<bool, CallError> {
+        self.should_send(client, mining_address, KeyGenMode::WritePart)
+    }
+
+    fn should_send_ack(
+        &mut self,
+        client: &dyn EngineClient,
+        mining_address: &Address,
+    ) -> Result<bool, CallError> {
+        self.should_send(client, mining_address, KeyGenMode::WriteAck)
     }
 
     /// Returns a collection of transactions the pending validator has to submit in order to
@@ -55,9 +91,6 @@ impl KeygenTransactionSender {
         client: &dyn EngineClient,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     ) -> Result<(), CallError> {
-        static LAST_PART_SENT: AtomicU64 = AtomicU64::new(0);
-        static LAST_ACKS_SENT: AtomicU64 = AtomicU64::new(0);
-
         // If we have no signer there is nothing for us to send.
         let address = match signer.read().as_ref() {
             Some(signer) => signer.address(),
@@ -95,16 +128,10 @@ impl KeygenTransactionSender {
         };
 
         let upcoming_epoch = get_posdao_epoch(client, BlockId::Latest)? + 1;
-        trace!(target:"engine", "preparing to send PARTS for upcomming epoch: {}", upcoming_epoch);
-
-        let cur_block = client
-            .block_number(BlockId::Latest)
-            .ok_or(CallError::ReturnValueInvalid)?;
+        trace!(target:"engine", "preparing to send PARTS for upcoming epoch: {}", upcoming_epoch);
 
         // Check if we already sent our part.
-        if (LAST_PART_SENT.load(Ordering::SeqCst) + 10 < cur_block)
-            && !has_part_of_address_data(client, address)?
-        {
+        if self.should_send_part(client, &address)? {
             let serialized_part = match bincode::serialize(&part_data) {
                 Ok(part) => part,
                 Err(_) => return Err(CallError::ReturnValueInvalid),
@@ -130,7 +157,6 @@ impl KeygenTransactionSender {
             full_client
                 .transact_silently(part_transaction)
                 .map_err(|_| CallError::ReturnValueInvalid)?;
-            LAST_PART_SENT.store(cur_block, Ordering::SeqCst);
         }
 
         trace!(target:"engine", "checking for acks...");
@@ -159,9 +185,7 @@ impl KeygenTransactionSender {
         trace!(target:"engine", "has_acks_of_address_data: {:?}", has_acks_of_address_data(client, address));
 
         // Now we are sure all parts are ready, let's check if we sent our Acks.
-        if (LAST_ACKS_SENT.load(Ordering::SeqCst) + 10 < cur_block)
-            && !has_acks_of_address_data(client, address)?
-        {
+        if self.should_send_ack(client, &address)? {
             let mut serialized_acks = Vec::new();
             let mut total_bytes_for_acks = 0;
 
@@ -191,7 +215,6 @@ impl KeygenTransactionSender {
             full_client
                 .transact_silently(acks_transaction)
                 .map_err(|_| CallError::ReturnValueInvalid)?;
-            LAST_ACKS_SENT.store(cur_block, Ordering::SeqCst);
         }
 
         Ok(())
