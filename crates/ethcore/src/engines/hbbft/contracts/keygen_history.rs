@@ -86,16 +86,6 @@ pub fn synckeygen_to_network_info(
     ))
 }
 
-pub fn has_part_of_address_data(
-    client: &dyn EngineClient,
-    address: Address,
-) -> Result<bool, CallError> {
-    let c = BoundContract::bind(client, BlockId::Latest, *KEYGEN_HISTORY_ADDRESS);
-    let serialized_part = call_const_key_history!(c, parts, address)?;
-    //println!("Part for address {}: {:?}", address, serialized_part);
-    Ok(!serialized_part.is_empty())
-}
-
 pub fn part_of_address(
     client: &dyn EngineClient,
     address: Address,

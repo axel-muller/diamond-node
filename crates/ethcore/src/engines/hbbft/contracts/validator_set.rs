@@ -79,6 +79,30 @@ pub fn is_pending_validator(
     call_const_validator!(c, is_pending_validator, staking_address.clone())
 }
 
+#[derive(PartialEq)]
+pub enum KeyGenMode {
+    WritePart,
+    WriteAck,
+    Other,
+}
+
+pub fn get_pending_validator_key_generation_mode(
+    client: &dyn EngineClient,
+    mining_address: &Address,
+) -> Result<KeyGenMode, CallError> {
+    let c = BoundContract::bind(client, BlockId::Latest, *VALIDATOR_SET_ADDRESS);
+    let key_gen_mode = call_const_validator!(
+        c,
+        get_pending_validator_key_generation_mode,
+        mining_address.clone()
+    )?;
+    Ok(match key_gen_mode.low_u64() {
+        1 => KeyGenMode::WritePart,
+        3 => KeyGenMode::WriteAck,
+        _ => KeyGenMode::Other,
+    })
+}
+
 pub fn get_validator_available_since(
     client: &dyn EngineClient,
     address: &Address,
