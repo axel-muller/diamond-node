@@ -20,7 +20,7 @@ jobs:
           - ubuntu-16.04
           - macos-latest
         toolchain:
-          - stable
+          - 1.52.1
     runs-on:                    ${{ matrix.platform }}
     steps:
       - name:                   Checkout sources
@@ -54,7 +54,7 @@ jobs:
       # ==============================
       #       Linux/Macos Build
       # ==============================
-    
+
       - name:                   Build OpenEthereum for ${{matrix.platform}}
         if:                     matrix.platform != 'windows2019'
         run:                    sh scripts/actions/build-linux.sh ${{matrix.platform}}
