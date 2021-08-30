@@ -138,7 +138,7 @@ pub fn send_tx_announce_availability(
 
     let send_data = validator_set_hbbft::functions::announce_availability::call();
     let transaction = TransactionRequest::call(*VALIDATOR_SET_ADDRESS, send_data.0)
-        .gas(U256::from(250_000))
+        .gas(U256::from(1_000_000))
         .nonce(nonce);
 
     info!(target:"consensus", "sending announce availability with nonce: {}", nonce);
