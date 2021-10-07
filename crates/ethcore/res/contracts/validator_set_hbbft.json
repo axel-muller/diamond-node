@@ -505,7 +505,18 @@
 	},
 	{
 		"constant": false,
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_blockNumber",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "_blockhash",
+				"type": "bytes32"
+			}
+		],
 		"name": "announceAvailability",
 		"outputs": [],
 		"payable": false,
@@ -886,6 +897,27 @@
 				"internalType": "bytes",
 				"name": "",
 				"type": "bytes"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_possibleValidatorCount",
+				"type": "uint256"
+			}
+		],
+		"name": "getValidatorCountSweetSpot",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"payable": false,

@@ -5,6 +5,7 @@ use client::{
 use crypto::publickey::Public;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
+use ethjson::types::hash::H256;
 use std::{collections::BTreeMap, str::FromStr};
 use types::{ids::BlockId, transaction::Error};
 
@@ -112,14 +113,31 @@ pub fn send_tx_announce_availability(
         None => {}
     }
 
-    let send_data = validator_set_hbbft::functions::announce_availability::call();
-    let transaction = TransactionRequest::call(*VALIDATOR_SET_ADDRESS, send_data.0)
-        .gas(U256::from(250_000))
-        .nonce(nonce);
+    match full_client.block_number(BlockId::Latest) {
+        Some(block_number) => match full_client.block_hash(BlockId::Number(block_number)) {
+            None => {
+                error!(target:"consensus", "could not announce availability. could not retrieve block hash for block {}", block_number);
+            }
+            Some(block_hash) => {
+                let send_data = validator_set_hbbft::functions::announce_availability::call(
+                    block_number,
+                    block_hash,
+                );
+                let transaction = TransactionRequest::call(*VALIDATOR_SET_ADDRESS, send_data.0)
+                    .gas(U256::from(500_000))
+                    .nonce(nonce);
 
-    info!(target:"consensus", "sending announce availability with nonce: {}", nonce);
+                info!(target:"consensus", "sending announce availability with nonce: {}", nonce);
 
-    full_client.transact_silently(transaction)?;
+                full_client.transact_silently(transaction)?;
 
-    return Ok(());
+                return Ok(());
+            }
+        },
+        None => {
+            error!(target:"consensus", "could not announce availability. could not retrieve current block number");
+        }
+    }
+
+    return Err(Error::TransactionTypeNotEnabled);
 }
