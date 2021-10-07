@@ -8,10 +8,9 @@ use engines::hbbft::{sealing, NodeId};
 // use serde_json::{json, Result, Value};
 
 use std::{
-//    collections::BTreeMap,
     fs::{self, create_dir_all, File},
     io::Write,
-    path::{PathBuf},
+    path::PathBuf,
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -42,7 +41,6 @@ pub(crate) struct HbbftMessageMemorium {
     // HbMessage: message
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
-
     message_tracking_id: u64,
 
     config_blocks_to_keep_on_disk: u64,
@@ -153,7 +151,7 @@ impl HbbftMessageMemorium {
         //    MessageContent::Subset(subset) => {}
 
         //    MessageContent::DecryptionShare { proposer_id, share } => {
-                // debug!("got decryption share from {} {:?}", proposer_id, share);
+        // debug!("got decryption share from {} {:?}", proposer_id, share);
 
         //        if !self.decryption_shares.contains_key(&epoch) {
         //            match self.decryption_shares.insert(epoch, Vec::new()) {
@@ -168,7 +166,6 @@ impl HbbftMessageMemorium {
     }
 
     pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
-
         match serde_json::to_string(message) {
             Ok(json_string) => {
                 // debug!(target: "consensus", "{}", json_string);
@@ -182,8 +179,7 @@ impl HbbftMessageMemorium {
 
         // todo: also remember sealing messages in an organized way
     }
-    pub fn free_epoch_memory(&mut self, _epoch: u64)
-	{
+    pub fn free_epoch_memory(&mut self, _epoch: u64) {
         // self.signature_shares.remove(&epoch);
     }
 }
