@@ -7,7 +7,7 @@ use super::{
         validator_set::{is_pending_validator, mining_by_staking_address},
     },
     contribution::unix_now_secs,
-    test::hbbft_test_client::{create_hbbft_client, create_hbbft_clients},
+    test::hbbft_test_client::{create_hbbft_client, create_hbbft_clients, HbbftTestClient},
 };
 use client::traits::BlockInfo;
 use crypto::publickey::{Generator, KeyPair, Random, Secret};
@@ -21,7 +21,7 @@ pub mod network_simulator;
 
 lazy_static! {
     static ref MASTER_OF_CEREMONIES_KEYPAIR: KeyPair = KeyPair::from_secret(
-        Secret::from_str("18f059a4d72d166a96c1edfb9803af258a07b5ec862a961b3a1d801f443a1762")
+        Secret::from_str("f3c0abb01d69b061c0415a6d2acef23e63cbed0c83afff18672338ba4d9b4b0e")
             .expect("Secret from hex string must succeed")
     )
     .expect("KeyPair generation from secret must succeed");
@@ -105,6 +105,12 @@ fn test_staking_account_creation() {
     );
 }
 
+fn skip_n_blocks(n: u64, hbbft_client: &mut HbbftTestClient, transactor: &KeyPair) {
+    for _ in 0..n {
+        hbbft_client.create_some_transaction(Some(&transactor));
+    }
+}
+
 #[test]
 fn test_epoch_transition() {
     // Create Master of Ceremonies
@@ -142,21 +148,23 @@ fn test_epoch_transition() {
         U256::from(0)
     );
 
-    // First the validator realizes it is in the next validator set and sends his part.
-    moc.create_some_transaction(Some(&transactor));
-
-    // The part will be included in the block triggered by this transaction, but not part of the global state yet,
-    // so it sends the transaction another time.
-    moc.create_some_transaction(Some(&transactor));
-
-    // Now the part is part of the global chain state, and we send our acks.
-    moc.create_some_transaction(Some(&transactor));
-
-    // The acks will be included in the block triggered by this transaction, but not part of the global state yet.
-    moc.create_some_transaction(Some(&transactor));
-
-    // Now the acks are part of the global block state, and the key generation is complete and the next epoch begins
-    moc.create_some_transaction(Some(&transactor));
+    // We analyze what happens at each block if the key generation transactions are sent with a 3 block delay,
+    // and why it takes exactly 11 Blocks to complete.
+    //
+    // On part writing the following steps happen (remember the transaction send call
+    // happens in "on_close", when the new block is not integrated into the chain state yet!):
+    // Block 1: Client realizes it has to write its part, sets the send delay counter to 1.
+    // Block 2: Client sets the send delay counter to 2
+    // Block 3: Client sets the send delay counter to 3 - sends its Part transaction
+    // Block 4: Part transaction is part of the new block (but not in the chain state yet in the on_close function)
+    // Block 5: Client realizes it has to write its Acks, sets the send delay counter to 1.
+    // Block 6: Client sets the send delay counter to 2
+    // Block 7: Client sets the send delay counter to 3 - sends its Acks transaction
+    // Block 8: Acks transaction is part of the new block (but not in the chain state yet in the on_close function)
+    //   Remember that the Block reward call is also done in the "on_close" function and only respects the state of the *previous* block.
+    //   No epoch transition can happen in Block 10 for that reason, even though all Parts and Acks are sent and part of a block at that point.
+    // Block 9: In the "on_close" function all Parts and Acks are now on the chain state and the block reward system call request the epoch change.
+    skip_n_blocks(9, &mut moc, &transactor);
 
     // At this point we should be in the new epoch.
     assert_eq!(
