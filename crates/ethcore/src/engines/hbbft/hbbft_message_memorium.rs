@@ -1,16 +1,16 @@
-use hbbft::honey_badger::{self, Message, MessageContent};
+//use hbbft::honey_badger::{self, MessageContent};
+use hbbft::honey_badger::{self};
 
 // use threshold_crypto::{SignatureShare};
-use engines::hbbft::NodeId;
+use engines::hbbft::{sealing, NodeId};
 // use hbbft::honey_badger::Message;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Result, Value};
+// use serde::{Deserialize, Serialize};
+// use serde_json::{json, Result, Value};
+
 use std::{
-    borrow::Borrow,
-    collections::BTreeMap,
     fs::{self, create_dir_all, File},
     io::Write,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -31,17 +31,16 @@ Hbbft Message Process
 
 pub(crate) struct HbbftMessageMemorium {
     // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
-    signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    // signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
 
-    decryption_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    // decryption_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     //*
     // u64: epoch
     // NodeId: proposer
     // NodeId: node
     // HbMessage: message
     // */
-    agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
-
+    // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
 
     config_blocks_to_keep_on_disk: u64,
@@ -52,9 +51,9 @@ pub(crate) struct HbbftMessageMemorium {
 impl HbbftMessageMemorium {
     pub fn new() -> Self {
         HbbftMessageMemorium {
-            signature_shares: BTreeMap::new(),
-            decryption_shares: BTreeMap::new(),
-            agreements: BTreeMap::new(),
+            // signature_shares: BTreeMap::new(),
+            // decryption_shares: BTreeMap::new(),
+            // agreements: BTreeMap::new(),
             message_tracking_id: 0,
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
@@ -142,31 +141,45 @@ impl HbbftMessageMemorium {
                 self.on_message_string_received(json_string, epoch);
             }
             Err(e) => {
-                error!(target: "consensus", "could not create json.");
+                error!(target: "consensus", "could not create json: {:?}", e);
             }
         }
 
-        let content = message.content();
+        // let content = message.content();
 
-        match content {
-            MessageContent::Subset(subset) => {}
+        //match content {
+        //    MessageContent::Subset(subset) => {}
 
-            MessageContent::DecryptionShare { proposer_id, share } => {
-                // debug!("got decryption share from {} {:?}", proposer_id, share);
+        //    MessageContent::DecryptionShare { proposer_id, share } => {
+        // debug!("got decryption share from {} {:?}", proposer_id, share);
 
-                if !self.decryption_shares.contains_key(&epoch) {
-                    match self.decryption_shares.insert(epoch, Vec::new()) {
-                        None => {}
-                        Some(vec) => {
-                            //Vec<(NodeId, message)
-                        }
-                    }
-                }
-            }
-        }
+        //        if !self.decryption_shares.contains_key(&epoch) {
+        //            match self.decryption_shares.insert(epoch, Vec::new()) {
+        //                None => {}
+        //                Some(vec) => {
+        //                    //Vec<(NodeId, message)
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
     }
 
-    pub fn free_epoch_memory(&mut self, epoch: u64) {
-        self.signature_shares.remove(&epoch);
+    pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
+        match serde_json::to_string(message) {
+            Ok(json_string) => {
+                // debug!(target: "consensus", "{}", json_string);
+
+                self.on_message_string_received(json_string, epoch);
+            }
+            Err(e) => {
+                error!(target: "consensus", "could not create json: {:?}", e);
+            }
+        }
+
+        // todo: also remember sealing messages in an organized way
+    }
+    pub fn free_epoch_memory(&mut self, _epoch: u64) {
+        // self.signature_shares.remove(&epoch);
     }
 }
