@@ -121,7 +121,7 @@ pub fn get_current_key_gen_round(client: &dyn EngineClient)  -> Result<U256, Cal
 	//Ok(serialized_result.low_u64() != 0)
 	//Ok(serialized_length.low_u64() != 0)
 
-	Ok(U256::from(0))
+	Ok(U256::from(serialized_result))
 
 }
 
