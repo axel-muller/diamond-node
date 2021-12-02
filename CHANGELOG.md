@@ -1,3 +1,10 @@
+## Diamond Node Software 3.2.5-hbbft-0.6.0
+
+Enhancements:
+* Key Generation Round Counter
+Fixes:
+* Fixed stage 5 syncing error
+
 ## OpenEthereum v3.2.5-rc.1
 
 Enhancements:
@@ -23,7 +30,7 @@ Enhancements:
 * Executable queue for ancient blocks inclusion (#208)
 * Backport AuRa commits for xdai (#330)
 * Add Nethermind to clients that accept service transactions (#324)
-* Implement the filter argument in parity_pendingTransactions (#295) 
+* Implement the filter argument in parity_pendingTransactions (#295)
 * Ethereum-types and various libs upgraded (#315)
 * Bump ethereum/tests to v8.0.2
 * [evmbin] Omit storage output, now for std-json (#311)
