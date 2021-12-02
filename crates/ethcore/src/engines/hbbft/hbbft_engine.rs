@@ -666,9 +666,12 @@ impl HoneyBadgerBFT {
                 }
 
                 // Check if a new key is ready to be generated, return true to switch to the new epoch in that case.
+                // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
+                // when attempting to initialize the synckeygen.
+                let null_signer = Arc::new(RwLock::new(None));
                 if let Ok(synckeygen) = initialize_synckeygen(
                     &*client,
-                    &self.signer,
+                    &null_signer,
                     BlockId::Latest,
                     ValidatorType::Pending,
                 ) {
