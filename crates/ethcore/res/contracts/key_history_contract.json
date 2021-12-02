@@ -41,6 +41,21 @@
 	{
 		"constant": true,
 		"inputs": [],
+		"name": "currentKeyGenRound",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
 		"name": "numberOfAcksWritten",
 		"outputs": [
 			{
@@ -91,27 +106,6 @@
 	},
 	{
 		"constant": true,
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "validatorSet",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"constant": true,
 		"inputs": [],
 		"name": "validatorSetContract",
 		"outputs": [
@@ -135,6 +129,24 @@
 			}
 		],
 		"name": "clearPrevKeyGenState",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "notifyKeyGenFailed",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [],
+		"name": "notifyNewEpoch",
 		"outputs": [],
 		"payable": false,
 		"stateMutability": "nonpayable",
@@ -179,6 +191,11 @@
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "_roundCounter",
+				"type": "uint256"
+			},
+			{
 				"internalType": "bytes",
 				"name": "_part",
 				"type": "bytes"
@@ -196,6 +213,11 @@
 			{
 				"internalType": "uint256",
 				"name": "_upcommingEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_roundCounter",
 				"type": "uint256"
 			},
 			{
@@ -241,6 +263,21 @@
 			}
 		],
 		"name": "getAcksLength",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "getCurrentKeyGenRound",
 		"outputs": [
 			{
 				"internalType": "uint256",

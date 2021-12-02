@@ -8,7 +8,7 @@ use engines::{
     },
     signer::EngineSigner,
 };
-use ethereum_types::{Address, H512};
+use ethereum_types::{Address, H512, U256};
 use hbbft::{
     crypto::{PublicKeySet, SecretKeyShare},
     sync_key_gen::{
@@ -110,6 +110,22 @@ pub fn part_of_address(
         PartOutcome::Valid(ack) => Ok(ack),
     }
 }
+
+pub fn get_current_key_gen_round(client: &dyn EngineClient)  -> Result<U256, CallError> {
+	// let c = BoundContract::bind(client, block_id, *STAKING_CONTRACT_ADDRESS);
+	// call_const_staking!(c, staking_epoch)
+
+	let c = BoundContract::bind(client, BlockId::Latest, *KEYGEN_HISTORY_ADDRESS);
+	let serialized_result = call_const_key_history!(c, get_current_key_gen_round)?;
+
+	//Ok(serialized_result.low_u64() != 0)
+	//Ok(serialized_length.low_u64() != 0)
+
+	Ok(U256::from(serialized_result))
+
+}
+
+
 
 pub fn has_acks_of_address_data(
     client: &dyn EngineClient,
