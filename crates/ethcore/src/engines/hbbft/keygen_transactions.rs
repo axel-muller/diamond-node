@@ -3,8 +3,8 @@ use engines::{
     hbbft::{
         contracts::{
             keygen_history::{
-                engine_signer_to_synckeygen, has_acks_of_address_data, key_history_contract,
-                part_of_address, PublicWrapper, KEYGEN_HISTORY_ADDRESS,
+                engine_signer_to_synckeygen, get_current_key_gen_round, has_acks_of_address_data,
+                key_history_contract, part_of_address, PublicWrapper, KEYGEN_HISTORY_ADDRESS,
             },
             staking::get_posdao_epoch,
             validator_set::{
@@ -21,7 +21,6 @@ use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, sync::Arc};
 use types::ids::BlockId;
-use engines::hbbft::contracts::keygen_history::get_current_key_gen_round;
 
 pub struct KeygenTransactionSender {
     last_keygen_mode: KeyGenMode,
@@ -138,9 +137,12 @@ impl KeygenTransactionSender {
                 Err(_) => return Err(CallError::ReturnValueInvalid),
             };
             let serialized_part_len = serialized_part.len();
-			let current_round = get_current_key_gen_round(client)?;
-            let write_part_data =
-                key_history_contract::functions::write_part::call(upcoming_epoch,  current_round, serialized_part);
+            let current_round = get_current_key_gen_round(client)?;
+            let write_part_data = key_history_contract::functions::write_part::call(
+                upcoming_epoch,
+                current_round,
+                serialized_part,
+            );
 
             // the required gas values have been approximated by
             // experimenting and it's a very rough estimation.
@@ -199,9 +201,12 @@ impl KeygenTransactionSender {
                 total_bytes_for_acks += ack_to_push.len();
                 serialized_acks.push(ack_to_push);
             }
-			let current_round = get_current_key_gen_round(client)?;
-            let write_acks_data =
-                key_history_contract::functions::write_acks::call(upcoming_epoch, current_round, serialized_acks);
+            let current_round = get_current_key_gen_round(client)?;
+            let write_acks_data = key_history_contract::functions::write_acks::call(
+                upcoming_epoch,
+                current_round,
+                serialized_acks,
+            );
 
             // the required gas values have been approximated by
             // experimenting and it's a very rough estimation.
