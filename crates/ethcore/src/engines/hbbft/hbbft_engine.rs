@@ -939,6 +939,11 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             let contract = BlockRewardContract::new_from_address(address);
             let _total_reward = contract.reward(&mut call, is_epoch_end)?;
         }
+
+		self.hbbft_message_memorial
+			.write()
+			.free_memory(block.header.number());
+
         Ok(())
     }
 }
