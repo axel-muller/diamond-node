@@ -180,7 +180,6 @@ impl HbbftMessageMemorium {
         // todo: also remember sealing messages in an organized way
     }
 
-
     pub fn free_memory(&mut self, _current_block: u64) {
         // self.signature_shares.remove(&epoch);
     }
