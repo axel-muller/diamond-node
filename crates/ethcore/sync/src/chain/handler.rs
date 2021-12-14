@@ -42,7 +42,6 @@ use super::{
     SyncState, ETH_PROTOCOL_VERSION_63, ETH_PROTOCOL_VERSION_64, ETH_PROTOCOL_VERSION_65,
     MAX_NEW_BLOCK_AGE, MAX_NEW_HASHES, PAR_PROTOCOL_VERSION_1, PAR_PROTOCOL_VERSION_2,
 };
-use ethcore::error::TransactionImportError::Other;
 use network::client_version::ClientCapabilities;
 
 /// The Chain Sync Handler: handles responses from peers
