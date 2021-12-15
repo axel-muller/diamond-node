@@ -18,6 +18,20 @@
 
 use ethereum_types::Address;
 
+/// Skip block reward parameter.
+/// Defines one (potential open) range about skips
+/// for reward calls in the hbbft engine.
+/// https://github.com/DMDcoin/openethereum-3.x/issues/49
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct HbbftParamsSkipBlockReward {
+    /// No block reward calls get executed by the hbbft engine with beginning with this block (inclusive).
+    pub from_block: u64,
+    /// No block reward calls get executed up to this block (inclusive).
+    pub to_block: Option<u64>,
+}
+
 /// Hbbft parameters.
 #[derive(Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -33,8 +47,8 @@ pub struct HbbftParams {
     pub is_unit_test: Option<bool>,
     /// Block reward contract address.
     pub block_reward_contract_address: Option<Address>,
-
-
+    /// Block reward skips at different blocks.
+    pub block_reward_skips: Option<Vec<HbbftParamsSkipBlockReward>>,
 }
 
 /// Hbbft engine config.
@@ -43,6 +57,28 @@ pub struct HbbftParams {
 pub struct Hbbft {
     /// Hbbft parameters.
     pub params: HbbftParams,
+}
+
+impl HbbftParams {
+    /// Should the reward call get executed.
+    /// Returns false if a skip section is defined for this block number.
+    pub fn should_do_block_reward_contract_call(&self, block_number: u64) -> bool {
+        if let Some(skips) = &self.block_reward_skips {
+            for skip in skips {
+                if block_number >= skip.from_block {
+                    if let Some(end) = skip.to_block {
+                        if block_number <= end {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
 }
 
 #[cfg(test)]
@@ -71,6 +107,68 @@ mod tests {
         assert_eq!(
             deserialized.params.block_reward_contract_address,
             Address::from_str("2000000000000000000000000000000000000002").ok()
+        );
+    }
+
+    #[test]
+    fn hbbft_deserialization_reward_skips() {
+        let s = r#"{
+			"params": {
+				"minimumBlockTime": 0,
+				"maximumBlockTime": 600,
+				"transactionQueueSizeTrigger": 1,
+				"isUnitTest" : true,
+				"blockRewardContractAddress": "0x2000000000000000000000000000000000000002",
+				"blockRewardSkips" : [
+					{ "fromBlock": 1000, "toBlock": 2000 },
+					{ "fromBlock": 3000 }
+				]
+			}
+		}"#;
+
+        let deserialized: Hbbft = serde_json::from_str(s).unwrap();
+        assert!(deserialized.params.block_reward_skips.is_some());
+        let skips = deserialized.params.block_reward_skips.as_ref().unwrap();
+        assert_eq!(skips.len(), 2);
+        assert_eq!(
+            deserialized.params.should_do_block_reward_contract_call(0),
+            true
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(1000),
+            false
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(1500),
+            false
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(2000),
+            false
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(2001),
+            true
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(3001),
+            false
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .should_do_block_reward_contract_call(100_000),
+            false
         );
     }
 }
