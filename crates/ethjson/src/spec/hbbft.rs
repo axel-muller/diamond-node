@@ -17,7 +17,6 @@
 //! Hbbft parameter deserialization.
 
 use ethereum_types::Address;
-use serde::Deserialize;
 
 /// Hbbft parameters.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -34,6 +33,8 @@ pub struct HbbftParams {
     pub is_unit_test: Option<bool>,
     /// Block reward contract address.
     pub block_reward_contract_address: Option<Address>,
+
+
 }
 
 /// Hbbft engine config.
