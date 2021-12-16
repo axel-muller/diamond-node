@@ -5,7 +5,6 @@ use client::{
 use crypto::publickey::Public;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
-use ethjson::types::hash::H256;
 use std::{collections::BTreeMap, str::FromStr};
 use types::{ids::BlockId, transaction::Error};
 

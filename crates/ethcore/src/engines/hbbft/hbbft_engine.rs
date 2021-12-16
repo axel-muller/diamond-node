@@ -931,14 +931,27 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         self.check_for_epoch_change();
+
         if let Some(address) = self.params.block_reward_contract_address {
+            // only if no block reward skips are defined for this block.
             let header_number = block.header.number();
-            let mut call = default_system_or_code_call(&self.machine, block);
-            let is_epoch_end = self.do_keygen();
-            trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {}", header_number,  is_epoch_end, address);
-            let contract = BlockRewardContract::new_from_address(address);
-            let _total_reward = contract.reward(&mut call, is_epoch_end)?;
+
+            if self
+                .params
+                .should_do_block_reward_contract_call(header_number)
+            {
+                let mut call = default_system_or_code_call(&self.machine, block);
+                let is_epoch_end = self.do_keygen();
+                trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {}", header_number,  is_epoch_end, address);
+                let contract = BlockRewardContract::new_from_address(address);
+                let _total_reward = contract.reward(&mut call, is_epoch_end)?;
+            }
         }
+
+        self.hbbft_message_memorial
+            .write()
+            .free_memory(block.header.number());
+
         Ok(())
     }
 }

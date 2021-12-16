@@ -119,14 +119,14 @@ fn test_epoch_transition() {
     let transactor: KeyPair = Random.generate();
 
     let genesis_transition_time = start_time_of_next_phase_transition(moc.client.as_ref())
-        .expect("Constant call must succeed");
+        .expect("start_time_of_next_phase_transition call must succeed");
 
     // Genesis block is at time 0, current unix time must be much larger.
     assert!(genesis_transition_time.as_u64() < unix_now_secs());
 
     // We should not be in the pending validator set at the genesis block.
     assert!(!is_pending_validator(moc.client.as_ref(), &moc.address())
-        .expect("Constant call must succeed"));
+        .expect("is_pending_validator call must succeed"));
 
     // Fund the transactor.
     // Also triggers the creation of a block.
