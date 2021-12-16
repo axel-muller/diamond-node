@@ -3438,7 +3438,7 @@ dependencies = [
 
 [[package]]
 name = "parity-version"
-version = "3.2.5-hbbft-0.3.0"
+version = "3.2.5-hbbft-0.7.0"
 dependencies = [
  "parity-bytes",
  "rlp",
