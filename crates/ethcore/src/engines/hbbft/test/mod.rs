@@ -21,7 +21,7 @@ pub mod network_simulator;
 
 lazy_static! {
     static ref MASTER_OF_CEREMONIES_KEYPAIR: KeyPair = KeyPair::from_secret(
-        Secret::from_str("f3c0abb01d69b061c0415a6d2acef23e63cbed0c83afff18672338ba4d9b4b0e")
+        Secret::from_str("547f6be62482a75406504a45ff530725de3f59387492296f78bd72314d00f856")
             .expect("Secret from hex string must succeed")
     )
     .expect("KeyPair generation from secret must succeed");
