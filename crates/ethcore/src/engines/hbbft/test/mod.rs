@@ -20,6 +20,16 @@ pub mod hbbft_test_client;
 pub mod network_simulator;
 
 lazy_static! {
+    /// Keypair for initial validator
+    ///
+    /// Contract update procedure:
+    /// 1. Generate chain spec with a single initial validator(MOC)
+    ///     a. Adapt the environment variables declared in 'setup_testnet.py'
+    /// 2. Adapt the generated chain spec
+    ///     a. Change the 'minimumBlockTime' to 0
+    ///     b. Add '"isUnitTest": true' to the hbbft params section
+    ///     c. Fund the new MOC address sufficiently
+    /// 5. Copy the private key of the MOC to initialize the MASTER_OF_CEREMONIES_KEYPAIR variable below.
     static ref MASTER_OF_CEREMONIES_KEYPAIR: KeyPair = KeyPair::from_secret(
         Secret::from_str("547f6be62482a75406504a45ff530725de3f59387492296f78bd72314d00f856")
             .expect("Secret from hex string must succeed")
@@ -276,6 +286,9 @@ fn test_moc_to_first_validator() {
 
     // Write another dummy block to give validator_1 the chance to realize he wrote
     // his Part already so he sends his Acks.
+    // Due to the Parts/Acks sending delay of 3 blocks we have to inject 3 blocks here
+    moc.create_some_transaction(Some(&transactor));
+    moc.create_some_transaction(Some(&transactor));
     moc.create_some_transaction(Some(&transactor));
 
     // At this point the transaction from validator_1 has written its Keygen part,
@@ -299,8 +312,10 @@ fn test_moc_to_first_validator() {
     // Create a dummy transaction on the validator_1 client to verify it can create blocks.
     validator_1.create_some_transaction(Some(&transactor));
 
+    let post_block_nr = validator_1.client.chain().best_block_number();
+
     assert_eq!(
-        validator_1.client.chain().best_block_number(),
+        post_block_nr,
         pre_block_nr + 1
     );
 }
