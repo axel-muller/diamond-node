@@ -314,10 +314,7 @@ fn test_moc_to_first_validator() {
 
     let post_block_nr = validator_1.client.chain().best_block_number();
 
-    assert_eq!(
-        post_block_nr,
-        pre_block_nr + 1
-    );
+    assert_eq!(post_block_nr, pre_block_nr + 1);
 }
 
 #[test]
