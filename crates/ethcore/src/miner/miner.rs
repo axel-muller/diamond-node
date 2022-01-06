@@ -1072,6 +1072,11 @@ impl Miner {
             }
         }
     }
+
+    /// Return all transactions currently in the transaction queue.
+    pub fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
+        self.transaction_queue.all_transactions()
+    }
 }
 
 const SEALING_TIMEOUT_IN_BLOCKS: u64 = 5;
@@ -1251,8 +1256,40 @@ impl miner::MinerService for Miner {
         self.transaction_queue.local_transactions()
     }
 
-    fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
-        self.transaction_queue.all_transactions()
+    fn queued_transactions<C>(&self, chain: &C) -> Vec<Arc<VerifiedTransaction>>
+    where
+        C: BlockChain + CallContract + Nonce + Sync,
+    {
+        let client = self.pool_client(chain);
+        let chain_info = chain.chain_info();
+        let min_tx_gas: U256 = self
+            .engine
+            .schedule(chain_info.best_block_number)
+            .tx_gas
+            .into();
+
+        let status = self.queue_status();
+
+        // we will never need more transactions than limit divided by min gas
+        let max_transactions = if min_tx_gas.is_zero() {
+            usize::MAX
+        } else {
+            MAX_SKIPPED_TRANSACTIONS.saturating_add(
+                cmp::min(status.options.block_gas_limit / min_tx_gas, u64::MAX.into()).as_u64()
+                    as usize,
+            )
+        };
+
+        self.transaction_queue.pending(
+            client.clone(),
+            pool::PendingSettings {
+                block_number: chain_info.best_block_number,
+                current_timestamp: chain_info.best_block_timestamp,
+                nonce_cap: None,
+                max_len: max_transactions,
+                ordering: miner::PendingOrdering::Priority,
+            },
+        )
     }
 
     fn queued_transaction_hashes(&self) -> Vec<H256> {

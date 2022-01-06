@@ -3084,7 +3084,7 @@ impl super::traits::EngineClient for Client {
     }
 
     fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
-        self.importer.miner.queued_transactions()
+        self.importer.miner.queued_transactions(self)
     }
 
     fn create_pending_block_at(
