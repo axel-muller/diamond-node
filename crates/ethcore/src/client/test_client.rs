@@ -1173,7 +1173,7 @@ impl super::traits::EngineClient for TestBlockChainClient {
     }
 
     fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
-        self.miner.queued_transactions()
+        self.miner.queued_transactions(self)
     }
 
     fn create_pending_block_at(

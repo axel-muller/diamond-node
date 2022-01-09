@@ -116,7 +116,7 @@ impl HbbftTestClient {
     pub fn sync_transactions_to(&self, other: &mut Self) {
         let transactions = self
             .miner
-            .queued_transactions()
+            .all_transactions()
             //.transactions_to_propagate()
             .iter()
             .map(|i| i.signed().deref().clone())
