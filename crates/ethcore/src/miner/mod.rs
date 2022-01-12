@@ -247,8 +247,8 @@ pub trait MinerService: Send + Sync {
     where
         C: BlockChain + CallContract + Nonce + Sync;
 
-	/// Get a list of all transactions in the pool (some of them might not be ready for inclusion yet).
-	fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>>;
+    /// Get a list of all transactions in the pool (some of them might not be ready for inclusion yet).
+    fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>>;
 
     /// Get a list of all transaction hashes in the pool (some of them might not be ready for inclusion yet).
     fn queued_transaction_hashes(&self) -> Vec<H256>;

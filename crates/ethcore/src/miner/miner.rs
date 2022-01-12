@@ -1072,8 +1072,6 @@ impl Miner {
             }
         }
     }
-
-
 }
 
 const SEALING_TIMEOUT_IN_BLOCKS: u64 = 5;
@@ -1289,10 +1287,10 @@ impl miner::MinerService for Miner {
         )
     }
 
-	/// Return all transactions currently in the transaction queue.
-	fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
-		self.transaction_queue.all_transactions()
-	}
+    /// Return all transactions currently in the transaction queue.
+    fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
+        self.transaction_queue.all_transactions()
+    }
 
     fn queued_transaction_hashes(&self) -> Vec<H256> {
         self.transaction_queue.all_transaction_hashes()
