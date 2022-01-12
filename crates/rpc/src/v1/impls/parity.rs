@@ -283,7 +283,7 @@ where
     }
 
     fn all_transactions(&self) -> Result<Vec<Transaction>> {
-        let all_transactions = self.miner.queued_transactions();
+        let all_transactions = self.miner.all_transactions();
 
         Ok(all_transactions
             .into_iter()
