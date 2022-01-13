@@ -1,3 +1,15 @@
+
+
+## Diamond Node Software 3.2.5-hbbft-0.7.1
+
+Fixes:
+* block proposals with invalid transactions lead to 0-tx-Blocks (https://github.com/DMDcoin/openethereum-3.x/issues/58)
+
+## Diamond Node Software 3.2.5-hbbft-0.7.0
+
+Enhancements:
+* configure skipped block reward calls (https://github.com/DMDcoin/openethereum-3.x/issues/49)
+
 ## Diamond Node Software 3.2.5-hbbft-0.7.0
 
 Enhancements:
