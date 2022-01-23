@@ -151,8 +151,6 @@ impl KeygenTransactionSender {
             // and usually run into the gas limit problems.
             let gas: usize = serialized_part_len * 750 + 100_000;
 
-            trace!(target: "engine", "Hbbft part transaction gas: part-len: {} gas: {}", serialized_part_len, gas);
-
             let part_transaction =
                 TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
                     .gas(U256::from(gas))
