@@ -941,8 +941,18 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 .should_do_block_reward_contract_call(header_number)
             {
                 let mut call = default_system_or_code_call(&self.machine, block);
+
+                // only do the key gen
                 let is_epoch_end = self.do_keygen();
-                trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {}", header_number,  is_epoch_end, address);
+                let mut latest_block_number: BlockNumber = 0;
+
+                if let Some(client) = self.client_arc() {
+                    if let Some(header) = client.block_header(BlockId::Latest) {
+                        latest_block_number = header.number();
+                    }
+                }
+
+                trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {} (latest block: {}", header_number,  is_epoch_end, address, latest_block_number);
                 let contract = BlockRewardContract::new_from_address(address);
                 let _total_reward = contract.reward(&mut call, is_epoch_end)?;
             }
