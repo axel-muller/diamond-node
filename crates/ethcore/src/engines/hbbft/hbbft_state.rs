@@ -77,6 +77,8 @@ impl HbbftState {
         let (pks, sks) = synckeygen.generate().ok()?;
         self.public_master_key = Some(pks.public_key());
         // Clear network info and honey badger instance, since we may not be in this POSDAO epoch any more.
+        info!(target: "engine", "public master key: {:?}", pks.public_key());
+
         self.network_info = None;
         self.honey_badger = None;
         // Set the current POSDAO epoch #
@@ -193,10 +195,11 @@ impl HbbftState {
         // If honey_badger is None we are not a validator, nothing to do.
         let honey_badger = self.honey_badger.as_mut()?;
 
+        let message_epoch = message.epoch();
         // Note that if the message is for a future epoch we do not know if the current honey_badger
         // instance is the correct one to use. Tt may change if the the POSDAO epoch changes, causing
         // consensus messages to get lost.
-        if message.epoch() > honey_badger.epoch() {
+        if message_epoch > honey_badger.epoch() {
             trace!(target: "consensus", "Message from future epoch, caching it for handling it in when the epoch is current. Current hbbft epoch is: {}", honey_badger.epoch());
             self.future_messages_cache
                 .entry(message.epoch())
@@ -207,12 +210,16 @@ impl HbbftState {
 
         let network_info = self.network_info.as_ref()?.clone();
 
-        if let Ok(step) = honey_badger.handle_message(&sender_id, message) {
-            Some((step, network_info))
-        } else {
-            // TODO: Report consensus step errors
-            error!(target: "consensus", "Error on handling HoneyBadger message.");
-            None
+        match honey_badger.handle_message(&sender_id, message) {
+            Ok(step) => Some((step, network_info)),
+            Err(err) => {
+                // TODO: Report consensus step errors
+                // maybe we are not part of the HBBFT Set anymore ?
+                // maybe the sender is not Part of the hbbft set ?
+                // maybe we have the wrong hbbft for decryption ?
+                error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}",sender_id, message_epoch, err);
+                None
+            }
         }
     }
 
