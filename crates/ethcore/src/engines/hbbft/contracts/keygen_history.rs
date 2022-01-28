@@ -151,7 +151,7 @@ pub fn acks_of_address(
             .handle_ack(vmap.get(&address).unwrap(), deserialized_ack)
             .unwrap();
         if let AckOutcome::Invalid(fault) = outcome {
-            panic!("Expected Ack Outcome to be valid. {}", fault);
+            panic!("Expected Ack Outcome to be valid. {:?}", fault);
         }
     }
 
