@@ -27,6 +27,15 @@ pub struct KeygenTransactionSender {
     keygen_mode_counter: u64,
 }
 
+enum ShouldSendKeyAnswer {
+    // no, we are not in this key gen phase.
+    NoNotThisKeyGenMode,
+    // no, we are waiting to send key later.
+    NoWaiting,
+    // yes, keys should be send now.
+    Yes
+}
+
 static KEYGEN_TRANSACTION_SEND_DELAY: u64 = 3;
 static KEYGEN_TRANSACTION_RESEND_DELAY: u64 = 10;
 
@@ -43,13 +52,14 @@ impl KeygenTransactionSender {
         client: &dyn EngineClient,
         mining_address: &Address,
         mode_to_check: KeyGenMode,
-    ) -> Result<bool, CallError> {
+    ) -> Result<ShouldSendKeyAnswer, CallError> {
+
         let keygen_mode = get_pending_validator_key_generation_mode(client, mining_address)?;
         if keygen_mode == mode_to_check {
             if self.last_keygen_mode == mode_to_check {
                 self.keygen_mode_counter += 1;
                 if self.keygen_mode_counter == KEYGEN_TRANSACTION_SEND_DELAY {
-                    return Ok(true);
+                    return Ok(ShouldSendKeyAnswer::Yes);
                 } else if self.keygen_mode_counter > KEYGEN_TRANSACTION_SEND_DELAY {
                     // Part should have been sent already,
                     // give the chain time to include the transaction before trying a re-send.
@@ -57,22 +67,25 @@ impl KeygenTransactionSender {
                         % KEYGEN_TRANSACTION_RESEND_DELAY
                         == 0
                     {
-                        return Ok(true);
+                        return Ok(ShouldSendKeyAnswer::Yes);
                     }
+                } else {
+                    return Ok(ShouldSendKeyAnswer::NoWaiting);
                 }
             } else {
                 self.last_keygen_mode = mode_to_check;
                 self.keygen_mode_counter = 1;
+				return Ok(ShouldSendKeyAnswer::NoWaiting)
             }
         }
-        Ok(false)
+        return Ok(ShouldSendKeyAnswer::NoNotThisKeyGenMode);
     }
 
     fn should_send_part(
         &mut self,
         client: &dyn EngineClient,
         mining_address: &Address,
-    ) -> Result<bool, CallError> {
+    ) -> Result<ShouldSendKeyAnswer, CallError> {
         self.should_send(client, mining_address, KeyGenMode::WritePart)
     }
 
@@ -80,7 +93,7 @@ impl KeygenTransactionSender {
         &mut self,
         client: &dyn EngineClient,
         mining_address: &Address,
-    ) -> Result<bool, CallError> {
+    ) -> Result<ShouldSendKeyAnswer, CallError> {
         self.should_send(client, mining_address, KeyGenMode::WriteAck)
     }
 
@@ -131,34 +144,46 @@ impl KeygenTransactionSender {
         trace!(target:"engine", "preparing to send PARTS for upcoming epoch: {}", upcoming_epoch);
 
         // Check if we already sent our part.
-        if self.should_send_part(client, &address)? {
-            let serialized_part = match bincode::serialize(&part_data) {
-                Ok(part) => part,
-                Err(_) => return Err(CallError::ReturnValueInvalid),
-            };
-            let serialized_part_len = serialized_part.len();
-            let current_round = get_current_key_gen_round(client)?;
-            let write_part_data = key_history_contract::functions::write_part::call(
-                upcoming_epoch,
-                current_round,
-                serialized_part,
-            );
+        match self.should_send_part(client, &address)? {
 
-            // the required gas values have been approximated by
-            // experimenting and it's a very rough estimation.
-            // it can be further fine tuned to be just above the real consumption.
-            // ACKs require much more gas,
-            // and usually run into the gas limit problems.
-            let gas: usize = serialized_part_len * 750 + 100_000;
+            ShouldSendKeyAnswer::Yes => {
+                let serialized_part = match bincode::serialize(&part_data) {
+                    Ok(part) => part,
+                    Err(_) => return Err(CallError::ReturnValueInvalid),
+                };
+                let serialized_part_len = serialized_part.len();
+                let current_round = get_current_key_gen_round(client)?;
+                let write_part_data = key_history_contract::functions::write_part::call(
+                    upcoming_epoch,
+                    current_round,
+                    serialized_part,
+                );
 
-            let part_transaction =
-                TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
-                    .gas(U256::from(gas))
-                    .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
-                    .gas_price(U256::from(10000000000u64));
-            full_client
-                .transact_silently(part_transaction)
-                .map_err(|_| CallError::ReturnValueInvalid)?;
+                // the required gas values have been approximated by
+                // experimenting and it's a very rough estimation.
+                // it can be further fine tuned to be just above the real consumption.
+                // ACKs require much more gas,
+                // and usually run into the gas limit problems.
+                let gas: usize = serialized_part_len * 800 + 100_000;
+
+                let part_transaction =
+                    TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
+                        .gas(U256::from(gas))
+                        .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
+                        .gas_price(U256::from(10000000000u64));
+                full_client
+                    .transact_silently(part_transaction)
+                    .map_err(|_| CallError::ReturnValueInvalid)?;
+
+                trace!(target:"engine", "PART Transaction send.");
+                return Ok(());
+            },
+            ShouldSendKeyAnswer::NoWaiting => {
+                // we are waiting for parts to get written, 
+                // we do not need to continue any further with current key gen history.
+                return Ok(());
+            }, 
+            ShouldSendKeyAnswer::NoNotThisKeyGenMode => {}
         }
 
         trace!(target:"engine", "checking for acks...");
@@ -187,39 +212,46 @@ impl KeygenTransactionSender {
         trace!(target:"engine", "has_acks_of_address_data: {:?}", has_acks_of_address_data(client, address));
 
         // Now we are sure all parts are ready, let's check if we sent our Acks.
-        if self.should_send_ack(client, &address)? {
-            let mut serialized_acks = Vec::new();
-            let mut total_bytes_for_acks = 0;
+        match self.should_send_ack(client, &address)? {
+            
+            ShouldSendKeyAnswer::Yes => {
 
-            for ack in acks {
-                let ack_to_push = match bincode::serialize(&ack) {
-                    Ok(serialized_ack) => serialized_ack,
-                    Err(_) => return Err(CallError::ReturnValueInvalid),
-                };
-                total_bytes_for_acks += ack_to_push.len();
-                serialized_acks.push(ack_to_push);
-            }
-            let current_round = get_current_key_gen_round(client)?;
-            let write_acks_data = key_history_contract::functions::write_acks::call(
-                upcoming_epoch,
-                current_round,
-                serialized_acks,
-            );
+                
 
-            // the required gas values have been approximated by
-            // experimenting and it's a very rough estimation.
-            // it can be further fine tuned to be just above the real consumption.
-            let gas = total_bytes_for_acks * 800 + 200_000;
-            trace!(target: "engine","acks-len: {} gas: {}", total_bytes_for_acks, gas);
+                let mut serialized_acks = Vec::new();
+                let mut total_bytes_for_acks = 0;
 
-            let acks_transaction =
-                TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_acks_data.0)
-                    .gas(U256::from(gas))
-                    .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
-                    .gas_price(U256::from(10000000000u64));
-            full_client
-                .transact_silently(acks_transaction)
-                .map_err(|_| CallError::ReturnValueInvalid)?;
+                for ack in acks {
+                    let ack_to_push = match bincode::serialize(&ack) {
+                        Ok(serialized_ack) => serialized_ack,
+                        Err(_) => return Err(CallError::ReturnValueInvalid),
+                    };
+                    total_bytes_for_acks += ack_to_push.len();
+                    serialized_acks.push(ack_to_push);
+                }
+                let current_round = get_current_key_gen_round(client)?;
+                let write_acks_data = key_history_contract::functions::write_acks::call(
+                    upcoming_epoch,
+                    current_round,
+                    serialized_acks,
+                );
+
+                // the required gas values have been approximated by
+                // experimenting and it's a very rough estimation.
+                // it can be further fine tuned to be just above the real consumption.
+                let gas = total_bytes_for_acks * 850 + 200_000;
+                trace!(target: "engine","acks-len: {} gas: {}", total_bytes_for_acks, gas);
+
+                let acks_transaction =
+                    TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_acks_data.0)
+                        .gas(U256::from(gas))
+                        .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
+                        .gas_price(U256::from(10000000000u64));
+                full_client
+                    .transact_silently(acks_transaction)
+                    .map_err(|_| CallError::ReturnValueInvalid)?;
+            },
+            _ => {}
         }
 
         Ok(())
