@@ -34,6 +34,7 @@ use types::{
 
 use super::{
     contracts::{
+        keygen_history::all_parts_acks_available,
         keygen_history::initialize_synckeygen,
         staking::start_time_of_next_phase_transition,
         validator_set::{get_pending_validators, is_pending_validator, ValidatorType},
@@ -655,28 +656,35 @@ impl HoneyBadgerBFT {
             None => false,
             Some(client) => {
                 // If we are not in key generation phase, return false.
-                match get_pending_validators(&*client) {
+                let num_validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
                         }
+                        validators.len()
                     }
-                }
+                };
 
                 // Check if a new key is ready to be generated, return true to switch to the new epoch in that case.
                 // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
                 // when attempting to initialize the synckeygen.
-                let null_signer = Arc::new(RwLock::new(None));
-                if let Ok(synckeygen) = initialize_synckeygen(
-                    &*client,
-                    &null_signer,
-                    BlockId::Latest,
-                    ValidatorType::Pending,
-                ) {
-                    if synckeygen.is_ready() {
-                        return true;
+                if let Ok(all_available) =
+                    all_parts_acks_available(&*client, BlockId::Latest, num_validators)
+                {
+                    if all_available {
+                        let null_signer = Arc::new(RwLock::new(None));
+                        if let Ok(synckeygen) = initialize_synckeygen(
+                            &*client,
+                            &null_signer,
+                            BlockId::Latest,
+                            ValidatorType::Pending,
+                        ) {
+                            if synckeygen.is_ready() {
+                                return true;
+                            }
+                        }
                     }
                 }
 
