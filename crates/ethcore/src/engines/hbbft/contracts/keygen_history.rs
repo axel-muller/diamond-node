@@ -200,7 +200,7 @@ pub fn all_parts_acks_available(
     let c = BoundContract::bind(client, block_id, *KEYGEN_HISTORY_ADDRESS);
     let (num_parts, num_acks) = call_const_key_history!(c, get_number_of_key_fragments_written)?;
     Ok(num_parts.low_u64() == (num_validators as u64)
-        && num_acks.low_u64() == (num_validators * num_validators) as u64)
+        && num_acks.low_u64() == (num_validators) as u64)
 }
 
 /// Read available keygen data from the blockchain and initialize a SyncKeyGen instance with it.
