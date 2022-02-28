@@ -197,6 +197,22 @@ pub fn all_parts_acks_available(
     block_id: BlockId,
     num_validators: usize,
 ) -> Result<bool, CallError> {
+
+    // backward compatibility:
+    // this is a performance improvement introduced on the DMD Alpha Testnet.
+
+    match block_id {
+        BlockId::Number(num) => {
+            if num < 1000 {
+                // if the activation of the performance improvement feature has not been happened yet,
+                // we believe every block taht all parts and acks are available.
+                // the Logic will try to build a shared key like in the old days.
+                return Ok(true);
+            }
+        }
+        _ => {}
+    }
+
     let c = BoundContract::bind(client, block_id, *KEYGEN_HISTORY_ADDRESS);
     let (num_parts, num_acks) = call_const_key_history!(c, get_number_of_key_fragments_written)?;
     Ok(num_parts.low_u64() == (num_validators as u64)
