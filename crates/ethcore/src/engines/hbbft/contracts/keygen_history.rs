@@ -194,25 +194,19 @@ impl<'a> SecretKey for KeyPairWrapper {
 
 pub fn all_parts_acks_available(
     client: &dyn EngineClient,
-    block_id: BlockId,
+    block_timestamp: u64,
     num_validators: usize,
 ) -> Result<bool, CallError> {
     // backward compatibility:
     // this is a performance improvement introduced on the DMD Alpha Testnet.
 
-    match block_id {
-        BlockId::Number(num) => {
-            if num < 1000 {
-                // if the activation of the performance improvement feature has not been happened yet,
-                // we believe every block taht all parts and acks are available.
-                // the Logic will try to build a shared key like in the old days.
-                return Ok(true);
-            }
-        }
-        _ => {}
+    // point in time for testing: this is the 24.12.2021 - 12:00 GMT.
+    let trigger_timestamp: u64 = 1671883200;
+    if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
+        return Ok(true);
     }
 
-    let c = BoundContract::bind(client, block_id, *KEYGEN_HISTORY_ADDRESS);
+    let c = BoundContract::bind(client, BlockId::Latest, *KEYGEN_HISTORY_ADDRESS);
     let (num_parts, num_acks) = call_const_key_history!(c, get_number_of_key_fragments_written)?;
     Ok(num_parts.low_u64() == (num_validators as u64)
         && num_acks.low_u64() == (num_validators) as u64)

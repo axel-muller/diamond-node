@@ -650,7 +650,7 @@ impl HoneyBadgerBFT {
     }
 
     /// Returns true if we are in the keygen phase and a new key has been generated.
-    fn do_keygen(&self, block_number: BlockNumber) -> bool {
+    fn do_keygen(&self, block_timestamp: u64) -> bool {
         match self.client_arc() {
             None => false,
             Some(client) => {
@@ -669,17 +669,15 @@ impl HoneyBadgerBFT {
                 // Check if a new key is ready to be generated, return true to switch to the new epoch in that case.
                 // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
                 // when attempting to initialize the synckeygen.
-                if let Ok(all_available) = all_parts_acks_available(
-                    &*client,
-                    BlockId::Number(block_number),
-                    num_validators,
-                ) {
+                if let Ok(all_available) =
+                    all_parts_acks_available(&*client, block_timestamp, num_validators)
+                {
                     if all_available {
                         let null_signer = Arc::new(RwLock::new(None));
                         if let Ok(synckeygen) = initialize_synckeygen(
                             &*client,
                             &null_signer,
-                            BlockId::Number(block_number),
+                            BlockId::Latest,
                             ValidatorType::Pending,
                         ) {
                             if synckeygen.is_ready() {
@@ -951,14 +949,16 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             {
                 let mut call = default_system_or_code_call(&self.machine, block);
                 let mut latest_block_number: BlockNumber = 0;
+                let mut latest_block_timestamp: u64 = 0;
                 if let Some(client) = self.client_arc() {
                     if let Some(header) = client.block_header(BlockId::Latest) {
                         latest_block_number = header.number();
+                        latest_block_timestamp = header.timestamp()
                     }
                 }
 
                 // only do the key gen
-                let is_epoch_end = self.do_keygen(latest_block_number);
+                let is_epoch_end = self.do_keygen(latest_block_timestamp);
 
                 trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {} (latest block: {}", header_number,  is_epoch_end, address, latest_block_number);
                 let contract = BlockRewardContract::new_from_address(address);
