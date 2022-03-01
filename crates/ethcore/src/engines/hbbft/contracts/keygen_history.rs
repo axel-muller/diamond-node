@@ -197,7 +197,6 @@ pub fn all_parts_acks_available(
     block_id: BlockId,
     num_validators: usize,
 ) -> Result<bool, CallError> {
-
     // backward compatibility:
     // this is a performance improvement introduced on the DMD Alpha Testnet.
 

@@ -33,7 +33,7 @@ enum ShouldSendKeyAnswer {
     // no, we are waiting to send key later.
     NoWaiting,
     // yes, keys should be send now.
-    Yes
+    Yes,
 }
 
 static KEYGEN_TRANSACTION_SEND_DELAY: u64 = 3;
@@ -53,7 +53,6 @@ impl KeygenTransactionSender {
         mining_address: &Address,
         mode_to_check: KeyGenMode,
     ) -> Result<ShouldSendKeyAnswer, CallError> {
-
         let keygen_mode = get_pending_validator_key_generation_mode(client, mining_address)?;
         if keygen_mode == mode_to_check {
             if self.last_keygen_mode == mode_to_check {
@@ -75,7 +74,7 @@ impl KeygenTransactionSender {
             } else {
                 self.last_keygen_mode = mode_to_check;
                 self.keygen_mode_counter = 1;
-				return Ok(ShouldSendKeyAnswer::NoWaiting)
+                return Ok(ShouldSendKeyAnswer::NoWaiting);
             }
         }
         return Ok(ShouldSendKeyAnswer::NoNotThisKeyGenMode);
@@ -145,7 +144,6 @@ impl KeygenTransactionSender {
 
         // Check if we already sent our part.
         match self.should_send_part(client, &address)? {
-
             ShouldSendKeyAnswer::Yes => {
                 let serialized_part = match bincode::serialize(&part_data) {
                     Ok(part) => part,
@@ -177,12 +175,12 @@ impl KeygenTransactionSender {
 
                 trace!(target:"engine", "PART Transaction send.");
                 return Ok(());
-            },
+            }
             ShouldSendKeyAnswer::NoWaiting => {
-                // we are waiting for parts to get written, 
+                // we are waiting for parts to get written,
                 // we do not need to continue any further with current key gen history.
                 return Ok(());
-            }, 
+            }
             ShouldSendKeyAnswer::NoNotThisKeyGenMode => {}
         }
 
@@ -213,11 +211,7 @@ impl KeygenTransactionSender {
 
         // Now we are sure all parts are ready, let's check if we sent our Acks.
         match self.should_send_ack(client, &address)? {
-            
             ShouldSendKeyAnswer::Yes => {
-
-                
-
                 let mut serialized_acks = Vec::new();
                 let mut total_bytes_for_acks = 0;
 
@@ -250,7 +244,7 @@ impl KeygenTransactionSender {
                 full_client
                     .transact_silently(acks_transaction)
                     .map_err(|_| CallError::ReturnValueInvalid)?;
-            },
+            }
             _ => {}
         }
 
