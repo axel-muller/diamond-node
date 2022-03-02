@@ -202,6 +202,7 @@ pub fn all_parts_acks_available(
 
     // point in time for testing: this is the 24.12.2021 - 12:00 GMT.
     let trigger_timestamp: u64 = 1671883200;
+	warn!("block_timestamp: {}", block_timestamp);
     if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
         return Ok(true);
     }
