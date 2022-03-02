@@ -197,12 +197,18 @@ pub fn all_parts_acks_available(
     block_timestamp: u64,
     num_validators: usize,
 ) -> Result<bool, CallError> {
+
     // backward compatibility:
     // this is a performance improvement introduced on the DMD Alpha Testnet.
+	// more about https://github.com/DMDcoin/openethereum-3.x/issues/71
+	// this piece of  code exists only for the DMD public alpha testnet,
+	// in order to support the v1 protocol version.
+	// since the v2 protocol version is better,
+	// v1 should be never used.
+	// remove the code:
+	// see: https://github.com/DMDcoin/openethereum-3.x/issues/72
+    let trigger_timestamp: u64 = 1646395200; // Friday, March 4, 2022 12:00:00 PM
 
-    // point in time for testing: this is the 01.10.2021 - 00:00 GMT.
-    let trigger_timestamp: u64 = 1633046400;
-	warn!("block_timestamp: {}", block_timestamp);
     if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
         return Ok(true);
     }
