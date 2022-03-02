@@ -34,7 +34,7 @@ use types::{
 
 use super::{
     contracts::{
-        keygen_history::initialize_synckeygen,
+        keygen_history::{all_parts_acks_available, initialize_synckeygen},
         staking::start_time_of_next_phase_transition,
         validator_set::{get_pending_validators, is_pending_validator, ValidatorType},
     },
@@ -650,33 +650,40 @@ impl HoneyBadgerBFT {
     }
 
     /// Returns true if we are in the keygen phase and a new key has been generated.
-    fn do_keygen(&self) -> bool {
+    fn do_keygen(&self, block_timestamp: u64) -> bool {
         match self.client_arc() {
             None => false,
             Some(client) => {
                 // If we are not in key generation phase, return false.
-                match get_pending_validators(&*client) {
+                let num_validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
                         }
+                        validators.len()
                     }
-                }
+                };
 
                 // Check if a new key is ready to be generated, return true to switch to the new epoch in that case.
                 // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
                 // when attempting to initialize the synckeygen.
-                let null_signer = Arc::new(RwLock::new(None));
-                if let Ok(synckeygen) = initialize_synckeygen(
-                    &*client,
-                    &null_signer,
-                    BlockId::Latest,
-                    ValidatorType::Pending,
-                ) {
-                    if synckeygen.is_ready() {
-                        return true;
+                if let Ok(all_available) =
+                    all_parts_acks_available(&*client, block_timestamp, num_validators)
+                {
+                    if all_available {
+                        let null_signer = Arc::new(RwLock::new(None));
+                        if let Ok(synckeygen) = initialize_synckeygen(
+                            &*client,
+                            &null_signer,
+                            BlockId::Latest,
+                            ValidatorType::Pending,
+                        ) {
+                            if synckeygen.is_ready() {
+                                return true;
+                            }
+                        }
                     }
                 }
 
@@ -941,8 +948,19 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 .should_do_block_reward_contract_call(header_number)
             {
                 let mut call = default_system_or_code_call(&self.machine, block);
-                let is_epoch_end = self.do_keygen();
-                trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {}", header_number,  is_epoch_end, address);
+                let mut latest_block_number: BlockNumber = 0;
+                let mut latest_block_timestamp: u64 = 0;
+                if let Some(client) = self.client_arc() {
+                    if let Some(header) = client.block_header(BlockId::Latest) {
+                        latest_block_number = header.number();
+                        latest_block_timestamp = header.timestamp()
+                    }
+                }
+
+                // only do the key gen
+                let is_epoch_end = self.do_keygen(latest_block_timestamp);
+
+                trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {} (latest block: {}", header_number,  is_epoch_end, address, latest_block_number);
                 let contract = BlockRewardContract::new_from_address(address);
                 let _total_reward = contract.reward(&mut call, is_epoch_end)?;
             }
