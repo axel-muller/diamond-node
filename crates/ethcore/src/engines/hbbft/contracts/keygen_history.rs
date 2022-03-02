@@ -200,8 +200,8 @@ pub fn all_parts_acks_available(
     // backward compatibility:
     // this is a performance improvement introduced on the DMD Alpha Testnet.
 
-    // point in time for testing: this is the 24.12.2021 - 12:00 GMT.
-    let trigger_timestamp: u64 = 1671883200;
+    // point in time for testing: this is the 01.10.2021 - 00:00 GMT.
+    let trigger_timestamp: u64 = 1633046400;
 	warn!("block_timestamp: {}", block_timestamp);
     if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
         return Ok(true);
