@@ -1,4 +1,9 @@
 
+## Diamond Node Software ## 3.2.5-hbbft-0.8.0
+
+Mandatory upgrade that switches to hbbft protocol version 2 
+
+*  [protocol upgrade to v2: Await full key sets for shared key generation.](https://github.com/DMDcoin/openethereum-3.x/issues/71)
 
 ## Diamond Node Software 3.2.5-hbbft-0.7.1
 
