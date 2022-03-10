@@ -15,10 +15,10 @@ jobs:
         uses:                   actions/checkout@main
         with:
           submodules:           true
-      - name:                   Install 1.52.1 toolchain
+      - name:                   Install latest toolchain
         uses:                   actions-rs/toolchain@v1
         with:
-          toolchain:            1.52.1
+          toolchain:            latest
           profile:              minimal
           override:             true
       - name:                   Run cargo check 1/3
