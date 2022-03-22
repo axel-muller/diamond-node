@@ -1,5 +1,7 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
+use parking_lot::RwLock;
+use std::collections::VecDeque;
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -46,6 +48,9 @@ pub(crate) struct HbbftMessageMemorium {
     config_blocks_to_keep_on_disk: u64,
 
     last_block_deleted_from_disk: u64,
+
+    //mutex: Mutex<u64>
+    dispatched_messages: RwLock<VecDeque<HbMessage>>,
 }
 
 impl HbbftMessageMemorium {
@@ -57,6 +62,7 @@ impl HbbftMessageMemorium {
             message_tracking_id: 0,
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
+            dispatched_messages: RwLock::new(VecDeque::new()),
         }
     }
 
@@ -133,15 +139,30 @@ impl HbbftMessageMemorium {
     pub fn on_message_received(&mut self, message: &HbMessage) {
         //performance: dispatcher pattern + multithreading could improve performance a lot.
 
-        let epoch = message.epoch();
+        let mut lock = self.dispatched_messages.write();
+        lock.push_back(message.clone());
+    }
 
-        match serde_json::to_string(message) {
-            Ok(json_string) => {
-                // debug!(target: "consensus", "{}", json_string);
-                self.on_message_string_received(json_string, epoch);
-            }
-            Err(e) => {
-                error!(target: "consensus", "could not create json: {:?}", e);
+    pub fn work_message(&mut self) {
+        let mut message_option: Option<HbMessage> = None;
+
+        {
+            //scope it for short living.
+            let mut lock = self.dispatched_messages.write();
+            message_option = lock.pop_front();
+            lock.len();
+        }
+
+        if let Some(message) = message_option {
+            let epoch = message.epoch();
+            match serde_json::to_string(&message) {
+                Ok(json_string) => {
+                    // debug!(target: "consensus", "{}", json_string);
+                    self.on_message_string_received(json_string, epoch);
+                }
+                Err(e) => {
+                    error!(target: "consensus", "could not create json: {:?}", e);
+                }
             }
         }
 
