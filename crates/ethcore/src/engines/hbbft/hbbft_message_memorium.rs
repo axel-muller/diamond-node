@@ -214,11 +214,29 @@ impl HbbftMessageMemorium {
 					// being unable to interprete a message, could result in consequences
 					// not being able to report missbehavior,
 					// or reporting missbehavior, where there was not a missbehavior.
-                    error!(target: "consensus", "could not create json: {:?}", e);
+                    error!(target: "consensus", "could not store hbbft message: {:?}", e);
                 }
             }
 			return true;
         }
+
+		let mut seal_option = self.dispatched_seals.pop_front();
+
+		if let Some(seal) = seal_option {
+			let epoch = seal.1;
+			match serde_json::to_string(&seal.0) {
+				Ok(json_string) => {
+					self.on_message_string_received(json_string, epoch);
+				}
+				Err(e) => {
+					// being unable to interprete a message, could result in consequences
+					// not being able to report missbehavior,
+					// or reporting missbehavior, where there was not a missbehavior.
+					error!(target: "consensus", "could not store seal message: {:?}", e);
+				}
+			}
+			return true;
+		}
 
 		return false;
 
