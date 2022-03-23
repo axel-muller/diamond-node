@@ -45,12 +45,11 @@ pub(crate) struct HbbftMessageMemorium {
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
-
     config_blocks_to_keep_on_disk: u64,
-
     last_block_deleted_from_disk: u64,
-
 	dispatched_messages: VecDeque<HbMessage>,
+	dispatched_seals: VecDeque<(sealing::Message, u64)>
+
 }
 
 pub(crate) struct HbbftMessageDispatcher {
@@ -69,6 +68,10 @@ impl HbbftMessageDispatcher {
 	}
 
 	pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
+		self.memorial
+			.write()
+			.dispatched_seals
+			.push_back((message.clone(), epoch));
 
 		self.ensure_worker_thread();
 	}
@@ -93,13 +96,7 @@ impl HbbftMessageDispatcher {
 			let arc_clone = self.memorial.clone();
 			self.thread = Some(std::thread::spawn(move || {
 				loop {
-
-					let mut work_result = false;
-					{
-						let mut memorial = arc_clone.write();
-						work_result = memorial.work_message();
-					}
-
+					let mut work_result = arc_clone.write().work_message();
 					if !work_result {
 						std::thread::sleep(std::time::Duration::from_millis(250));
 					}
@@ -126,9 +123,7 @@ impl HbbftMessageMemorium {
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
-//			thread: None,
-//			sender,
-//			receiver
+			dispatched_seals: VecDeque::new()
         }
     }
 
