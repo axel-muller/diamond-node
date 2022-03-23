@@ -127,7 +127,7 @@ impl HbbftMessageMemorium {
         }
     }
 
-    pub fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
+    fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
         self.message_tracking_id += 1;
 
         //don't pick up messages if we do not keep any.
@@ -197,7 +197,6 @@ impl HbbftMessageMemorium {
         }
     }
 
-
     fn work_message(&mut self ) -> bool {
 
         let mut message_option
@@ -258,21 +257,6 @@ impl HbbftMessageMemorium {
         //        }
         //    }
         //}
-    }
-
-    pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
-        match serde_json::to_string(message) {
-            Ok(json_string) => {
-                // debug!(target: "consensus", "{}", json_string);
-
-                self.on_message_string_received(json_string, epoch);
-            }
-            Err(e) => {
-                error!(target: "consensus", "could not create json: {:?}", e);
-            }
-        }
-
-        // todo: also remember sealing messages in an organized way
     }
 
     pub fn free_memory(&mut self, _current_block: u64) {
