@@ -76,14 +76,27 @@ impl HbbftMessageDispatcher {
 		}
 	}
 
+	pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
+
+		self.ensure_worker_thread();
+	}
+
+
 	pub fn on_message_received(&mut self , message: &HbMessage) {
 		//performance: dispatcher pattern + multithreading could improve performance a lot.
 
 		let mut memorial = self.memorial.write();
 
 		let mut lock = memorial.dispatched_messages.write();
+
+		// ok, expensive memory copy...
+		// but probably better than using (weak) arcs in all the other code.
 		lock.push_back(message.clone());
-		//self.sender.send(message.clone());
+
+		self.ensure_worker_thread();
+	}
+
+	fn ensure_worker_thread(&mut self) {
 
 		if self.thread.is_none() {
 			// let mut memo = self;
