@@ -50,18 +50,10 @@ pub(crate) struct HbbftMessageMemorium {
 
     last_block_deleted_from_disk: u64,
 
-	dispatched_messages: RwLock<VecDeque<HbMessage>>,
-	//thread: Option<std::thread::JoinHandle<Self>>,
-
-	//sender: std::sync::mpsc::Sender<HbMessage>,
-	//receiver: std::sync::mpsc::Receiver<HbMessage>,
-
-	//memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>
-
+	dispatched_messages: VecDeque<HbMessage>,
 }
 
 pub(crate) struct HbbftMessageDispatcher {
-	// dispatched_messages: RwLock<VecDeque<HbMessage>>,
 	thread: Option<std::thread::JoinHandle<Self>>,
 	memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>
 }
@@ -85,13 +77,10 @@ impl HbbftMessageDispatcher {
 	pub fn on_message_received(&mut self , message: &HbMessage) {
 		//performance: dispatcher pattern + multithreading could improve performance a lot.
 
-		let mut memorial = self.memorial.write();
-
-		let mut lock = memorial.dispatched_messages.write();
-
-		// ok, expensive memory copy...
-		// but probably better than using (weak) arcs in all the other code.
-		lock.push_back(message.clone());
+		self.memorial
+			.write()
+			.dispatched_messages
+			.push_back(message.clone());
 
 		self.ensure_worker_thread();
 	}
@@ -136,7 +125,7 @@ impl HbbftMessageMemorium {
             message_tracking_id: 0,
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
-            dispatched_messages: RwLock::new(VecDeque::new()),
+            dispatched_messages: VecDeque::new(),
 //			thread: None,
 //			sender,
 //			receiver
@@ -216,14 +205,8 @@ impl HbbftMessageMemorium {
 
     fn work_message(&mut self ) -> bool {
 
-        let mut message_option: Option<HbMessage> = None;
-
-        {
-            //scope it for short living.
-            let mut lock =  self.dispatched_messages.write();
-            message_option = lock.pop_front();
-            //lock.len();
-        }
+        let mut message_option
+			= self.dispatched_messages.pop_front();
 
         if let Some(message) = message_option {
             let epoch = message.epoch();
