@@ -22,11 +22,12 @@ use std::{
 };
 
 use bytes::Bytes;
+use call_contract::CallContract;
 use ethcore::{
     block::SealedBlock,
     client::{
         test_client::TestState, traits::ForceUpdateSealing, EngineInfo, Nonce, PrepareOpenBlock,
-        StateClient,
+        StateClient, BlockChain
     },
     engines::{signer::EngineSigner, EthEngine},
     error::Error,
@@ -271,31 +272,42 @@ impl MinerService for TestMinerService {
             .collect()
     }
 
-    fn ready_transactions_filtered<C>(
+    fn ready_transactions_filtered<C: ethcore::client::BlockChain>(
         &self,
-        _chain: &C,
+        chain: &C,
         _max_len: usize,
         filter: Option<TransactionFilter>,
         _ordering: miner::PendingOrdering,
-    ) -> Vec<Arc<VerifiedTransaction>> {
+    ) -> Vec<Arc<VerifiedTransaction>> where
+    C: BlockChain + CallContract + Nonce + Sync {
         match filter {
             Some(f) => self
-                .queued_transactions()
+                .queued_transactions(chain)
                 .into_iter()
                 .filter(|tx| f.matches(tx))
                 .collect(),
-            None => self.queued_transactions(),
+            None => self.queued_transactions(chain),
         }
     }
 
-    fn pending_transaction_hashes<C>(&self, _chain: &C) -> BTreeSet<H256> {
-        self.queued_transactions()
+    fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256> where
+        C: BlockChain + CallContract + Nonce + Sync {
+        self.queued_transactions(chain)
             .into_iter()
             .map(|tx| tx.signed().hash())
             .collect()
     }
 
-    fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
+    fn queued_transactions<C>(&self, _chain: &C) -> Vec<Arc<VerifiedTransaction>> {
+        self.pending_transactions
+            .lock()
+            .values()
+            .cloned()
+            .map(|tx| Arc::new(VerifiedTransaction::from_pending_block_transaction(tx)))
+            .collect()
+    }
+
+    fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
         self.pending_transactions
             .lock()
             .values()

@@ -427,66 +427,11 @@ fn main() {
 mod tests {
     use super::*;
     use hbbft::{
-        crypto::{serde_impl::SerdeSecret, PublicKeySet, SecretKeyShare},
         sync_key_gen::{AckOutcome, PartOutcome, SyncKeyGen},
     };
     use keygen_history_helpers::KeyPairWrapper;
     use rand;
-    use serde::{Deserialize, Serialize};
     use std::{collections::BTreeMap, sync::Arc};
-
-    #[derive(Deserialize)]
-    struct TomlHbbftOptions {
-        pub mining: client_traits::HbbftOptions,
-    }
-
-    fn compare<'a, N>(keygen: &SyncKeyGen<N, KeyPairWrapper>, options: &'a TomlHbbftOptions)
-    where
-        N: hbbft::NodeIdT + Serialize + Deserialize<'a>,
-    {
-        let generated_keys = keygen.generate().unwrap();
-
-        // Parse and compare the Secret Key Share
-        let secret_key_share: SerdeSecret<SecretKeyShare> =
-            serde_json::from_str(&options.mining.hbbft_secret_share).unwrap();
-        assert_eq!(generated_keys.1.unwrap(), *secret_key_share);
-
-        // Parse and compare the Public Key Set
-        let pks: PublicKeySet = serde_json::from_str(&options.mining.hbbft_public_key_set).unwrap();
-        assert_eq!(generated_keys.0, pks);
-
-        // Parse and compare the Node IDs.
-        let ips: BTreeMap<N, String> =
-            serde_json::from_str(&options.mining.hbbft_validator_ip_addresses).unwrap();
-        assert!(keygen.public_keys().keys().eq(ips.keys()));
-    }
-
-    #[test]
-    fn test_network_info_serde() {
-        let num_nodes = 1;
-        let mut rng = rand::thread_rng();
-        let enodes_map = generate_enodes(num_nodes, None);
-
-        let pub_keys = enodes_to_pub_keys(&enodes_map);
-
-        let pub_keys_for_key_gen = pub_keys.iter().take(num_nodes).collect();
-
-        let (sync_keygen, _, _) =
-            generate_keygens(pub_keys_for_key_gen, &mut rng, (num_nodes - 1) / 3);
-
-        let keygen = sync_keygen.iter().nth(0).unwrap();
-        let toml_string = toml::to_string(&to_toml(
-            keygen,
-            &enodes_map,
-            1,
-            &ConfigType::PosdaoSetup,
-            None,
-            &Address::default(),
-        ))
-        .unwrap();
-        let config: TomlHbbftOptions = toml::from_str(&toml_string).unwrap();
-        compare(keygen, &config);
-    }
 
     #[test]
     fn test_threshold_encryption_single() {
@@ -524,7 +469,7 @@ mod tests {
         let num_nodes = 4;
         let t = 1;
 
-        let enodes = generate_enodes(num_nodes, None);
+        let enodes = generate_enodes(num_nodes, Vec::new(), None);
         let pub_keys = enodes_to_pub_keys(&enodes);
         let mut rng = rand::thread_rng();
 
