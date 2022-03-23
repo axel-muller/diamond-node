@@ -14,6 +14,7 @@ use std::{
     io::Write,
     path::PathBuf,
 };
+use std::thread::Thread;
 
 pub type HbMessage = honey_badger::Message<NodeId>;
 
@@ -49,12 +50,72 @@ pub(crate) struct HbbftMessageMemorium {
 
     last_block_deleted_from_disk: u64,
 
-    //mutex: Mutex<u64>
-    dispatched_messages: RwLock<VecDeque<HbMessage>>,
+	dispatched_messages: RwLock<VecDeque<HbMessage>>,
+	//thread: Option<std::thread::JoinHandle<Self>>,
+
+	//sender: std::sync::mpsc::Sender<HbMessage>,
+	//receiver: std::sync::mpsc::Receiver<HbMessage>,
+
+	//memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>
+
 }
+
+pub(crate) struct HbbftMessageDispatcher {
+	// dispatched_messages: RwLock<VecDeque<HbMessage>>,
+	thread: Option<std::thread::JoinHandle<Self>>,
+	memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>
+}
+
+
+impl HbbftMessageDispatcher {
+	pub fn new() -> Self {
+		HbbftMessageDispatcher {
+
+			thread: None,
+			memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new()))
+		}
+	}
+
+	pub fn on_message_received(&mut self , message: &HbMessage) {
+		//performance: dispatcher pattern + multithreading could improve performance a lot.
+
+		let mut memorial = self.memorial.write();
+
+		let mut lock = memorial.dispatched_messages.write();
+		lock.push_back(message.clone());
+		//self.sender.send(message.clone());
+
+		if self.thread.is_none() {
+			// let mut memo = self;
+			// let mut arc = std::sync::Arc::new(&self);
+			let arc_clone = self.memorial.clone();
+			self.thread = Some(std::thread::spawn(move || {
+				loop {
+
+					let mut work_result = false;
+					{
+						let mut memorial = arc_clone.write();
+						work_result = memorial.work_message();
+					}
+
+					if !work_result {
+						std::thread::sleep(std::time::Duration::from_millis(250));
+					}
+				}
+			}));
+		}
+	}
+
+	pub fn free_memory(&mut self, _current_block: u64) {
+		// TODO: make memorium freeing memory of ancient block.
+	}
+}
+
+
 
 impl HbbftMessageMemorium {
     pub fn new() -> Self {
+
         HbbftMessageMemorium {
             // signature_shares: BTreeMap::new(),
             // decryption_shares: BTreeMap::new(),
@@ -63,6 +124,9 @@ impl HbbftMessageMemorium {
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
             dispatched_messages: RwLock::new(VecDeque::new()),
+//			thread: None,
+//			sender,
+//			receiver
         }
     }
 
@@ -136,21 +200,16 @@ impl HbbftMessageMemorium {
         }
     }
 
-    pub fn on_message_received(&mut self, message: &HbMessage) {
-        //performance: dispatcher pattern + multithreading could improve performance a lot.
 
-        let mut lock = self.dispatched_messages.write();
-        lock.push_back(message.clone());
-    }
+    fn work_message(&mut self ) -> bool {
 
-    pub fn work_message(&mut self) {
         let mut message_option: Option<HbMessage> = None;
 
         {
             //scope it for short living.
-            let mut lock = self.dispatched_messages.write();
+            let mut lock =  self.dispatched_messages.write();
             message_option = lock.pop_front();
-            lock.len();
+            //lock.len();
         }
 
         if let Some(message) = message_option {
@@ -161,10 +220,16 @@ impl HbbftMessageMemorium {
                     self.on_message_string_received(json_string, epoch);
                 }
                 Err(e) => {
+					// being unable to interprete a message, could result in consequences
+					// not being able to report missbehavior,
+					// or reporting missbehavior, where there was not a missbehavior.
                     error!(target: "consensus", "could not create json: {:?}", e);
                 }
             }
+			return true;
         }
+
+		return false;
 
         // let content = message.content();
 
