@@ -358,9 +358,9 @@ impl HoneyBadgerBFT {
         block_num: BlockNumber,
     ) -> Result<(), EngineError> {
         // store received messages here.
-//        self.hbbft_message_memorial
-//            .write()
-//            .on_sealing_message_received(&message, block_num);
+        self.hbbft_message_dispatcher
+            .write()
+            .on_sealing_message_received(&message, block_num);
 
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
         trace!(target: "consensus", "Received sealing message for block {} from {} : {:?} ",block_num, sender_id, message);
