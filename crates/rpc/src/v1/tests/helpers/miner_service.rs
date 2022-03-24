@@ -26,8 +26,8 @@ use call_contract::CallContract;
 use ethcore::{
     block::SealedBlock,
     client::{
-        test_client::TestState, traits::ForceUpdateSealing, EngineInfo, Nonce, PrepareOpenBlock,
-        StateClient, BlockChain
+        test_client::TestState, traits::ForceUpdateSealing, BlockChain, EngineInfo, Nonce,
+        PrepareOpenBlock, StateClient,
     },
     engines::{signer::EngineSigner, EthEngine},
     error::Error,
@@ -278,8 +278,10 @@ impl MinerService for TestMinerService {
         _max_len: usize,
         filter: Option<TransactionFilter>,
         _ordering: miner::PendingOrdering,
-    ) -> Vec<Arc<VerifiedTransaction>> where
-    C: BlockChain + CallContract + Nonce + Sync {
+    ) -> Vec<Arc<VerifiedTransaction>>
+    where
+        C: BlockChain + CallContract + Nonce + Sync,
+    {
         match filter {
             Some(f) => self
                 .queued_transactions(chain)
@@ -290,8 +292,10 @@ impl MinerService for TestMinerService {
         }
     }
 
-    fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256> where
-        C: BlockChain + CallContract + Nonce + Sync {
+    fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256>
+    where
+        C: BlockChain + CallContract + Nonce + Sync,
+    {
         self.queued_transactions(chain)
             .into_iter()
             .map(|tx| tx.signed().hash())

@@ -50,8 +50,8 @@ use types::{
 use block::SealedBlock;
 use call_contract::{CallContract, RegistryInfo};
 use client::{
-    traits::ForceUpdateSealing, AccountData, BlockChain, BlockProducer, Nonce,
-    ScheduleInfo, SealedBlockImporter,
+    traits::ForceUpdateSealing, AccountData, BlockChain, BlockProducer, Nonce, ScheduleInfo,
+    SealedBlockImporter,
 };
 use error::Error;
 use state::StateInfo;

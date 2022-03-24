@@ -426,9 +426,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hbbft::{
-        sync_key_gen::{AckOutcome, PartOutcome, SyncKeyGen},
-    };
+    use hbbft::sync_key_gen::{AckOutcome, PartOutcome, SyncKeyGen};
     use keygen_history_helpers::KeyPairWrapper;
     use rand;
     use std::{collections::BTreeMap, sync::Arc};
