@@ -48,10 +48,9 @@ use engines::hbbft::{
     contracts::validator_set::{
         get_validator_available_since, send_tx_announce_availability, staking_by_mining_address,
     },
-    hbbft_message_memorium::HbbftMessageMemorium,
+    hbbft_message_memorium::HbbftMessageDispatcher,
 };
 use std::{ops::Deref, sync::atomic::Ordering};
-use engines::hbbft::hbbft_message_memorium::HbbftMessageDispatcher;
 
 type TargetedMessage = hbbft::TargetedMessage<Message, NodeId>;
 
@@ -211,7 +210,7 @@ impl HoneyBadgerBFT {
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-			hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new()),
+            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new()),
             sealing: RwLock::new(BTreeMap::new()),
             params,
             message_counter: RwLock::new(0),
@@ -334,7 +333,7 @@ impl HoneyBadgerBFT {
 
         // store received messages here.
         self.hbbft_message_dispatcher
-			.write()
+            .write()
             .on_message_received(&message);
 
         let step = self.hbbft_state.write().process_message(
@@ -968,7 +967,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
 
         self.hbbft_message_dispatcher
-			.write()
+            .write()
             .free_memory(block.header.number());
 
         Ok(())
