@@ -76,7 +76,6 @@ impl HbbftMessageDispatcher {
 		self.ensure_worker_thread();
 	}
 
-
 	pub fn on_message_received(&mut self , message: &HbMessage) {
 		//performance: dispatcher pattern + multithreading could improve performance a lot.
 
@@ -199,6 +198,8 @@ impl HbbftMessageMemorium {
 
     fn work_message(&mut self ) -> bool {
 
+		// warn!(target: "consensus", "working on hbbft messages: {} consensuns: {}", self.dispatched_messages.len(), self.dispatched_seals.len());
+
         let mut message_option
 			= self.dispatched_messages.pop_front();
 
@@ -222,10 +223,9 @@ impl HbbftMessageMemorium {
 		let mut seal_option = self.dispatched_seals.pop_front();
 
 		if let Some(seal) = seal_option {
-			let epoch = seal.1;
 			match serde_json::to_string(&seal.0) {
 				Ok(json_string) => {
-					self.on_message_string_received(json_string, epoch);
+					self.on_message_string_received(json_string, seal.1);
 				}
 				Err(e) => {
 					// being unable to interprete a message, could result in consequences
@@ -240,13 +240,10 @@ impl HbbftMessageMemorium {
 		return false;
 
         // let content = message.content();
-
         //match content {
         //    MessageContent::Subset(subset) => {}
-
         //    MessageContent::DecryptionShare { proposer_id, share } => {
         // debug!("got decryption share from {} {:?}", proposer_id, share);
-
         //        if !self.decryption_shares.contains_key(&epoch) {
         //            match self.decryption_shares.insert(epoch, Vec::new()) {
         //                None => {}
