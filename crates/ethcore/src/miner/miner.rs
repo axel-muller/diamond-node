@@ -544,6 +544,8 @@ impl Miner {
             open_block.remove_gas_limit();
         }
 
+        let block_number = open_block.header.number();
+
         let client = self.pool_client(chain);
         let engine_params = self.engine.params();
         let schedule = self.engine.schedule(block_number);
@@ -1311,6 +1313,11 @@ impl miner::MinerService for Miner {
                 nonce_cap: None,
                 max_len: max_transactions,
                 ordering: miner::PendingOrdering::Priority,
+                includable_boundary: self
+                    .engine
+                    .calculate_base_fee(&chain.best_block_header())
+                    .unwrap_or_default(),
+                enforce_priority_fees: false,
             },
         )
     }
