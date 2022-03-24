@@ -3345,6 +3345,7 @@ dependencies = [
  "ethash",
  "ethcore",
  "ethcore-accounts",
+ "ethcore-call-contract",
  "ethcore-io",
  "ethcore-logger",
  "ethcore-miner",

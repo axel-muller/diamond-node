@@ -51,8 +51,8 @@ use types::{
 use block::SealedBlock;
 use call_contract::{CallContract, RegistryInfo};
 use client::{
-    traits::ForceUpdateSealing, AccountData, BlockChain, BlockProducer, ChainInfo, Nonce,
-    ScheduleInfo, SealedBlockImporter,
+    traits::ForceUpdateSealing, AccountData, BlockChain, BlockProducer, Nonce, ScheduleInfo,
+    SealedBlockImporter,
 };
 use error::Error;
 use state::StateInfo;
@@ -212,7 +212,7 @@ pub trait MinerService: Send + Sync {
     /// Depending on the settings may look in transaction pool or only in pending block.
     fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256>
     where
-        C: ChainInfo + Sync;
+        C: BlockChain + CallContract + Nonce + Sync;
 
     /// Get a list of all ready transactions either ordered by priority or unordered (cheaper),
     /// and optionally filtered by sender, recipient, gas, gas price, value and/or nonce.
@@ -228,7 +228,7 @@ pub trait MinerService: Send + Sync {
         ordering: PendingOrdering,
     ) -> Vec<Arc<VerifiedTransaction>>
     where
-        C: BlockChain + Nonce + Sync;
+        C: BlockChain + CallContract + Nonce + Sync;
 
     /// Get an unfiltered list of all ready transactions.
     fn ready_transactions<C>(
@@ -238,7 +238,7 @@ pub trait MinerService: Send + Sync {
         ordering: PendingOrdering,
     ) -> Vec<Arc<VerifiedTransaction>>
     where
-        C: BlockChain + Nonce + Sync,
+        C: BlockChain + CallContract + Nonce + Sync,
     {
         self.ready_transactions_filtered(chain, max_len, None, ordering)
     }
