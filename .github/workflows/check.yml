@@ -9,16 +9,16 @@ on:
 jobs:
   check:
     name:                       Check
-    runs-on:                    ubuntu-16.04
+    runs-on:                    ubuntu-20.04
     steps:
       - name:                   Checkout sources
         uses:                   actions/checkout@main
         with:
           submodules:           true
-      - name:                   Install latest toolchain
+      - name:                   Install 1.59 toolchain
         uses:                   actions-rs/toolchain@v1
         with:
-          toolchain:            latest
+          toolchain:            1.59
           profile:              minimal
           override:             true
       - name:                   Run cargo check 1/3
