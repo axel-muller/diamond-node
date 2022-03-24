@@ -139,9 +139,9 @@ impl SyncSupplier {
                         debug!(target: "sync", "{} -> Dispatching packet: {}", peer, packet_id);
 
                         match id {
-                        ConsensusDataPacket => {
-                            SyncHandler::on_consensus_packet(io, peer, &rlp, node_id)
-                        }
+                            ConsensusDataPacket => {
+                                SyncHandler::on_consensus_packet(io, peer, &rlp, node_id)
+                            }
                             TransactionsPacket => {
                                 let res = {
                                     let sync_ro = sync.read();
