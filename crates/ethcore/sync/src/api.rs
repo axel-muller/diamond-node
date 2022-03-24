@@ -33,7 +33,7 @@ use std::{
 use chain::{
     fork_filter::ForkFilterApi, ChainSyncApi, SyncState, SyncStatus as EthSyncStatus,
     ETH_PROTOCOL_VERSION_63, ETH_PROTOCOL_VERSION_64, ETH_PROTOCOL_VERSION_65,
-    PAR_PROTOCOL_VERSION_1, PAR_PROTOCOL_VERSION_2,
+    ETH_PROTOCOL_VERSION_66, PAR_PROTOCOL_VERSION_1, PAR_PROTOCOL_VERSION_2,
 };
 use ethcore::{
     client::{BlockChainClient, ChainMessageType, ChainNotify, NewBlocks},
@@ -110,6 +110,10 @@ pub struct SyncConfig {
     pub fork_block: Option<(BlockNumber, H256)>,
     /// Enable snapshot sync
     pub warp_sync: WarpSync,
+    /// Number of first block where EIP-1559 rules begin. New encoding/decoding block format.
+    pub eip1559_transition: BlockNumber,
+    /// Number of blocks for which new transactions will be returned in a result of `parity_newTransactionsStats` RPC call
+    pub new_transactions_stats_period: u64,
 }
 
 impl Default for SyncConfig {
@@ -121,6 +125,8 @@ impl Default for SyncConfig {
             subprotocol_name: ETH_PROTOCOL,
             fork_block: None,
             warp_sync: WarpSync::Disabled,
+            eip1559_transition: BlockNumber::max_value(),
+            new_transactions_stats_period: 0,
         }
     }
 }
@@ -137,7 +143,10 @@ pub trait SyncProvider: Send + Sync + PrometheusMetrics {
     fn enode(&self) -> Option<String>;
 
     /// Returns propagation count for pending transactions.
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
+    fn pending_transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
+
+    /// Returns propagation count for new transactions.
+    fn new_transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
 }
 
 /// Transaction stats
@@ -234,6 +243,8 @@ pub struct EthSync {
     subprotocol_name: ProtocolId,
     /// Priority tasks notification channel
     priority_tasks: Mutex<mpsc::Sender<PriorityTask>>,
+    /// New incoming transactions notification channel
+    new_transaction_hashes: crossbeam_channel::Sender<H256>,
 }
 
 impl EthSync {
@@ -243,6 +254,7 @@ impl EthSync {
         connection_filter: Option<Arc<dyn ConnectionFilter>>,
     ) -> Result<Arc<EthSync>, Error> {
         let (priority_tasks_tx, priority_tasks_rx) = mpsc::channel();
+        let (new_transaction_hashes_tx, new_transaction_hashes_rx) = crossbeam_channel::unbounded();
         let fork_filter = ForkFilterApi::new(&*params.chain, params.forks);
 
         let sync = ChainSyncApi::new(
@@ -250,6 +262,7 @@ impl EthSync {
             &*params.chain,
             fork_filter,
             priority_tasks_rx,
+            new_transaction_hashes_rx,
         );
         let service = NetworkService::new(
             params.network_config.clone().into_basic()?,
@@ -267,6 +280,7 @@ impl EthSync {
             }),
             subprotocol_name: params.config.subprotocol_name,
             priority_tasks: Mutex::new(priority_tasks_tx),
+            new_transaction_hashes: new_transaction_hashes_tx,
         });
 
         Ok(sync)
@@ -275,6 +289,11 @@ impl EthSync {
     /// Priority tasks producer
     pub fn priority_tasks(&self) -> mpsc::Sender<PriorityTask> {
         self.priority_tasks.lock().clone()
+    }
+
+    /// New transactions hashes producer
+    pub fn new_transaction_hashes(&self) -> crossbeam_channel::Sender<H256> {
+        self.new_transaction_hashes.clone()
     }
 }
 
@@ -319,8 +338,12 @@ impl SyncProvider for EthSync {
         self.network.external_url()
     }
 
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
-        self.eth_handler.sync.transactions_stats()
+    fn pending_transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
+        self.eth_handler.sync.pending_transactions_stats()
+    }
+
+    fn new_transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
+        self.eth_handler.sync.new_transactions_stats()
     }
 }
 
@@ -628,6 +651,7 @@ impl ChainNotify for EthSync {
                     ETH_PROTOCOL_VERSION_63,
                     ETH_PROTOCOL_VERSION_64,
                     ETH_PROTOCOL_VERSION_65,
+                    ETH_PROTOCOL_VERSION_66,
                 ],
             )
             .unwrap_or_else(|e| warn!("Error registering ethereum protocol: {:?}", e));

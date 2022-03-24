@@ -127,6 +127,8 @@ pub struct TestBlockChainClient {
     pub history: RwLock<Option<u64>>,
     /// Is disabled
     pub disabled: AtomicBool,
+    /// Transaction hashes producer
+    pub new_transaction_hashes: RwLock<Option<crossbeam_channel::Sender<H256>>>,
 }
 
 /// Used for generating test client blocks.
@@ -196,6 +198,7 @@ impl TestBlockChainClient {
             history: RwLock::new(None),
             disabled: AtomicBool::new(false),
             error_on_logs: RwLock::new(None),
+            new_transaction_hashes: RwLock::new(None),
         };
 
         // insert genesis hash.
@@ -322,7 +325,7 @@ impl TestBlockChainClient {
         rlp.append(&header);
         rlp.append_raw(&txs, 1);
         rlp.append_raw(uncles.as_raw(), 1);
-        let unverified = Unverified::from_rlp(rlp.out()).unwrap();
+        let unverified = Unverified::from_rlp(rlp.out(), BlockNumber::max_value()).unwrap();
         self.import_block(unverified).unwrap();
     }
 
@@ -339,7 +342,7 @@ impl TestBlockChainClient {
         let mut header: Header = self
             .block_header(BlockId::Number(n))
             .unwrap()
-            .decode()
+            .decode(BlockNumber::max_value())
             .expect("decoding failed");
         header.set_parent_hash(H256::from_low_u64_be(42));
         let mut rlp = RlpStream::new_list(3);
@@ -388,6 +391,14 @@ impl TestBlockChainClient {
             .import_external_transactions(self, vec![signed_tx.into()]);
         let res = res.into_iter().next().unwrap();
         assert!(res.is_ok());
+
+        // if new_transaction_hashes producer channel exists, send the transaction hash
+        let _ = self
+            .new_transaction_hashes
+            .write()
+            .as_ref()
+            .and_then(|tx| Some(tx.send(hash)));
+
         hash
     }
 
@@ -404,6 +415,13 @@ impl TestBlockChainClient {
     /// Returns true if the client has been disabled.
     pub fn is_disabled(&self) -> bool {
         self.disabled.load(AtomicOrder::SeqCst)
+    }
+
+    pub fn set_new_transaction_hashes_producer(
+        &self,
+        new_transaction_hashes: crossbeam_channel::Sender<H256>,
+    ) {
+        *self.new_transaction_hashes.write() = Some(new_transaction_hashes);
     }
 }
 
@@ -550,7 +568,7 @@ impl BlockInfo for TestBlockChainClient {
     fn best_block_header(&self) -> Header {
         self.block_header(BlockId::Hash(self.chain_info().best_block_hash))
             .expect("Best block always has header.")
-            .decode()
+            .decode(BlockNumber::max_value())
             .expect("decoding failed")
     }
 
@@ -608,7 +626,7 @@ impl ImportBlock for TestBlockChainClient {
         if number > 0 {
             match self.blocks.read().get(header.parent_hash()) {
                 Some(parent) => {
-                    let parent = view!(BlockView, parent).header();
+                    let parent = view!(BlockView, parent).header(BlockNumber::max_value());
                     if parent.number() != (header.number() - 1) {
                         panic!("Unexpected block parent");
                     }
@@ -638,7 +656,7 @@ impl ImportBlock for TestBlockChainClient {
                     *self.numbers.write().get_mut(&n).unwrap() = parent_hash.clone();
                     n -= 1;
                     parent_hash = view!(BlockView, &self.blocks.read()[&parent_hash])
-                        .header()
+                        .header(BlockNumber::max_value())
                         .parent_hash()
                         .clone();
                 }
@@ -720,7 +738,7 @@ impl StateClient for TestBlockChainClient {
 
 impl EngineInfo for TestBlockChainClient {
     fn engine(&self) -> &dyn EthEngine {
-        unimplemented!()
+        &*self.spec.engine
     }
 }
 
@@ -882,7 +900,7 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>> {
         self.block(id)
-            .map(|block| block.view().header())
+            .map(|block| block.view().header(BlockNumber::max_value()))
             .map(|header| self.spec.engine.extra_info(&header))
     }
 
@@ -1091,6 +1109,33 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn registrar_address(&self) -> Option<Address> {
         None
+    }
+
+    fn state_data(&self, hash: &H256) -> Option<Bytes> {
+        let begins_with_f =
+            H256::from_str("f000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap();
+        if *hash > begins_with_f {
+            let mut rlp = RlpStream::new();
+            rlp.append(&hash.clone());
+            return Some(rlp.out());
+        } else if *hash
+            == H256::from_str("000000000000000000000000000000000000000000000000000000000000000a")
+                .unwrap()
+        {
+            // for basic `return_node_data` tests
+            return Some(vec![0xaa, 0xaa]);
+        } else if *hash
+            == H256::from_str("000000000000000000000000000000000000000000000000000000000000000c")
+                .unwrap()
+        {
+            return Some(vec![0xcc]);
+        }
+        None
+    }
+
+    fn transaction(&self, tx_hash: &H256) -> Option<Arc<VerifiedTransaction>> {
+        self.miner.transaction(tx_hash)
     }
 }
 

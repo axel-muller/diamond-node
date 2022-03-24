@@ -2,7 +2,7 @@
 description = "OpenEthereum"
 name = "openethereum"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "3.2.5-hbbft-0.8.0"
+version = "3.3.4-hbbft-0.9.0"
 license = "GPL-3.0"
 authors = [
 	"OpenEthereum developers",
@@ -23,6 +23,7 @@ rpassword = "1.0"
 semver = "0.9"
 ansi_term = "0.10"
 parking_lot = "0.11.1"
+crossbeam-channel = "0.5.2"
 regex = "1.0"
 atty = "0.2.8"
 toml = "0.4"

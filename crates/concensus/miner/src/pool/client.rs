@@ -32,6 +32,8 @@ pub struct AccountDetails {
     pub nonce: U256,
     /// Current account balance
     pub balance: U256,
+    /// Code hash associated with an account if any
+    pub code_hash: Option<H256>,
     /// Is this account a local account?
     pub is_local: bool,
 }
@@ -87,4 +89,10 @@ pub trait Client: fmt::Debug + Sync {
 pub trait NonceClient: fmt::Debug + Sync {
     /// Fetch only account nonce for given sender.
     fn account_nonce(&self, address: &Address) -> U256;
+}
+
+/// State balance client
+pub trait BalanceClient: fmt::Debug + Sync {
+    /// Fetch only account balance for given sender.
+    fn account_balance(&self, address: &Address) -> U256;
 }

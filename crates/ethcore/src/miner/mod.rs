@@ -19,6 +19,7 @@
 //! Miner module
 //! Keeps track of transactions and currently sealed pending block.
 
+mod cache;
 mod miner;
 
 pub mod pool_client;
@@ -227,7 +228,7 @@ pub trait MinerService: Send + Sync {
         ordering: PendingOrdering,
     ) -> Vec<Arc<VerifiedTransaction>>
     where
-        C: ChainInfo + Nonce + Sync;
+        C: BlockChain + Nonce + Sync;
 
     /// Get an unfiltered list of all ready transactions.
     fn ready_transactions<C>(
@@ -237,7 +238,7 @@ pub trait MinerService: Send + Sync {
         ordering: PendingOrdering,
     ) -> Vec<Arc<VerifiedTransaction>>
     where
-        C: ChainInfo + Nonce + Sync,
+        C: BlockChain + Nonce + Sync,
     {
         self.ready_transactions_filtered(chain, max_len, None, ordering)
     }
@@ -265,6 +266,9 @@ pub trait MinerService: Send + Sync {
 
     /// Suggested gas price.
     fn sensible_gas_price(&self) -> U256;
+
+    /// Suggested max priority fee gas price
+    fn sensible_max_priority_fee(&self) -> U256;
 
     /// Suggested gas limit.
     fn sensible_gas_limit(&self) -> U256;
