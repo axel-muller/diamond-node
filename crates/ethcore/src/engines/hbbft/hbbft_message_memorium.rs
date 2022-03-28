@@ -1,5 +1,7 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
+use parking_lot::RwLock;
+use std::collections::VecDeque;
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -42,10 +44,62 @@ pub(crate) struct HbbftMessageMemorium {
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
-
     config_blocks_to_keep_on_disk: u64,
-
     last_block_deleted_from_disk: u64,
+    dispatched_messages: VecDeque<HbMessage>,
+    dispatched_seals: VecDeque<(sealing::Message, u64)>,
+}
+
+pub(crate) struct HbbftMessageDispatcher {
+    thread: Option<std::thread::JoinHandle<Self>>,
+    memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>,
+}
+
+impl HbbftMessageDispatcher {
+    pub fn new() -> Self {
+        HbbftMessageDispatcher {
+            thread: None,
+            memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new())),
+        }
+    }
+
+    pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
+        self.memorial
+            .write()
+            .dispatched_seals
+            .push_back((message.clone(), epoch));
+
+        self.ensure_worker_thread();
+    }
+
+    pub fn on_message_received(&mut self, message: &HbMessage) {
+        //performance: dispatcher pattern + multithreading could improve performance a lot.
+
+        self.memorial
+            .write()
+            .dispatched_messages
+            .push_back(message.clone());
+
+        self.ensure_worker_thread();
+    }
+
+    fn ensure_worker_thread(&mut self) {
+        if self.thread.is_none() {
+            // let mut memo = self;
+            // let mut arc = std::sync::Arc::new(&self);
+            let arc_clone = self.memorial.clone();
+            self.thread = Some(std::thread::spawn(move || loop {
+                let work_result = arc_clone.write().work_message();
+                if !work_result {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }));
+        }
+    }
+
+    pub fn free_memory(&mut self, _current_block: u64) {
+        // TODO: make memorium freeing memory of ancient block.
+    }
 }
 
 impl HbbftMessageMemorium {
@@ -57,10 +111,12 @@ impl HbbftMessageMemorium {
             message_tracking_id: 0,
             config_blocks_to_keep_on_disk: 200,
             last_block_deleted_from_disk: 0,
+            dispatched_messages: VecDeque::new(),
+            dispatched_seals: VecDeque::new(),
         }
     }
 
-    pub fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
+    fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
         self.message_tracking_id += 1;
 
         //don't pick up messages if we do not keep any.
@@ -130,29 +186,48 @@ impl HbbftMessageMemorium {
         }
     }
 
-    pub fn on_message_received(&mut self, message: &HbMessage) {
-        //performance: dispatcher pattern + multithreading could improve performance a lot.
+    fn work_message(&mut self) -> bool {
+        // warn!(target: "consensus", "working on hbbft messages: {} consensuns: {}", self.dispatched_messages.len(), self.dispatched_seals.len());
 
-        let epoch = message.epoch();
-
-        match serde_json::to_string(message) {
-            Ok(json_string) => {
-                // debug!(target: "consensus", "{}", json_string);
-                self.on_message_string_received(json_string, epoch);
+        if let Some(message) = self.dispatched_messages.pop_front() {
+            let epoch = message.epoch();
+            match serde_json::to_string(&message) {
+                Ok(json_string) => {
+                    // debug!(target: "consensus", "{}", json_string);
+                    self.on_message_string_received(json_string, epoch);
+                }
+                Err(e) => {
+                    // being unable to interprete a message, could result in consequences
+                    // not being able to report missbehavior,
+                    // or reporting missbehavior, where there was not a missbehavior.
+                    error!(target: "consensus", "could not store hbbft message: {:?}", e);
+                }
             }
-            Err(e) => {
-                error!(target: "consensus", "could not create json: {:?}", e);
-            }
+            return true;
         }
 
-        // let content = message.content();
+        if let Some(seal) = self.dispatched_seals.pop_front() {
+            match serde_json::to_string(&seal.0) {
+                Ok(json_string) => {
+                    self.on_message_string_received(json_string, seal.1);
+                }
+                Err(e) => {
+                    // being unable to interprete a message, could result in consequences
+                    // not being able to report missbehavior,
+                    // or reporting missbehavior, where there was not a missbehavior.
+                    error!(target: "consensus", "could not store seal message: {:?}", e);
+                }
+            }
+            return true;
+        }
 
+        return false;
+
+        // let content = message.content();
         //match content {
         //    MessageContent::Subset(subset) => {}
-
         //    MessageContent::DecryptionShare { proposer_id, share } => {
         // debug!("got decryption share from {} {:?}", proposer_id, share);
-
         //        if !self.decryption_shares.contains_key(&epoch) {
         //            match self.decryption_shares.insert(epoch, Vec::new()) {
         //                None => {}
@@ -163,21 +238,6 @@ impl HbbftMessageMemorium {
         //        }
         //    }
         //}
-    }
-
-    pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
-        match serde_json::to_string(message) {
-            Ok(json_string) => {
-                // debug!(target: "consensus", "{}", json_string);
-
-                self.on_message_string_received(json_string, epoch);
-            }
-            Err(e) => {
-                error!(target: "consensus", "could not create json: {:?}", e);
-            }
-        }
-
-        // todo: also remember sealing messages in an organized way
     }
 
     pub fn free_memory(&mut self, _current_block: u64) {

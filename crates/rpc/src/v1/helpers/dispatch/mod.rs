@@ -135,7 +135,7 @@ pub trait Dispatcher: Send + Sync + Clone {
         <P::Out as futures::future::IntoFuture>::Future: Send;
 
     /// Converts a `SignedTransaction` into `RichRawTransaction`
-    fn enrich(&self, SignedTransaction) -> RpcRichRawTransaction;
+    fn enrich(&self, signed_transaction: SignedTransaction) -> RpcRichRawTransaction;
 
     /// "Dispatch" a local transaction.
     fn dispatch_transaction(&self, signed_transaction: PendingTransaction) -> Result<H256>;
