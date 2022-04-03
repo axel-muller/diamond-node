@@ -815,6 +815,7 @@ mod test {
             0usize,
             GetNodeDataPacket.id(),
             &node_request,
+            None,
         );
         assert_eq!(1, io.packets.len());
     }
@@ -853,6 +854,7 @@ mod test {
             0usize,
             GetNodeDataPacket.id(),
             &node_request.out(),
+            None,
         );
         assert_eq!(1, io.packets.len());
         assert_eq!(
