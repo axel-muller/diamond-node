@@ -48,7 +48,7 @@ use engines::hbbft::{
     contracts::validator_set::{
         get_validator_available_since, send_tx_announce_availability, staking_by_mining_address,
     },
-    hbbft_message_memorium::HbbftMessageMemorium,
+    hbbft_message_memorium::HbbftMessageDispatcher,
 };
 use std::{ops::Deref, sync::atomic::Ordering};
 
@@ -70,7 +70,7 @@ pub struct HoneyBadgerBFT {
     signer: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     machine: EthereumMachine,
     hbbft_state: RwLock<HbbftState>,
-    hbbft_message_memorial: RwLock<HbbftMessageMemorium>,
+    hbbft_message_dispatcher: RwLock<HbbftMessageDispatcher>,
     sealing: RwLock<BTreeMap<BlockNumber, Sealing>>,
     params: HbbftParams,
     message_counter: RwLock<usize>,
@@ -210,7 +210,7 @@ impl HoneyBadgerBFT {
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-            hbbft_message_memorial: RwLock::new(HbbftMessageMemorium::new()),
+            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new()),
             sealing: RwLock::new(BTreeMap::new()),
             params,
             message_counter: RwLock::new(0),
@@ -332,7 +332,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Received message of idx {}  {:?} from {}", msg_idx, message, sender_id);
 
         // store received messages here.
-        self.hbbft_message_memorial
+        self.hbbft_message_dispatcher
             .write()
             .on_message_received(&message);
 
@@ -357,7 +357,7 @@ impl HoneyBadgerBFT {
         block_num: BlockNumber,
     ) -> Result<(), EngineError> {
         // store received messages here.
-        self.hbbft_message_memorial
+        self.hbbft_message_dispatcher
             .write()
             .on_sealing_message_received(&message, block_num);
 
@@ -966,7 +966,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             }
         }
 
-        self.hbbft_message_memorial
+        self.hbbft_message_dispatcher
             .write()
             .free_memory(block.header.number());
 

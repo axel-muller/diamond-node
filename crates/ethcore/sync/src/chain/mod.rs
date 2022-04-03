@@ -1266,7 +1266,7 @@ impl ChainSync {
                 match session_info {
                     Some(s) => {
                         warn!(target: "sync", "disabling peer {} {} originated by us: {}. client_version: {}, protocol version: {}",
-							  peer_id, s.remote_address, s.originated, s.client_version, s.protocol_version);
+                          peer_id, s.remote_address, s.originated, s.client_version, s.protocol_version);
                         io.disable_peer(peer_id);
                         self.deactivate_peer(io, peer_id);
                         return;
