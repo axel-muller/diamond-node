@@ -151,11 +151,9 @@ where
     }
 
     fn peer_version(&self, peer_id: PeerId) -> ClientVersion {
-        let client_id = self
-            .peers_info
-            .get(&peer_id)
-            .cloned()
-            .unwrap_or_else(|| "OpenEthereum/v3.2.5-hbbft/x86_64-linux-gnu/rustc1.59.0".to_string());
+        let client_id = self.peers_info.get(&peer_id).cloned().unwrap_or_else(|| {
+            "OpenEthereum/v3.2.5-hbbft/x86_64-linux-gnu/rustc1.59.0".to_string()
+        });
 
         ClientVersion::from(client_id)
     }
