@@ -15,10 +15,14 @@
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
 use ethereum_types::U256;
+use hash::KECCAK_EMPTY;
 use txpool;
 use types::transaction::{self, PendingTransaction};
 
-use pool::{verifier, PendingOrdering, PendingSettings, PrioritizationStrategy, TransactionQueue};
+use pool::{
+    transaction_filter::TransactionFilter, verifier, PendingOrdering, PendingSettings,
+    PrioritizationStrategy, TransactionQueue,
+};
 
 pub mod client;
 pub mod tx;
@@ -37,7 +41,7 @@ const TEST_QUEUE_MAX_MEM: usize = 100;
 fn new_queue() -> TransactionQueue {
     TransactionQueue::new(
         txpool::Options {
-            max_count: 3,
+            max_count: 4,
             max_per_sender: 3,
             max_mem_usage: TEST_QUEUE_MAX_MEM,
         },
@@ -46,6 +50,8 @@ fn new_queue() -> TransactionQueue {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     )
@@ -64,6 +70,8 @@ fn should_return_correct_nonces_when_dropped_because_of_limit() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -124,6 +132,8 @@ fn should_never_drop_local_transactions_from_different_senders() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -263,6 +273,100 @@ fn should_import_transaction_below_min_gas_price_threshold_if_local() {
 
     // when
     let res = txq.import(TestClient::new(), vec![tx.signed().local()]);
+
+    // then
+    assert_eq!(res, vec![Ok(())]);
+    assert_eq!(txq.status().status.transaction_count, 1);
+}
+
+#[test]
+fn should_import_transaction_with_priority_fee_above_min_gas_price_threshold_but_max_fee_below_current_base_fee_if_external(
+) {
+    // given
+    let txq = new_queue();
+    txq.set_verifier_options(verifier::Options {
+        minimal_gas_price: 3.into(),
+        block_base_fee: Some(10.into()),
+        ..Default::default()
+    });
+    // when
+    let tx1 = Tx::gas_price(3).signed(); // Legacy transaction
+    let client = TestClient::new().with_balance(1_000_000);
+    let res = txq.import(client, vec![tx1.unverified()]);
+
+    // then
+    assert_eq!(res, vec![Ok(())]);
+    assert_eq!(txq.status().status.transaction_count, 1);
+
+    // when
+    let tx2 = Tx::gas_price(5).eip1559_one(3); // EIP1559 transaction
+    let client = TestClient::new().with_balance(1_000_000);
+    let res = txq.import(client, vec![tx2.unverified()]);
+
+    // then
+    assert_eq!(res, vec![Ok(())]);
+    assert_eq!(txq.status().status.transaction_count, 2);
+}
+
+#[test]
+fn should_reject_transaction_from_non_eoa_if_non_eoa_sender_is_not_allowed() {
+    // given
+    let txq = new_queue();
+    let tx = Tx::default();
+    let code_hash = [
+        0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f,
+        0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a,
+        0x0f, 0x0e,
+    ];
+
+    // when
+    let res = txq.import(
+        TestClient::new().with_code_hash(code_hash),
+        vec![tx.signed().unverified()],
+    );
+
+    // then
+    assert_eq!(res, vec![Err(transaction::Error::SenderIsNotEOA)]);
+    assert_eq!(txq.status().status.transaction_count, 0);
+}
+
+#[test]
+fn should_import_transaction_from_non_eoa_if_non_eoa_sender_is_allowed() {
+    // given
+    let txq = new_queue();
+    let tx = Tx::default();
+    let code_hash = [
+        0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f,
+        0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a, 0x0f, 0x0e, 0x0c, 0x0a,
+        0x0f, 0x0e,
+    ];
+    txq.set_verifier_options(verifier::Options {
+        allow_non_eoa_sender: true,
+        ..Default::default()
+    });
+
+    // when
+    let res = txq.import(
+        TestClient::new().with_code_hash(code_hash),
+        vec![tx.signed().unverified()],
+    );
+
+    // then
+    assert_eq!(res, vec![Ok(())]);
+    assert_eq!(txq.status().status.transaction_count, 1);
+}
+
+#[test]
+fn should_import_transaction_if_account_code_hash_is_keccak_empty() {
+    // given
+    let txq = new_queue();
+    let tx = Tx::default();
+
+    // when
+    let res = txq.import(
+        TestClient::new().with_code_hash(KECCAK_EMPTY),
+        vec![tx.signed().unverified()],
+    );
 
     // then
     assert_eq!(res, vec![Ok(())]);
@@ -541,6 +645,8 @@ fn should_prefer_current_transactions_when_hitting_the_limit() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -880,7 +986,16 @@ fn should_not_accept_external_service_transaction_if_sender_not_certified() {
 }
 
 #[test]
-fn should_not_return_transactions_over_nonce_cap() {
+fn should_not_return_transactions_over_nonce_cap_with_enforced_fees() {
+    should_not_return_transactions_over_nonce_cap(true)
+}
+
+#[test]
+fn should_not_return_transactions_over_nonce_cap_with_non_enforced_fees() {
+    should_not_return_transactions_over_nonce_cap(false)
+}
+
+fn should_not_return_transactions_over_nonce_cap(enforce_priority_fees: bool) {
     // given
     let txq = new_queue();
     let (tx1, tx2, tx3) = Tx::default().signed_triple();
@@ -898,6 +1013,8 @@ fn should_not_return_transactions_over_nonce_cap() {
             nonce_cap: Some(123.into()),
             max_len: usize::max_value(),
             ordering: PendingOrdering::Priority,
+            includable_boundary: Default::default(),
+            enforce_priority_fees,
         },
     );
 
@@ -907,7 +1024,16 @@ fn should_not_return_transactions_over_nonce_cap() {
 }
 
 #[test]
-fn should_return_cached_pending_even_if_unordered_is_requested() {
+fn should_return_cached_pending_even_if_unordered_is_requested_with_enforced_fees() {
+    should_return_cached_pending_even_if_unordered_is_requested(true)
+}
+
+#[test]
+fn should_return_cached_pending_even_if_unordered_is_requested_with_non_enforced_fees() {
+    should_return_cached_pending_even_if_unordered_is_requested(false)
+}
+
+fn should_return_cached_pending_even_if_unordered_is_requested(enforce_priority_fees: bool) {
     // given
     let txq = new_queue();
     let tx1 = Tx::default().signed();
@@ -919,7 +1045,18 @@ fn should_return_cached_pending_even_if_unordered_is_requested() {
     assert_eq!(res, vec![Ok(()), Ok(())]);
 
     // when
-    let all = txq.pending(TestClient::new(), PendingSettings::all_prioritized(0, 0));
+    let all = txq.pending(
+        TestClient::new(),
+        PendingSettings {
+            block_number: 0,
+            current_timestamp: 0,
+            nonce_cap: None,
+            max_len: 3,
+            ordering: PendingOrdering::Priority,
+            includable_boundary: Default::default(),
+            enforce_priority_fees,
+        },
+    );
     assert_eq!(all[0].hash, tx2_1_hash);
     assert_eq!(all.len(), 3);
 
@@ -932,6 +1069,8 @@ fn should_return_cached_pending_even_if_unordered_is_requested() {
             nonce_cap: None,
             max_len: 3,
             ordering: PendingOrdering::Unordered,
+            includable_boundary: Default::default(),
+            enforce_priority_fees,
         },
     );
 
@@ -940,7 +1079,16 @@ fn should_return_cached_pending_even_if_unordered_is_requested() {
 }
 
 #[test]
-fn should_return_unordered_and_not_populate_the_cache() {
+fn should_return_unordered_and_not_populate_the_cache_with_enforced_fees() {
+    should_return_unordered_and_not_populate_the_cache(true)
+}
+
+#[test]
+fn should_return_unordered_and_not_populate_the_cache_with_non_enforced_fees() {
+    should_return_unordered_and_not_populate_the_cache(false)
+}
+
+fn should_return_unordered_and_not_populate_the_cache(enforce_priority_fees: bool) {
     // given
     let txq = new_queue();
     let tx1 = Tx::default().signed();
@@ -960,12 +1108,18 @@ fn should_return_unordered_and_not_populate_the_cache() {
             nonce_cap: None,
             max_len: usize::max_value(),
             ordering: PendingOrdering::Unordered,
+            includable_boundary: Default::default(),
+            enforce_priority_fees,
         },
     );
 
     // then
     assert_eq!(limited.len(), 3);
-    assert!(!txq.is_pending_cached());
+    if enforce_priority_fees {
+        assert!(!txq.is_enforced_pending_cached());
+    } else {
+        assert!(!txq.is_non_enforced_pending_cached());
+    }
 }
 
 #[test]
@@ -1035,6 +1189,8 @@ fn should_include_local_transaction_to_a_full_pool() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -1067,6 +1223,8 @@ fn should_avoid_verifying_transaction_already_in_pool() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -1102,6 +1260,8 @@ fn should_avoid_reverifying_recently_rejected_transactions() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -1150,6 +1310,8 @@ fn should_reject_early_in_case_gas_price_is_less_than_min_effective() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: false,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -1192,6 +1354,8 @@ fn should_not_reject_early_in_case_gas_price_is_less_than_min_effective() {
             block_gas_limit: 1_000_000.into(),
             tx_gas_limit: 1_000_000.into(),
             no_early_reject: true,
+            block_base_fee: None,
+            allow_non_eoa_sender: false,
         },
         PrioritizationStrategy::GasPriceOnly,
     );
@@ -1214,4 +1378,148 @@ fn should_not_reject_early_in_case_gas_price_is_less_than_min_effective() {
     assert_eq!(res, vec![Ok(())]);
     assert_eq!(txq.status().status.transaction_count, 2);
     assert!(client.was_verification_triggered());
+}
+
+#[test]
+fn should_not_return_pending_external_transactions_with_too_low_priority_fee_if_priority_fees_are_enforced_by_pending(
+) {
+    should_not_return_pending_external_transactions_with_too_low_priority_fee_if_priority_fees_are_enforced(false)
+}
+
+#[test]
+fn should_not_return_pending_external_transactions_with_too_low_priority_fee_if_priority_fees_are_enforced_by_pending_filtered(
+) {
+    should_not_return_pending_external_transactions_with_too_low_priority_fee_if_priority_fees_are_enforced(true)
+}
+
+fn should_not_return_pending_external_transactions_with_too_low_priority_fee_if_priority_fees_are_enforced(
+    pending_filtered: bool,
+) {
+    // given
+    let client = TestClient::new().with_balance(1_000_000);
+    let block_base_fee = 1.into();
+    let txq = new_queue();
+    txq.set_verifier_options(verifier::Options {
+        minimal_gas_price: 3.into(),
+        block_base_fee: Some(block_base_fee),
+        ..Default::default()
+    });
+    let tx1 = Tx::gas_price(4).signed();
+    let tx1_hash = tx1.hash();
+    let tx2 = Tx::gas_price(3).signed();
+    let tx3 = Tx::gas_price(4).signed();
+    let tx3_hash = tx3.hash();
+    let tx4 = Tx::gas_price(3).signed();
+    let tx4_hash = tx4.hash();
+    let res = txq.import(client.clone(), vec![tx1, tx2].unverified());
+    assert_eq!(res, vec![Ok(()), Ok(())]);
+    let res = txq.import(client.clone(), vec![tx3, tx4].local());
+    assert_eq!(res, vec![Ok(()), Ok(())]);
+
+    // when (priority fees are enforced)
+    let pending_settings = PendingSettings {
+        block_number: 0,
+        current_timestamp: 0,
+        nonce_cap: None,
+        max_len: 4,
+        ordering: PendingOrdering::Priority,
+        includable_boundary: block_base_fee,
+        enforce_priority_fees: true,
+    };
+    let all = if !pending_filtered {
+        txq.pending(client.clone(), pending_settings)
+    } else {
+        txq.pending_filtered(
+            client.clone(),
+            pending_settings,
+            &TransactionFilter::default(),
+        )
+    };
+
+    // then
+    assert_eq!(all.len(), 3);
+    assert_eq!(all[0].hash, tx3_hash);
+    assert_eq!(all[1].hash, tx4_hash);
+    assert_eq!(all[2].hash, tx1_hash);
+
+    // when (priority fees are not enforced)
+    let pending_settings = PendingSettings {
+        block_number: 0,
+        current_timestamp: 0,
+        nonce_cap: None,
+        max_len: 4,
+        ordering: PendingOrdering::Priority,
+        includable_boundary: block_base_fee,
+        enforce_priority_fees: false,
+    };
+    let all = if !pending_filtered {
+        txq.pending(client.clone(), pending_settings)
+    } else {
+        txq.pending_filtered(
+            client.clone(),
+            pending_settings,
+            &TransactionFilter::default(),
+        )
+    };
+
+    // then
+    assert_eq!(all.len(), 4);
+}
+
+#[test]
+fn should_return_correct_cached_pending_depending_on_fees_enforcement_if_enforced() {
+    should_return_correct_cached_pending_depending_on_fees_enforcement(true)
+}
+
+#[test]
+fn should_return_correct_cached_pending_depending_on_fees_enforcement_if_do_not_enforced() {
+    should_return_correct_cached_pending_depending_on_fees_enforcement(false)
+}
+
+fn should_return_correct_cached_pending_depending_on_fees_enforcement(enforce_priority_fees: bool) {
+    // given
+    let client = TestClient::new().with_balance(1_000_000);
+    let block_base_fee = 1.into();
+    let txq = new_queue();
+    txq.set_verifier_options(verifier::Options {
+        minimal_gas_price: 3.into(),
+        block_base_fee: Some(block_base_fee),
+        ..Default::default()
+    });
+    let tx1 = Tx::gas_price(4).signed();
+    let tx2 = Tx::gas_price(3).signed();
+    let tx3 = Tx::gas_price(3).signed();
+    let res = txq.import(client.clone(), vec![tx1, tx2].unverified());
+    assert_eq!(res, vec![Ok(()), Ok(())]);
+    let res = txq.import(client.clone(), vec![tx3].local());
+    assert_eq!(res, vec![Ok(())]);
+
+    // when (priority fees are enforced)
+    let pending_settings = PendingSettings {
+        block_number: 0,
+        current_timestamp: 0,
+        nonce_cap: None,
+        max_len: 4,
+        ordering: PendingOrdering::Priority,
+        includable_boundary: block_base_fee,
+        enforce_priority_fees,
+    };
+    let all = txq.pending(client.clone(), pending_settings);
+
+    // This should not invalidate the cache!
+    let limited = txq.pending(
+        TestClient::new(),
+        PendingSettings {
+            block_number: 0,
+            current_timestamp: 0,
+            nonce_cap: None,
+            max_len: 3,
+            ordering: PendingOrdering::Unordered,
+            includable_boundary: Default::default(),
+            enforce_priority_fees,
+        },
+    );
+
+    // then
+    assert_eq!(all, limited);
 }

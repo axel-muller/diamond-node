@@ -18,7 +18,7 @@ use api::PAR_PROTOCOL;
 use bytes::Bytes;
 use chain::{
     sync_packet::{PacketInfo, SyncPacket},
-    ChainSync, ForkFilterApi, SyncSupplier, ETH_PROTOCOL_VERSION_65, PAR_PROTOCOL_VERSION_2,
+    ChainSync, ForkFilterApi, SyncSupplier, ETH_PROTOCOL_VERSION_66, PAR_PROTOCOL_VERSION_2,
 };
 use ethcore::{
     client::{
@@ -151,11 +151,9 @@ where
     }
 
     fn peer_version(&self, peer_id: PeerId) -> ClientVersion {
-        let client_id = self
-            .peers_info
-            .get(&peer_id)
-            .cloned()
-            .unwrap_or_else(|| peer_id.to_string());
+        let client_id = self.peers_info.get(&peer_id).cloned().unwrap_or_else(|| {
+            "OpenEthereum/v3.2.5-hbbft/x86_64-linux-gnu/rustc1.59.0".to_string()
+        });
 
         ClientVersion::from(client_id)
     }
@@ -172,7 +170,7 @@ where
         if protocol == PAR_PROTOCOL {
             PAR_PROTOCOL_VERSION_2.0
         } else {
-            ETH_PROTOCOL_VERSION_65.0
+            ETH_PROTOCOL_VERSION_66.0
         }
     }
 
@@ -398,7 +396,13 @@ impl TestNet<EthPeer<TestBlockChainClient>> {
         for _ in 0..n {
             let chain = TestBlockChainClient::new();
             let ss = Arc::new(TestSnapshotService::new());
-            let sync = ChainSync::new(config.clone(), &chain, ForkFilterApi::new_dummy(&chain));
+            let (_, transaction_hashes_rx) = crossbeam_channel::unbounded();
+            let sync = ChainSync::new(
+                config.clone(),
+                &chain,
+                ForkFilterApi::new_dummy(&chain),
+                transaction_hashes_rx,
+            );
             net.peers.push(Arc::new(EthPeer {
                 sync: RwLock::new(sync),
                 snapshot_service: ss,
@@ -447,7 +451,13 @@ impl TestNet<EthPeer<EthcoreClient>> {
         .unwrap();
 
         let ss = Arc::new(TestSnapshotService::new());
-        let sync = ChainSync::new(config, &*client, ForkFilterApi::new_dummy(&*client));
+        let (_, transaction_hashes_rx) = crossbeam_channel::unbounded();
+        let sync = ChainSync::new(
+            config,
+            &*client,
+            ForkFilterApi::new_dummy(&*client),
+            transaction_hashes_rx,
+        );
         let peer = Arc::new(EthPeer {
             sync: RwLock::new(sync),
             snapshot_service: ss,

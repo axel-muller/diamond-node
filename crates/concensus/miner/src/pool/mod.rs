@@ -71,6 +71,12 @@ pub struct PendingSettings {
     pub max_len: usize,
     /// Ordering of transactions.
     pub ordering: PendingOrdering,
+    /// Value of score that is a boundary between includable and non-includable transactions
+    /// Before EIP1559 it should be equal to zero, after EIP1559 it should be equal to block_base_fee
+    pub includable_boundary: U256,
+    /// If `true` all non-local transactions in the pending set should have
+    /// `effective_priority_fee` to be at least `min_gas_price`.
+    pub enforce_priority_fees: bool,
 }
 
 impl PendingSettings {
@@ -82,6 +88,8 @@ impl PendingSettings {
             nonce_cap: None,
             max_len: usize::max_value(),
             ordering: PendingOrdering::Priority,
+            includable_boundary: Default::default(),
+            enforce_priority_fees: false,
         }
     }
 }
@@ -118,10 +126,17 @@ pub trait ScoredTransaction {
     fn priority(&self) -> Priority;
 
     /// Gets transaction gas price.
-    fn gas_price(&self) -> &U256;
+    fn effective_gas_price(&self, block_base_fee: Option<U256>) -> U256;
+
+    /// Gets the actual reward miner will get if the transaction is added into the current block.
+    fn effective_priority_fee(&self, block_base_fee: Option<U256>) -> U256;
 
     /// Gets transaction nonce.
     fn nonce(&self) -> U256;
+
+    /// Calculates maximal transaction cost
+    /// (`gas_price` * `gas_limit` + `value`).
+    fn cost(&self) -> U256;
 }
 
 /// Verified transaction stored in the pool.
@@ -184,6 +199,10 @@ impl txpool::VerifiedTransaction for VerifiedTransaction {
     fn sender(&self) -> &Address {
         &self.sender
     }
+
+    fn has_zero_gas_price(&self) -> bool {
+        self.transaction.has_zero_gas_price()
+    }
 }
 
 impl ScoredTransaction for VerifiedTransaction {
@@ -191,13 +210,24 @@ impl ScoredTransaction for VerifiedTransaction {
         self.priority
     }
 
-    /// Gets transaction gas price.
-    fn gas_price(&self) -> &U256 {
-        &self.transaction.tx().gas_price
+    fn effective_gas_price(&self, block_base_fee: Option<U256>) -> U256 {
+        self.transaction.effective_gas_price(block_base_fee)
+    }
+
+    fn effective_priority_fee(&self, block_base_fee: Option<U256>) -> U256 {
+        self.transaction.effective_priority_fee(block_base_fee)
     }
 
     /// Gets transaction nonce.
     fn nonce(&self) -> U256 {
         self.transaction.tx().nonce
+    }
+
+    /// Gets maximum potential cost of the transaction.
+    fn cost(&self) -> U256 {
+        let tx = self.transaction.tx();
+        // As the transaction is verified, arithmetic
+        // expression below could not overflow.
+        tx.gas_price * tx.gas + tx.value
     }
 }
