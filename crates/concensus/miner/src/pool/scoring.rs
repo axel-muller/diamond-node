@@ -128,6 +128,7 @@ where
                 scores[i] = txs[i].effective_gas_price(self.block_base_fee);
                 let boost = match txs[i].priority() {
                     super::Priority::Local => 15,
+					super::Priority::Service => 14,
                     super::Priority::Retracted => 10,
                     super::Priority::Regular => 0,
                 };
@@ -154,6 +155,7 @@ where
                             scores[i] = txs[i].transaction.effective_gas_price(self.block_base_fee);
                             let boost = match txs[i].priority() {
                                 super::Priority::Local => 15,
+								super::Priority::Service => 14,
                                 super::Priority::Retracted => 10,
                                 super::Priority::Regular => 0,
                             };
@@ -172,7 +174,7 @@ where
     }
 
     fn should_ignore_sender_limit(&self, new: &P) -> bool {
-        new.priority().is_local()
+        new.priority().is_local() || new.priority().is_service()
     }
 }
 
