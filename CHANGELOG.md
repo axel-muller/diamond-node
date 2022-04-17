@@ -1,6 +1,9 @@
-## Diamond Node Software ## 3.3.4-hbbft-0.9.0
+## Diamond Node Software 3.3.4-hbbft-0.8.2
 
 Merge with OpenEthereum 3.3.4.
+Including all changes from 3.2.5 up to 3.3.4 from open ethereum
+
+## Diamond Node Software 3.2.5-hbbft-0.8.1
 
 Performance and stability improvement for active validator nodes.
 
