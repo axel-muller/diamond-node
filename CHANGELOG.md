@@ -2,6 +2,8 @@
 
 Merge with OpenEthereum 3.3.4.
 Including all changes from 3.2.5 up to 3.3.4 from open ethereum
+* Merge with OpenEthereum 3.3.4. Including all changes from 3.2.5 up to 3.3.4 from open ethereum
+* [Key Gen Transactions not broadcasted](https://github.com/DMDcoin/openethereum-3.x/issues/81)
 
 ## Diamond Node Software 3.2.5-hbbft-0.8.1
 
