@@ -236,19 +236,12 @@ pub fn initialize_synckeygen(
     let (mut synckeygen, _) = engine_signer_to_synckeygen(signer, Arc::new(pub_keys))
         .map_err(|_| CallError::ReturnValueInvalid)?;
 
-    let mut num_of_parts = 0;
-    let mut num_of_acks = 0;
-
     for v in vmap.keys().sorted() {
         part_of_address(&*client, *v, &vmap, &mut synckeygen, block_id)?;
-        num_of_parts = num_of_parts + 1;
     }
     for v in vmap.keys().sorted() {
         acks_of_address(&*client, *v, &vmap, &mut synckeygen, block_id)?;
-        num_of_acks = num_of_acks + 1;
     }
-
-    info!(target: "engine", "initialize_synckeygen ok with parts: {} acks: {}", num_of_parts, num_of_acks);
 
     Ok(synckeygen)
 }

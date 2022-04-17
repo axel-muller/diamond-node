@@ -1,7 +1,8 @@
-## Diamond Node Software ## 3.3.4-hbbft-0.9.0
+## Diamond Node Software ## 3.3.4-hbbft-0.8.2
 
 Merge with OpenEthereum 3.3.4.
 
+## Diamond Node Software ## 3.2.5-hbbft-0.8.1
 Performance and stability improvement for active validator nodes.
 
 *  [Multithreading for hbbft message analysis and logging](https://github.com/DMDcoin/openethereum-3.x/issues/76)

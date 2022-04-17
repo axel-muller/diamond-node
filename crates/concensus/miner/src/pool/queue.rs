@@ -359,6 +359,8 @@ impl TransactionQueue {
                 let imported = verifier
                     .verify_transaction(transaction)
                     .and_then(|verified| {
+						let status = self.pool.read().light_status();
+						debug!(target: "txqueue", "importing pool status: {:?}", status);
                         self.pool.write().import(verified, &mut replace).map_err(convert_error)
                     });
 
