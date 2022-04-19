@@ -22,11 +22,12 @@ use std::{
 };
 
 use bytes::Bytes;
+use call_contract::CallContract;
 use ethcore::{
     block::SealedBlock,
     client::{
-        test_client::TestState, traits::ForceUpdateSealing, EngineInfo, Nonce, PrepareOpenBlock,
-        StateClient,
+        test_client::TestState, traits::ForceUpdateSealing, BlockChain, EngineInfo, Nonce,
+        PrepareOpenBlock, StateClient,
     },
     engines::{signer::EngineSigner, EthEngine},
     error::Error,
@@ -38,7 +39,6 @@ use miner::pool::{
     VerifiedTransaction,
 };
 use parking_lot::{Mutex, RwLock};
-use txpool;
 use types::{
     block::Block,
     header::Header,
@@ -271,31 +271,46 @@ impl MinerService for TestMinerService {
             .collect()
     }
 
-    fn ready_transactions_filtered<C>(
+    fn ready_transactions_filtered<C: ethcore::client::BlockChain>(
         &self,
-        _chain: &C,
+        chain: &C,
         _max_len: usize,
         filter: Option<TransactionFilter>,
         _ordering: miner::PendingOrdering,
-    ) -> Vec<Arc<VerifiedTransaction>> {
+    ) -> Vec<Arc<VerifiedTransaction>>
+    where
+        C: BlockChain + CallContract + Nonce + Sync,
+    {
         match filter {
             Some(f) => self
-                .queued_transactions()
+                .queued_transactions(chain)
                 .into_iter()
                 .filter(|tx| f.matches(tx))
                 .collect(),
-            None => self.queued_transactions(),
+            None => self.queued_transactions(chain),
         }
     }
 
-    fn pending_transaction_hashes<C>(&self, _chain: &C) -> BTreeSet<H256> {
-        self.queued_transactions()
+    fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256>
+    where
+        C: BlockChain + CallContract + Nonce + Sync,
+    {
+        self.queued_transactions(chain)
             .into_iter()
             .map(|tx| tx.signed().hash())
             .collect()
     }
 
-    fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
+    fn queued_transactions<C>(&self, _chain: &C) -> Vec<Arc<VerifiedTransaction>> {
+        self.pending_transactions
+            .lock()
+            .values()
+            .cloned()
+            .map(|tx| Arc::new(VerifiedTransaction::from_pending_block_transaction(tx)))
+            .collect()
+    }
+
+    fn all_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
         self.pending_transactions
             .lock()
             .values()
@@ -336,6 +351,8 @@ impl MinerService for TestMinerService {
                 block_gas_limit: 5_000_000.into(),
                 tx_gas_limit: 5_000_000.into(),
                 no_early_reject: false,
+                block_base_fee: None,
+                allow_non_eoa_sender: false,
             },
             status: txpool::LightStatus {
                 mem_usage: 1_000,
@@ -358,6 +375,10 @@ impl MinerService for TestMinerService {
 
     fn sensible_gas_price(&self) -> U256 {
         20_000_000_000u64.into()
+    }
+
+    fn sensible_max_priority_fee(&self) -> U256 {
+        2_000_000_000u64.into()
     }
 
     fn sensible_gas_limit(&self) -> U256 {

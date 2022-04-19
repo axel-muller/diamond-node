@@ -239,6 +239,6 @@ mod tests {
         let part_ser = bincode::serialize(&part.1).expect("Part has to serialize");
         let part_deser: Part =
             bincode::deserialize(&part_ser).expect("Deserialization expected to succeed");
-        assert_eq!(part.1, part_deser);
+        assert_eq!(part.1, &part_deser);
     }
 }

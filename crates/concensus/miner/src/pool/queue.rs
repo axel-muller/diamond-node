@@ -26,6 +26,7 @@ use std::{
     },
 };
 
+use self::scoring::ScoringEvent;
 use ethereum_types::{Address, H256, U256};
 use parking_lot::RwLock;
 use txpool::{self, Verifier};
@@ -75,16 +76,16 @@ pub struct Status {
 impl fmt::Display for Status {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
-			fmt,
-			"Pool: {current}/{max} ({senders} senders; {mem}/{mem_max} kB) [minGasPrice: {gp} Mwei, maxGas: {max_gas}]",
-			current = self.status.transaction_count,
-			max = self.limits.max_count,
-			senders = self.status.senders,
-			mem = self.status.mem_usage / 1024,
-			mem_max = self.limits.max_mem_usage / 1024,
-			gp = self.options.minimal_gas_price / 1_000_000,
-			max_gas = cmp::min(self.options.block_gas_limit, self.options.tx_gas_limit),
-		)
+            fmt,
+            "Pool: {current}/{max} ({senders} senders; {mem}/{mem_max} kB) [minGasPrice: {gp} Mwei, maxGas: {max_gas}]",
+            current = self.status.transaction_count,
+            max = self.limits.max_count,
+            senders = self.status.senders,
+            mem = self.status.mem_usage / 1024,
+            mem_max = self.limits.max_mem_usage / 1024,
+            gp = self.options.minimal_gas_price / 1_000_000,
+            max_gas = cmp::min(self.options.block_gas_limit, self.options.tx_gas_limit),
+        )
     }
 }
 
@@ -229,7 +230,10 @@ pub struct TransactionQueue {
     insertion_id: Arc<AtomicUsize>,
     pool: RwLock<Pool>,
     options: RwLock<verifier::Options>,
-    cached_pending: RwLock<CachedPending>,
+    /// Cached pending transactions got *with* priority fee enforcement.
+    cached_enforced_pending: RwLock<CachedPending>,
+    /// Cached pending transactions got *without* priority fee enforcement.
+    cached_non_enforced_pending: RwLock<CachedPending>,
     recently_rejected: RecentlyRejected,
 }
 
@@ -245,15 +249,40 @@ impl TransactionQueue {
             insertion_id: Default::default(),
             pool: RwLock::new(txpool::Pool::new(
                 Default::default(),
-                scoring::NonceAndGasPrice(strategy),
+                scoring::NonceAndGasPrice {
+                    strategy,
+                    block_base_fee: verification_options.block_base_fee,
+                },
                 limits,
             )),
             options: RwLock::new(verification_options),
-            cached_pending: RwLock::new(CachedPending::none()),
+            cached_enforced_pending: RwLock::new(CachedPending::none()),
+            cached_non_enforced_pending: RwLock::new(CachedPending::none()),
             recently_rejected: RecentlyRejected::new(cmp::max(
                 MIN_REJECTED_CACHE_SIZE,
                 max_count / 4,
             )),
+        }
+    }
+
+    /// If latest block has different base fee than it's parent, then transaction pool scoring needs to be updated.
+    pub fn update_scoring(&self, block_base_fee: U256) {
+        let update_needed = match self.pool.read().scoring().block_base_fee {
+            Some(base_fee) => base_fee != block_base_fee,
+            None => true,
+        };
+
+        if update_needed {
+            self.pool.write().set_scoring(
+                scoring::NonceAndGasPrice {
+                    strategy: PrioritizationStrategy::GasPriceOnly,
+                    block_base_fee: Some(block_base_fee),
+                },
+                ScoringEvent::BlockBaseFeeChanged,
+            );
+
+            self.cached_enforced_pending.write().clear();
+            self.cached_non_enforced_pending.write().clear();
         }
     }
 
@@ -277,7 +306,7 @@ impl TransactionQueue {
     ///
     /// Given blockchain and state access (Client)
     /// verifies and imports transactions to the pool.
-    pub fn import<C: client::Client + client::NonceClient + Clone>(
+    pub fn import<C: client::Client + client::NonceClient + client::BalanceClient + Clone>(
         &self,
         client: C,
         transactions: Vec<verifier::Transaction>,
@@ -307,44 +336,50 @@ impl TransactionQueue {
             transaction_to_replace,
         );
 
-        let mut replace =
-            replace::ReplaceByScoreAndReadiness::new(self.pool.read().scoring().clone(), client);
+        let mut replace = replace::ReplaceByScoreReadinessAndValidity::new(
+            self.pool.read().scoring().clone(),
+            client,
+            self.options.read().block_base_fee,
+        );
 
         let results = transactions
-			.into_iter()
-			.map(|transaction| {
-				let hash = transaction.hash();
+            .into_iter()
+            .map(|transaction| {
+                let hash = transaction.hash();
 
-				if self.pool.read().find(&hash).is_some() {
-					return Err(transaction::Error::AlreadyImported);
-				}
+                if self.pool.read().find(&hash).is_some() {
+                    return Err(transaction::Error::AlreadyImported);
+                }
 
-				if let Some(err) = self.recently_rejected.get(&hash) {
-					trace!(target: "txqueue", "[{:?}] Rejecting recently rejected: {:?}", hash, err);
-					return Err(err);
-				}
+                if let Some(err) = self.recently_rejected.get(&hash) {
+                    trace!(target: "txqueue", "[{:?}] Rejecting recently rejected: {:?}", hash, err);
+                    return Err(err);
+                }
 
-				let imported = verifier
-					.verify_transaction(transaction)
-					.and_then(|verified| {
-						self.pool.write().import(verified, &mut replace).map_err(convert_error)
-					});
+                let imported = verifier
+                    .verify_transaction(transaction)
+                    .and_then(|verified| {
+						let status = self.pool.read().light_status();
+						debug!(target: "txqueue", "importing pool status: {:?}", status);
+                        self.pool.write().import(verified, &mut replace).map_err(convert_error)
+                    });
 
-				match imported {
-					Ok(_) => Ok(()),
-					Err(err) => {
-						self.recently_rejected.insert(hash, &err);
-						Err(err)
-					},
-				}
-			})
-			.collect::<Vec<_>>();
+                match imported {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        self.recently_rejected.insert(hash, &err);
+                        Err(err)
+                    },
+                }
+            })
+            .collect::<Vec<_>>();
 
         // Notify about imported transactions.
         (self.pool.write().listener_mut().1).0.notify();
 
         if results.iter().any(|r| r.is_ok()) {
-            self.cached_pending.write().clear();
+            self.cached_enforced_pending.write().clear();
+            self.cached_non_enforced_pending.write().clear();
         }
 
         results
@@ -353,7 +388,10 @@ impl TransactionQueue {
     /// Returns all transactions in the queue without explicit ordering.
     pub fn all_transactions(&self) -> Vec<Arc<pool::VerifiedTransaction>> {
         let ready = |_tx: &pool::VerifiedTransaction| txpool::Readiness::Ready;
-        self.pool.read().unordered_pending(ready).collect()
+        self.pool
+            .read()
+            .unordered_pending(ready, Default::default())
+            .collect()
     }
 
     /// Returns all transaction hashes in the queue without explicit ordering.
@@ -361,7 +399,7 @@ impl TransactionQueue {
         let ready = |_tx: &pool::VerifiedTransaction| txpool::Readiness::Ready;
         self.pool
             .read()
-            .unordered_pending(ready)
+            .unordered_pending(ready, Default::default())
             .map(|tx| tx.hash)
             .collect()
     }
@@ -376,7 +414,7 @@ impl TransactionQueue {
         let ready = ready::OptionalState::new(nonce);
         self.pool
             .read()
-            .unordered_pending(ready)
+            .unordered_pending(ready, Default::default())
             .map(|tx| tx.hash)
             .collect()
     }
@@ -400,23 +438,34 @@ impl TransactionQueue {
             nonce_cap,
             max_len,
             ordering,
+            includable_boundary,
+            enforce_priority_fees,
         } = settings;
-        if let Some(pending) = self.cached_pending.read().pending(
-            block_number,
-            current_timestamp,
-            nonce_cap.as_ref(),
-            max_len,
-        ) {
+
+        let cached = if enforce_priority_fees {
+            &self.cached_enforced_pending
+        } else {
+            &self.cached_non_enforced_pending
+        };
+
+        if let Some(pending) =
+            cached
+                .read()
+                .pending(block_number, current_timestamp, nonce_cap.as_ref(), max_len)
+        {
             return pending;
         }
 
         // Double check after acquiring write lock
-        let mut cached_pending = self.cached_pending.write();
+        let mut cached_pending = cached.write();
         if let Some(pending) =
             cached_pending.pending(block_number, current_timestamp, nonce_cap.as_ref(), max_len)
         {
             return pending;
         }
+
+        let effective_priority_fee_filter =
+            self.build_effective_priority_fee_filter(enforce_priority_fees, includable_boundary);
 
         // In case we don't have a cached set, but we don't care about order
         // just return the unordered set.
@@ -425,15 +474,24 @@ impl TransactionQueue {
             return self
                 .pool
                 .read()
-                .unordered_pending(ready)
+                .unordered_pending(ready, includable_boundary)
+                .filter(effective_priority_fee_filter)
                 .take(max_len)
                 .collect();
         }
 
-        let pending: Vec<_> =
-            self.collect_pending(client, block_number, current_timestamp, nonce_cap, |i| {
-                i.take(max_len).collect()
-            });
+        let pending: Vec<_> = self.collect_pending(
+            client,
+            includable_boundary,
+            block_number,
+            current_timestamp,
+            nonce_cap,
+            |i| {
+                i.filter(effective_priority_fee_filter)
+                    .take(max_len)
+                    .collect()
+            },
+        );
 
         *cached_pending = CachedPending {
             block_number,
@@ -459,13 +517,19 @@ impl TransactionQueue {
     where
         C: client::NonceClient,
     {
+        let effective_priority_fee_filter = self.build_effective_priority_fee_filter(
+            settings.enforce_priority_fees,
+            settings.includable_boundary,
+        );
         self.collect_pending(
             client,
+            settings.includable_boundary,
             settings.block_number,
             settings.current_timestamp,
             settings.nonce_cap,
             |i| {
                 i.filter(|tx| filter.matches(tx))
+                    .filter(effective_priority_fee_filter)
                     .take(settings.max_len)
                     .collect()
             },
@@ -479,6 +543,7 @@ impl TransactionQueue {
     pub fn collect_pending<C, F, T>(
         &self,
         client: C,
+        includable_boundary: U256,
         block_number: u64,
         current_timestamp: u64,
         nonce_cap: Option<U256>,
@@ -498,7 +563,29 @@ impl TransactionQueue {
         debug!(target: "txqueue", "Re-computing pending set for block: {}", block_number);
         trace_time!("pool::collect_pending");
         let ready = Self::ready(client, block_number, current_timestamp, nonce_cap);
-        collect(self.pool.read().pending(ready))
+        collect(self.pool.read().pending(ready, includable_boundary))
+    }
+
+    /// Depending on `enforce_priority_fees` parameter creates a filter that returns only
+    /// external transactions with enough effective priority fee and local transactions,
+    /// or a filter that just returns all transactions.
+    fn build_effective_priority_fee_filter(
+        &self,
+        enforce_priority_fees: bool,
+        includable_boundary: U256,
+    ) -> Box<dyn Fn(&Arc<pool::VerifiedTransaction>) -> bool> {
+        if enforce_priority_fees {
+            let min_gas_price = self.status().options.minimal_gas_price;
+            Box::new(move |tx| {
+                tx.priority.is_local()
+                    || tx
+                        .transaction
+                        .effective_priority_fee(Some(includable_boundary))
+                        >= min_gas_price
+            })
+        } else {
+            Box::new(|_| true)
+        }
     }
 
     fn ready<C>(
@@ -563,7 +650,7 @@ impl TransactionQueue {
 
         self.pool
             .read()
-            .pending_from_sender(state_readiness, address)
+            .pending_from_sender(state_readiness, address, Default::default())
             .last()
             .map(|tx| tx.signed().tx().nonce.saturating_add(U256::from(1)))
     }
@@ -597,7 +684,8 @@ impl TransactionQueue {
         };
 
         if results.iter().any(Option::is_some) {
-            self.cached_pending.write().clear();
+            self.cached_enforced_pending.write().clear();
+            self.cached_non_enforced_pending.write().clear();
         }
 
         results
@@ -612,16 +700,35 @@ impl TransactionQueue {
     pub fn penalize<'a, T: IntoIterator<Item = &'a Address>>(&self, senders: T) {
         let mut pool = self.pool.write();
         for sender in senders {
-            pool.update_scores(sender, ());
+            pool.update_scores(sender, ScoringEvent::Penalize);
         }
     }
 
     /// Returns gas price of currently the worst transaction in the pool.
     pub fn current_worst_gas_price(&self) -> U256 {
         match self.pool.read().worst_transaction() {
-            Some(tx) => tx.signed().tx().gas_price,
-            None => self.options.read().minimal_gas_price,
+            Some(tx) => tx
+                .signed()
+                .effective_gas_price(self.options.read().block_base_fee),
+            None => {
+                self.options.read().minimal_gas_price
+                    + self.options.read().block_base_fee.unwrap_or_default()
+            }
         }
+    }
+
+    /// Returns effective priority fee gas price of currently the worst transaction in the pool.
+    /// If the worst transaction has zero gas price, the minimal gas price is returned.
+    pub fn current_worst_effective_priority_fee(&self) -> U256 {
+        self.pool
+            .read()
+            .worst_transaction()
+            .filter(|tx| !tx.signed().has_zero_gas_price())
+            .map(|tx| {
+                tx.signed()
+                    .effective_priority_fee(self.options.read().block_base_fee)
+            })
+            .unwrap_or(self.options.read().minimal_gas_price)
     }
 
     /// Returns a status of the queue.
@@ -669,8 +776,13 @@ impl TransactionQueue {
 
     /// Check if pending set is cached.
     #[cfg(test)]
-    pub fn is_pending_cached(&self) -> bool {
-        self.cached_pending.read().pending.is_some()
+    pub fn is_enforced_pending_cached(&self) -> bool {
+        self.cached_enforced_pending.read().pending.is_some()
+    }
+
+    #[cfg(test)]
+    pub fn is_non_enforced_pending_cached(&self) -> bool {
+        self.cached_non_enforced_pending.read().pending.is_some()
     }
 }
 

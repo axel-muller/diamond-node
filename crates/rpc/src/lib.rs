@@ -92,8 +92,6 @@ extern crate serde_derive;
 
 #[cfg(test)]
 extern crate ethjson;
-#[cfg(test)]
-extern crate transaction_pool as txpool;
 
 #[cfg(test)]
 #[macro_use]
@@ -108,6 +106,9 @@ extern crate fake_fetch;
 
 #[cfg(test)]
 extern crate ethcore_io as io;
+
+#[cfg(test)]
+extern crate ethcore_call_contract as call_contract;
 
 pub extern crate jsonrpc_ws_server as ws;
 

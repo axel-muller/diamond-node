@@ -12,10 +12,10 @@ jobs:
     strategy:
       matrix:
         platform:
-          - ubuntu-16.04
+          - ubuntu-latest
           - macos-latest
         toolchain:
-          -  latest
+          -  1.59
     runs-on:                    ${{ matrix.platform }}
     steps:
       - name:                   Checkout sources
