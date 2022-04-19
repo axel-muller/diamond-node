@@ -109,12 +109,23 @@ pub enum Priority {
     /// Transactions either from a local account or
     /// submitted over local RPC connection via `eth_sendRawTransaction`
     Local,
+    /// Service Transaction (high prioritiy)
+    ///
+    /// Service transaction entering the pool from gossiping from other Nodes.
+    Service,
 }
 
 impl Priority {
     fn is_local(&self) -> bool {
         match *self {
             Priority::Local => true,
+            _ => false,
+        }
+    }
+
+    fn is_service(&self) -> bool {
+        match *self {
+            Priority::Service => true,
             _ => false,
         }
     }

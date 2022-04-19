@@ -331,6 +331,7 @@ impl<C: Client> txpool::Verifier<Transaction>
         let sender = transaction.sender();
         let account_details = self.client.account_details(&sender);
 
+        let mut is_service_tx = false;
         if !self.options.allow_non_eoa_sender {
             if let Some(code_hash) = account_details.code_hash {
                 if code_hash != KECCAK_EMPTY {
@@ -351,6 +352,7 @@ impl<C: Client> txpool::Verifier<Transaction>
             let transaction_type = self.client.transaction_type(&transaction);
             if let TransactionType::Service = transaction_type {
                 debug!(target: "txqueue", "Service tx {:?} below minimal gas price accepted", hash);
+                is_service_tx = true;
             } else if is_own || account_details.is_local {
                 info!(target: "own_tx", "Local tx {:?} below minimal gas price accepted", hash);
             } else {
@@ -415,11 +417,22 @@ impl<C: Client> txpool::Verifier<Transaction>
             bail!(transaction::Error::Old);
         }
 
-        let priority = match (is_own || account_details.is_local, is_retracted) {
-            (true, _) => super::Priority::Local,
-            (false, false) => super::Priority::Regular,
-            (false, true) => super::Priority::Retracted,
+        let priority = match (
+            is_own || account_details.is_local,
+            is_service_tx,
+            is_retracted,
+        ) {
+            (true, _, _) => super::Priority::Local,
+            (false, true, _) => super::Priority::Service,
+            (false, false, false) => super::Priority::Regular,
+            (false, _, true) => super::Priority::Retracted,
         };
+        debug!(
+            target: "txqueue",
+            "[{:?}] priority: {:?}",
+            hash,
+            priority
+        );
         Ok(VerifiedTransaction {
             transaction,
             priority,
