@@ -1269,9 +1269,9 @@ impl ChainSync {
                         warn!(target: "sync", "protected from hang. peer {}, did send wrong information ( td={:?}, our td={}) for blockhash latest={}  {} originated by us: {}. client_version: {}, protocol version: {}",
 							peer_id, peer_difficulty, syncing_difficulty, peer_latest, s.remote_address, s.originated, s.client_version, s.protocol_version);
 
-						// todo: temporary disabled peer deactivation.
-						// we are just returning now.
-						// will we see this problem in sequences now, but less disconnects ?
+                        // todo: temporary disabled peer deactivation.
+                        // we are just returning now.
+                        // will we see this problem in sequences now, but less disconnects ?
                         // io.disable_peer(peer_id);
                         // self.deactivate_peer(io, peer_id);
 
