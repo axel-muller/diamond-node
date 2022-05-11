@@ -313,7 +313,7 @@ where
         let to_remove = match self.worst_transactions.iter().next_back() {
             // No elements to remove? and the pool is still full?
             None => {
-                warn!("The pool is full but there are no transactions to remove.");
+                warn!(target: "txqueue","The pool is full but there are no transactions to remove.");
                 return Err(error::Error::TooCheapToEnter(
                     transaction.hash().clone(),
                     "unknown".into(),

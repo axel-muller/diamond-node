@@ -628,12 +628,15 @@ impl ChainSync {
 
     /// creates latest block rlp for the given client
     fn create_latest_block_rlp(chain: &dyn BlockChainClient) -> Bytes {
+        // here it might happen that best_block_hash does not match the given total_difficulty.
+        let chain_info = chain.chain_info();
+
         Self::create_block_rlp(
             &chain
-                .block(BlockId::Hash(chain.chain_info().best_block_hash))
+                .block(BlockId::Hash(chain_info.best_block_hash))
                 .expect("Best block always exists")
                 .into_inner(),
-            chain.chain_info().total_difficulty,
+            chain_info.total_difficulty,
         )
     }
 
@@ -1257,18 +1260,21 @@ impl ChainSync {
 
         if higher_difficulty && !is_other_block {
             if peer_difficulty.is_some() {
-                //only warn if the other peer has provided a difficulty level.
-                warn!(target: "sync", "protected from hang. peer {}, did send wrong information ( td={:?}, our td={}) for blockhash latest={}", peer_id, peer_difficulty, syncing_difficulty, peer_latest);
-
                 // NetworkContext session_info
                 let session_info = io.peer_session_info(peer_id);
 
                 match session_info {
                     Some(s) => {
-                        warn!(target: "sync", "disabling peer {} {} originated by us: {}. client_version: {}, protocol version: {}",
-                          peer_id, s.remote_address, s.originated, s.client_version, s.protocol_version);
-                        io.disable_peer(peer_id);
-                        self.deactivate_peer(io, peer_id);
+                        //only warn if the other peer has provided a difficulty level.
+                        warn!(target: "sync", "protected from hang. peer {}, did send wrong information ( td={:?}, our td={}) for blockhash latest={}  {} originated by us: {}. client_version: {}, protocol version: {}",
+							peer_id, peer_difficulty, syncing_difficulty, peer_latest, s.remote_address, s.originated, s.client_version, s.protocol_version);
+
+                        // todo: temporary disabled peer deactivation.
+                        // we are just returning now.
+                        // will we see this problem in sequences now, but less disconnects ?
+                        // io.disable_peer(peer_id);
+                        // self.deactivate_peer(io, peer_id);
+
                         return;
                     }
                     _ => {}
