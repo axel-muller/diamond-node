@@ -132,6 +132,7 @@ impl TransitionHandler {
 
 // Arbitrary identifier for the timer we register with the event handler.
 const ENGINE_TIMEOUT_TOKEN: TimerToken = 1;
+const ENGINE_SHUTDOWN_IF_UNAVAILABLE: TimerToken = 2;
 
 impl IoHandler<()> for TransitionHandler {
     fn initialize(&self, io: &IoContext<()>) {
@@ -139,7 +140,12 @@ impl IoHandler<()> for TransitionHandler {
         io.register_timer_once(ENGINE_TIMEOUT_TOKEN, DEFAULT_DURATION)
             .unwrap_or_else(
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
-            )
+            );
+
+        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(3600*3))
+            .unwrap_or_else(
+                 |e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e),
+            );
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
@@ -197,6 +203,40 @@ impl IoHandler<()> for TransitionHandler {
 				.unwrap_or_else(
 					|e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
 				);
+        }
+        else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
+            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+
+
+
+            // 1: check if we are a validator candidate
+            // 2: ... and not a current validator
+            // 3: ... and we are flagged as unavailable
+
+            // then order a shutdown ?! via: IO Message Shutdown
+        
+            match self.engine.is_stacked() {
+                Ok(is_stacked) => {
+                    if (is_stacked) {
+                        match self.engine.is_available() {
+                            Ok(is_available) => {
+                                if !is_available {
+                                    info!("Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+                                    //TODO: implement shutdown.
+                                }
+                                // if the node is available, everythign is fine!
+                            }
+                            Err(error) => {
+                                warn!(target: "consensus", "Could not query Honey Badger check for unavailability shutdown. {:?}", error);
+                            }
+                        }
+                    }
+                    // else: just a regular node.
+                }
+                Err(error) => {
+                    warn!(target: "consensus", "Could not query Honey Badger check if validator is staked. {:?}", error);
+                }
+            }
         }
     }
 }
@@ -732,6 +772,44 @@ impl HoneyBadgerBFT {
             // We only support full clients at this point.
             None => true,
         }
+    }
+
+    /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
+    pub fn is_available(&self) -> Result<bool, Error> {
+
+        // TODO: implement
+        return Ok(true);
+
+    }
+
+    /** returns if the signer of hbbft is stacked. */
+    pub fn is_stacked(&self) -> Result<bool, Error> {
+        // is the configured validator stacked ??
+
+        // TODO: improvement: 
+        // since a signer address can not change after boot,
+        // we can just cash the value
+        // so we don't need a read lock here,
+        // getting the numbers of required read locks down (deadlock risk)
+        // and improving the performance.
+
+        match self.signer.read().as_ref() {
+            Some(signer) => {
+                let address = signer.address();
+
+
+            }
+            None => {
+                // warn!("Could not retrieve address for writing availability transaction.");
+                return Ok(false);
+            }
+        };
+
+
+        return Ok(false);
+
+        
+
     }
 }
 
