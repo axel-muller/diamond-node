@@ -142,7 +142,7 @@ impl IoHandler<()> for TransitionHandler {
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
             );
 
-        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(3600*3))
+        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(600))
             .unwrap_or_else(
                  |e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e),
             );
@@ -221,6 +221,7 @@ impl IoHandler<()> for TransitionHandler {
                     }
                 }
             }
+            // the engine knows already if it is acting as validator or as regular node.
             
             match self.engine.is_staked() {
                 Ok(is_stacked) => {
@@ -230,6 +231,28 @@ impl IoHandler<()> for TransitionHandler {
                                 if !is_available {
                                     info!("Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
                                     //TODO: implement shutdown.
+                                    panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+
+                                    // if let Some(ref weak) = *self.client.read() {
+                                    //     if let Some(client) = weak.upgrade() {
+
+                                            
+                                            // match client.as_full_client() {
+                                            //     Some(full_client) => {
+                                            //         //full_client.shutdown();
+                                            //     }
+                                            //     None => {
+
+                                            //     }
+                                            // }
+
+                                            // match client.as_full_client() {
+                                            //     Some(full_client) => full_client.is_major_syncing(),
+                                            //     // We only support full clients at this point.
+                                            //     None => true,
+                                            // }
+                                    //     }
+                                    // }
                                 }
                                 // if the node is available, everythign is fine!
                             }
