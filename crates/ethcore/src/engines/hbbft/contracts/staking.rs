@@ -35,6 +35,17 @@ pub fn start_time_of_next_phase_transition(client: &dyn EngineClient) -> Result<
     call_const_staking!(c, start_time_of_next_phase_transition)
 }
 
+pub fn candidate_min_stake(client: &dyn EngineClient) -> Result<U256, CallError>  {
+    let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
+    call_const_staking!(c, candidate_min_stake)
+}
+
+pub fn stake_amount(client: &dyn EngineClient, staking_address: &Address, owner_address: &Address) -> Result<U256, CallError> {
+    let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
+    call_const_staking!(c, stake_amount, staking_address.clone(), owner_address.clone())
+}
+
+
 #[cfg(test)]
 pub mod tests {
     use super::*;

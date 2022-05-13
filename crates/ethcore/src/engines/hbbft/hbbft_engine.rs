@@ -207,17 +207,16 @@ impl IoHandler<()> for TransitionHandler {
         else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
             debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
 
-
-
             // 1: check if we are a validator candidate
             // 2: ... and not a current validator
             // 3: ... and we are flagged as unavailable
+            // 4: ... and we have staked enough funds on our pool
 
-            // then order a shutdown ?! via: IO Message Shutdown
-        
+            // then order a shutdown!!
+
             match self.engine.is_stacked() {
                 Ok(is_stacked) => {
-                    if (is_stacked) {
+                    if is_stacked {
                         match self.engine.is_available() {
                             Ok(is_available) => {
                                 if !is_available {
@@ -786,7 +785,7 @@ impl HoneyBadgerBFT {
     pub fn is_stacked(&self) -> Result<bool, Error> {
         // is the configured validator stacked ??
 
-        // TODO: improvement: 
+        // TODO: improvement:
         // since a signer address can not change after boot,
         // we can just cash the value
         // so we don't need a read lock here,
@@ -795,23 +794,55 @@ impl HoneyBadgerBFT {
 
         match self.signer.read().as_ref() {
             Some(signer) => {
-                let address = signer.address();
 
+                match self.client_arc() {
+                    Some(client) => {
+                        let engine_client = client.deref();
+                        let mining_address = signer.address();
 
+                        match super::contracts::validator_set::staking_by_mining_address(engine_client, &mining_address) {
+                            Ok(staking_address) => {
+
+                                // if there is no pool for this validator defined, we know that 
+                                if staking_address.is_zero() {
+                                    return Ok(false);
+                                }
+                                match super::contracts::staking::stake_amount(engine_client, &staking_address, &staking_address) {
+                                    Ok(stake_amount) => {
+                                        // we need to check if the pool stake amount is >= minimum stake
+                                        match super::contracts::staking::candidate_min_stake(engine_client) {
+                                            Ok(min_stake) => {
+                                                return Ok(stake_amount.ge(&min_stake));
+                                            }
+                                            Err(err) => {
+                                                warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        warn!(target: "consensus", "Error get stake_amount: ! {:?}", err);
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                warn!(target: "consensus", "Error get staking_by_mining_address: ! {:?}", err);
+                            }
+                        }
+                    }
+                    None => {
+                        // warn!("Could not retrieve address for writing availability transaction.");
+                        warn!(target: "consensus", "could not get engine client");
+                    }
             }
-            None => {
-                // warn!("Could not retrieve address for writing availability transaction.");
-                return Ok(false);
             }
-        };
-
-
+            None => {}
+        }
         return Ok(false);
-
-        
-
     }
+
 }
+
+
 
 impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn name(&self) -> &str {
