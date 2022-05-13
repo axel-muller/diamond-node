@@ -773,12 +773,39 @@ impl HoneyBadgerBFT {
         }
     }
 
+
     /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
     pub fn is_available(&self) -> Result<bool, Error> {
 
-        // TODO: implement
-        return Ok(true);
+        match self.signer.read().as_ref() {
+            Some(signer) => {
 
+                match self.client_arc() {
+                    Some(client) => {
+                        let engine_client = client.deref();
+                        let mining_address = signer.address();
+
+                        if mining_address.is_zero() {
+                            return Ok(false);
+                        }
+                        match super::contracts::validator_set::get_validator_available_since(engine_client, &mining_address) {
+                            Ok(available_since) => {
+                                return Ok(!available_since.is_zero());
+                            }
+                            Err(err) => {
+                                warn!(target: "consensus", "Error get get_validator_available_since: ! {:?}", err);
+                            }
+                        }
+                    }
+                    None => {
+                        // warn!("Could not retrieve address for writing availability transaction.");
+                        warn!(target: "consensus", "is_available: could not get engine client");
+                    }
+                }
+            }
+            None => {}
+        }
+        return Ok(false);
     }
 
     /** returns if the signer of hbbft is stacked. */
@@ -799,6 +826,10 @@ impl HoneyBadgerBFT {
                     Some(client) => {
                         let engine_client = client.deref();
                         let mining_address = signer.address();
+
+                        if mining_address.is_zero() {
+                            return Ok(false);
+                        }
 
                         match super::contracts::validator_set::staking_by_mining_address(engine_client, &mining_address) {
                             Ok(staking_address) => {
