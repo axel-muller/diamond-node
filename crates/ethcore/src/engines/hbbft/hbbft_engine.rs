@@ -695,9 +695,10 @@ impl HoneyBadgerBFT {
                                             );
                                         }
                                     }
-
-                                    HAS_SENT.store(true, Ordering::SeqCst);
                                 }
+                                // we store "HAS_SENT" if we SEND, 
+                                // or if we are already marked as available.
+                                HAS_SENT.store(true, Ordering::SeqCst);
                             }
                             Err(e) => {
                                 //return Err(format!("Error trying to send availability check: {:?}", e));
