@@ -200,21 +200,29 @@ impl IoHandler<()> for TransitionHandler {
             }
 
             io.register_timer_once(ENGINE_TIMEOUT_TOKEN, timer_duration)
-				.unwrap_or_else(
-					|e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
-				);
+                .unwrap_or_else(
+                    |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
+                );
         }
         else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
             debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
 
+            // 0: just return if we are syncing.
             // 1: check if we are a validator candidate
             // 2: ... and not a current validator
             // 3: ... and we are flagged as unavailable
             // 4: ... and we have staked enough funds on our pool
-
             // then order a shutdown!!
 
-            match self.engine.is_stacked() {
+            if let Some(ref weak) = *self.client.read() {
+                if let Some(c) = weak.upgrade() {
+                    if self.engine.is_syncing(&c) {
+                        return;
+                    }
+                }
+            }
+            
+            match self.engine.is_staked() {
                 Ok(is_stacked) => {
                     if is_stacked {
                         match self.engine.is_available() {
@@ -809,7 +817,7 @@ impl HoneyBadgerBFT {
     }
 
     /** returns if the signer of hbbft is stacked. */
-    pub fn is_stacked(&self) -> Result<bool, Error> {
+    pub fn is_staked(&self) -> Result<bool, Error> {
         // is the configured validator stacked ??
 
         // TODO: improvement:
