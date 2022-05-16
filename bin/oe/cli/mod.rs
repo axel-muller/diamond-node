@@ -814,6 +814,12 @@ usage! {
             ARG arg_snapshot_threads: (Option<usize>) = None, or |c: &Config| c.snapshots.as_ref()?.processing_threads,
             "--snapshot-threads=[NUM]",
             "Enables multiple threads for snapshots creation.",
+
+        ["Hbbft Options "]
+            ARG blocks_to_keep_on_disk: (Option<u64>) = Some(0), or |c: &Config| c.hbbft.as_ref()?.blocks_to_keep_on_disk,
+            "--blocks-to-keep-on-disk=[NUM]",
+            "Configures hbbft messages that should be kept on disk. Keeps n newest blocks. Default: 0 - means no message storage at all.",
+
     }
 }
 
@@ -829,6 +835,7 @@ struct Config {
     ipc: Option<Ipc>,
     secretstore: Option<SecretStore>,
     mining: Option<Mining>,
+    hbbft: Option<Hbbft>,
     footprint: Option<Footprint>,
     snapshots: Option<Snapshots>,
     misc: Option<Misc>,
@@ -995,6 +1002,13 @@ struct Mining {
     infinite_pending_block: Option<bool>,
     max_round_blocks_to_import: Option<usize>,
     new_transactions_stats_period: Option<u64>,
+}
+
+// hbbft consensus specific options
+#[derive(Default, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Hbbft {
+    blocks_to_keep_on_disk: Option<u64>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
