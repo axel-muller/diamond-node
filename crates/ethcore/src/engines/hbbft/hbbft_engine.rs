@@ -143,9 +143,7 @@ impl IoHandler<()> for TransitionHandler {
             );
 
         io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(600))
-            .unwrap_or_else(
-                 |e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e),
-            );
+            .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
@@ -203,8 +201,7 @@ impl IoHandler<()> for TransitionHandler {
                 .unwrap_or_else(
                     |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
                 );
-        }
-        else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
+        } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
             debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
 
             // 0: just return if we are syncing.
@@ -222,7 +219,7 @@ impl IoHandler<()> for TransitionHandler {
                 }
             }
             // the engine knows already if it is acting as validator or as regular node.
-            
+
             match self.engine.is_staked() {
                 Ok(is_stacked) => {
                     if is_stacked {
@@ -236,21 +233,20 @@ impl IoHandler<()> for TransitionHandler {
                                     // if let Some(ref weak) = *self.client.read() {
                                     //     if let Some(client) = weak.upgrade() {
 
-                                            
-                                            // match client.as_full_client() {
-                                            //     Some(full_client) => {
-                                            //         //full_client.shutdown();
-                                            //     }
-                                            //     None => {
+                                    // match client.as_full_client() {
+                                    //     Some(full_client) => {
+                                    //         //full_client.shutdown();
+                                    //     }
+                                    //     None => {
 
-                                            //     }
-                                            // }
+                                    //     }
+                                    // }
 
-                                            // match client.as_full_client() {
-                                            //     Some(full_client) => full_client.is_major_syncing(),
-                                            //     // We only support full clients at this point.
-                                            //     None => true,
-                                            // }
+                                    // match client.as_full_client() {
+                                    //     Some(full_client) => full_client.is_major_syncing(),
+                                    //     // We only support full clients at this point.
+                                    //     None => true,
+                                    // }
                                     //     }
                                     // }
                                 }
@@ -696,7 +692,7 @@ impl HoneyBadgerBFT {
                                         }
                                     }
                                 }
-                                // we store "HAS_SENT" if we SEND, 
+                                // we store "HAS_SENT" if we SEND,
                                 // or if we are already marked as available.
                                 HAS_SENT.store(true, Ordering::SeqCst);
                             }
@@ -805,13 +801,10 @@ impl HoneyBadgerBFT {
         }
     }
 
-
     /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
     pub fn is_available(&self) -> Result<bool, Error> {
-
         match self.signer.read().as_ref() {
             Some(signer) => {
-
                 match self.client_arc() {
                     Some(client) => {
                         let engine_client = client.deref();
@@ -820,7 +813,10 @@ impl HoneyBadgerBFT {
                         if mining_address.is_zero() {
                             return Ok(false);
                         }
-                        match super::contracts::validator_set::get_validator_available_since(engine_client, &mining_address) {
+                        match super::contracts::validator_set::get_validator_available_since(
+                            engine_client,
+                            &mining_address,
+                        ) {
                             Ok(available_since) => {
                                 return Ok(!available_since.is_zero());
                             }
@@ -853,7 +849,6 @@ impl HoneyBadgerBFT {
 
         match self.signer.read().as_ref() {
             Some(signer) => {
-
                 match self.client_arc() {
                     Some(client) => {
                         let engine_client = client.deref();
@@ -863,17 +858,25 @@ impl HoneyBadgerBFT {
                             return Ok(false);
                         }
 
-                        match super::contracts::validator_set::staking_by_mining_address(engine_client, &mining_address) {
+                        match super::contracts::validator_set::staking_by_mining_address(
+                            engine_client,
+                            &mining_address,
+                        ) {
                             Ok(staking_address) => {
-
-                                // if there is no pool for this validator defined, we know that 
+                                // if there is no pool for this validator defined, we know that
                                 if staking_address.is_zero() {
                                     return Ok(false);
                                 }
-                                match super::contracts::staking::stake_amount(engine_client, &staking_address, &staking_address) {
+                                match super::contracts::staking::stake_amount(
+                                    engine_client,
+                                    &staking_address,
+                                    &staking_address,
+                                ) {
                                     Ok(stake_amount) => {
                                         // we need to check if the pool stake amount is >= minimum stake
-                                        match super::contracts::staking::candidate_min_stake(engine_client) {
+                                        match super::contracts::staking::candidate_min_stake(
+                                            engine_client,
+                                        ) {
                                             Ok(min_stake) => {
                                                 return Ok(stake_amount.ge(&min_stake));
                                             }
@@ -896,16 +899,13 @@ impl HoneyBadgerBFT {
                         // warn!("Could not retrieve address for writing availability transaction.");
                         warn!(target: "consensus", "could not get engine client");
                     }
-            }
+                }
             }
             None => {}
         }
         return Ok(false);
     }
-
 }
-
-
 
 impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn name(&self) -> &str {
