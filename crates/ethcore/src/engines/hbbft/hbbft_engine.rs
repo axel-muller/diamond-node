@@ -132,6 +132,7 @@ impl TransitionHandler {
 
 // Arbitrary identifier for the timer we register with the event handler.
 const ENGINE_TIMEOUT_TOKEN: TimerToken = 1;
+const ENGINE_SHUTDOWN_IF_UNAVAILABLE: TimerToken = 2;
 
 impl IoHandler<()> for TransitionHandler {
     fn initialize(&self, io: &IoContext<()>) {
@@ -139,7 +140,10 @@ impl IoHandler<()> for TransitionHandler {
         io.register_timer_once(ENGINE_TIMEOUT_TOKEN, DEFAULT_DURATION)
             .unwrap_or_else(
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
-            )
+            );
+
+        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(600))
+            .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
@@ -194,9 +198,71 @@ impl IoHandler<()> for TransitionHandler {
             }
 
             io.register_timer_once(ENGINE_TIMEOUT_TOKEN, timer_duration)
-				.unwrap_or_else(
-					|e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
-				);
+                .unwrap_or_else(
+                    |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
+                );
+        } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
+            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+
+            // 0: just return if we are syncing.
+            // 1: check if we are a validator candidate
+            // 2: ... and not a current validator
+            // 3: ... and we are flagged as unavailable
+            // 4: ... and we have staked enough funds on our pool
+            // then order a shutdown!!
+
+            if let Some(ref weak) = *self.client.read() {
+                if let Some(c) = weak.upgrade() {
+                    if self.engine.is_syncing(&c) {
+                        return;
+                    }
+                }
+            }
+            // the engine knows already if it is acting as validator or as regular node.
+
+            match self.engine.is_staked() {
+                Ok(is_stacked) => {
+                    if is_stacked {
+                        match self.engine.is_available() {
+                            Ok(is_available) => {
+                                if !is_available {
+                                    info!("Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+                                    //TODO: implement shutdown.
+                                    panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+
+                                    // if let Some(ref weak) = *self.client.read() {
+                                    //     if let Some(client) = weak.upgrade() {
+
+                                    // match client.as_full_client() {
+                                    //     Some(full_client) => {
+                                    //         //full_client.shutdown();
+                                    //     }
+                                    //     None => {
+
+                                    //     }
+                                    // }
+
+                                    // match client.as_full_client() {
+                                    //     Some(full_client) => full_client.is_major_syncing(),
+                                    //     // We only support full clients at this point.
+                                    //     None => true,
+                                    // }
+                                    //     }
+                                    // }
+                                }
+                                // if the node is available, everythign is fine!
+                            }
+                            Err(error) => {
+                                warn!(target: "consensus", "Could not query Honey Badger check for unavailability shutdown. {:?}", error);
+                            }
+                        }
+                    }
+                    // else: just a regular node.
+                }
+                Err(error) => {
+                    warn!(target: "consensus", "Could not query Honey Badger check if validator is staked. {:?}", error);
+                }
+            }
         }
     }
 }
@@ -625,9 +691,10 @@ impl HoneyBadgerBFT {
                                             );
                                         }
                                     }
-
-                                    HAS_SENT.store(true, Ordering::SeqCst);
                                 }
+                                // we store "HAS_SENT" if we SEND,
+                                // or if we are already marked as available.
+                                HAS_SENT.store(true, Ordering::SeqCst);
                             }
                             Err(e) => {
                                 //return Err(format!("Error trying to send availability check: {:?}", e));
@@ -732,6 +799,111 @@ impl HoneyBadgerBFT {
             // We only support full clients at this point.
             None => true,
         }
+    }
+
+    /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
+    pub fn is_available(&self) -> Result<bool, Error> {
+        match self.signer.read().as_ref() {
+            Some(signer) => {
+                match self.client_arc() {
+                    Some(client) => {
+                        let engine_client = client.deref();
+                        let mining_address = signer.address();
+
+                        if mining_address.is_zero() {
+                            return Ok(false);
+                        }
+                        match super::contracts::validator_set::get_validator_available_since(
+                            engine_client,
+                            &mining_address,
+                        ) {
+                            Ok(available_since) => {
+                                return Ok(!available_since.is_zero());
+                            }
+                            Err(err) => {
+                                warn!(target: "consensus", "Error get get_validator_available_since: ! {:?}", err);
+                            }
+                        }
+                    }
+                    None => {
+                        // warn!("Could not retrieve address for writing availability transaction.");
+                        warn!(target: "consensus", "is_available: could not get engine client");
+                    }
+                }
+            }
+            None => {}
+        }
+        return Ok(false);
+    }
+
+    /** returns if the signer of hbbft is stacked. */
+    pub fn is_staked(&self) -> Result<bool, Error> {
+        // is the configured validator stacked ??
+
+        // TODO: improvement:
+        // since a signer address can not change after boot,
+        // we can just cash the value
+        // so we don't need a read lock here,
+        // getting the numbers of required read locks down (deadlock risk)
+        // and improving the performance.
+
+        match self.signer.read().as_ref() {
+            Some(signer) => {
+                match self.client_arc() {
+                    Some(client) => {
+                        let engine_client = client.deref();
+                        let mining_address = signer.address();
+
+                        if mining_address.is_zero() {
+                            return Ok(false);
+                        }
+
+                        match super::contracts::validator_set::staking_by_mining_address(
+                            engine_client,
+                            &mining_address,
+                        ) {
+                            Ok(staking_address) => {
+                                // if there is no pool for this validator defined, we know that
+                                if staking_address.is_zero() {
+                                    return Ok(false);
+                                }
+                                match super::contracts::staking::stake_amount(
+                                    engine_client,
+                                    &staking_address,
+                                    &staking_address,
+                                ) {
+                                    Ok(stake_amount) => {
+                                        // we need to check if the pool stake amount is >= minimum stake
+                                        match super::contracts::staking::candidate_min_stake(
+                                            engine_client,
+                                        ) {
+                                            Ok(min_stake) => {
+                                                return Ok(stake_amount.ge(&min_stake));
+                                            }
+                                            Err(err) => {
+                                                warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        warn!(target: "consensus", "Error get stake_amount: ! {:?}", err);
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                warn!(target: "consensus", "Error get staking_by_mining_address: ! {:?}", err);
+                            }
+                        }
+                    }
+                    None => {
+                        // warn!("Could not retrieve address for writing availability transaction.");
+                        warn!(target: "consensus", "could not get engine client");
+                    }
+                }
+            }
+            None => {}
+        }
+        return Ok(false);
     }
 }
 
