@@ -111,12 +111,12 @@ impl KeygenTransactionSender {
                 return Err(CallError::ReturnValueInvalid);
             }
         };
-        trace!(target:"engine", "getting full client...");
+
         let full_client = client.as_full_client().ok_or(CallError::NotFullClient)?;
 
         // If the chain is still syncing, do not send Parts or Acks.
         if full_client.is_major_syncing() {
-            trace!(target:"engine", "skipping sending key gen transaction, because we are syncing");
+            debug!(target:"engine", "skipping sending key gen transaction, because we are syncing");
             return Ok(());
         }
 
