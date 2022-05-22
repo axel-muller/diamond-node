@@ -44,6 +44,7 @@ pub(crate) struct HbbftMessageMemorium {
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
+
     config_blocks_to_keep_on_disk: u64,
     last_block_deleted_from_disk: u64,
     dispatched_messages: VecDeque<HbMessage>,
@@ -109,7 +110,7 @@ impl HbbftMessageMemorium {
             // decryption_shares: BTreeMap::new(),
             // agreements: BTreeMap::new(),
             message_tracking_id: 0,
-            config_blocks_to_keep_on_disk: 200,
+            config_blocks_to_keep_on_disk: 0,
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
@@ -187,13 +188,14 @@ impl HbbftMessageMemorium {
     }
 
     fn work_message(&mut self) -> bool {
-        // warn!(target: "consensus", "working on hbbft messages: {} consensuns: {}", self.dispatched_messages.len(), self.dispatched_seals.len());
 
         if let Some(message) = self.dispatched_messages.pop_front() {
             let epoch = message.epoch();
+
+
+            
             match serde_json::to_string(&message) {
                 Ok(json_string) => {
-                    // debug!(target: "consensus", "{}", json_string);
                     self.on_message_string_received(json_string, epoch);
                 }
                 Err(e) => {
