@@ -46,6 +46,7 @@ pub(crate) struct HbbftMessageMemorium {
     message_tracking_id: u64,
 
     config_blocks_to_keep_on_disk: u64,
+    config_block_to_keep_directory: String,
     last_block_deleted_from_disk: u64,
     dispatched_messages: VecDeque<HbMessage>,
     dispatched_seals: VecDeque<(sealing::Message, u64)>,
@@ -57,11 +58,12 @@ pub(crate) struct HbbftMessageDispatcher {
 }
 
 impl HbbftMessageDispatcher {
-    pub fn new(num_blocks_to_keep_on_disk: u64) -> Self {
+    pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
         HbbftMessageDispatcher {
             thread: None,
             memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new(
                 num_blocks_to_keep_on_disk,
+                block_to_keep_directory,
             ))),
         }
     }
@@ -106,17 +108,22 @@ impl HbbftMessageDispatcher {
 }
 
 impl HbbftMessageMemorium {
-    pub fn new(config_blocks_to_keep_on_disk: u64) -> Self {
+    pub fn new(config_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
         HbbftMessageMemorium {
             // signature_shares: BTreeMap::new(),
             // decryption_shares: BTreeMap::new(),
             // agreements: BTreeMap::new(),
             message_tracking_id: 0,
             config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
+            config_block_to_keep_directory: block_to_keep_directory,
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
         }
+    }
+
+    fn get_path_to_write(&self, epoch: u64) -> PathBuf {
+        return PathBuf::from(format!("{}{}", self.config_block_to_keep_directory, epoch));
     }
 
     fn on_message_string_received(&mut self, message_json: String, epoch: u64) {
@@ -126,7 +133,7 @@ impl HbbftMessageMemorium {
         // and don't pick up old delayed messages for blocks already
         // decided to not to keep.
         if self.config_blocks_to_keep_on_disk > 0 && epoch > self.last_block_deleted_from_disk {
-            let mut path_buf = PathBuf::from(format!("data/messages/{}", epoch));
+            let mut path_buf = self.get_path_to_write(epoch);
             if let Err(e) = create_dir_all(path_buf.as_path()) {
                 warn!("Error creating key directory: {:?}", e);
                 return;
