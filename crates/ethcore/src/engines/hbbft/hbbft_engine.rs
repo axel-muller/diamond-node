@@ -276,7 +276,9 @@ impl HoneyBadgerBFT {
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new()),
+            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new(
+                params.blocks_to_keep_on_disk.unwrap_or(0),
+            )),
             sealing: RwLock::new(BTreeMap::new()),
             params,
             message_counter: RwLock::new(0),

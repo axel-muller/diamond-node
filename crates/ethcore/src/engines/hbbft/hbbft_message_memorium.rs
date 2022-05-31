@@ -44,6 +44,7 @@ pub(crate) struct HbbftMessageMemorium {
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
+
     config_blocks_to_keep_on_disk: u64,
     last_block_deleted_from_disk: u64,
     dispatched_messages: VecDeque<HbMessage>,
@@ -56,10 +57,12 @@ pub(crate) struct HbbftMessageDispatcher {
 }
 
 impl HbbftMessageDispatcher {
-    pub fn new() -> Self {
+    pub fn new(num_blocks_to_keep_on_disk: u64) -> Self {
         HbbftMessageDispatcher {
             thread: None,
-            memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new())),
+            memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new(
+                num_blocks_to_keep_on_disk,
+            ))),
         }
     }
 
@@ -103,13 +106,13 @@ impl HbbftMessageDispatcher {
 }
 
 impl HbbftMessageMemorium {
-    pub fn new() -> Self {
+    pub fn new(config_blocks_to_keep_on_disk: u64) -> Self {
         HbbftMessageMemorium {
             // signature_shares: BTreeMap::new(),
             // decryption_shares: BTreeMap::new(),
             // agreements: BTreeMap::new(),
             message_tracking_id: 0,
-            config_blocks_to_keep_on_disk: 200,
+            config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
@@ -187,13 +190,11 @@ impl HbbftMessageMemorium {
     }
 
     fn work_message(&mut self) -> bool {
-        // warn!(target: "consensus", "working on hbbft messages: {} consensuns: {}", self.dispatched_messages.len(), self.dispatched_seals.len());
-
         if let Some(message) = self.dispatched_messages.pop_front() {
             let epoch = message.epoch();
+
             match serde_json::to_string(&message) {
                 Ok(json_string) => {
-                    // debug!(target: "consensus", "{}", json_string);
                     self.on_message_string_received(json_string, epoch);
                 }
                 Err(e) => {
