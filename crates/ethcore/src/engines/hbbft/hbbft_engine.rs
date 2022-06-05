@@ -80,7 +80,7 @@ pub struct HoneyBadgerBFT {
 
 struct TransitionHandler {
     client: Arc<RwLock<Option<Weak<dyn EngineClient>>>>,
-    engine: Arc<HoneyBadgerBFT>,
+    engine: Arc<HoneyBadgerBFT>
 }
 
 const DEFAULT_DURATION: Duration = Duration::from_secs(1);
@@ -202,7 +202,21 @@ impl IoHandler<()> for TransitionHandler {
                     |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
                 );
         } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
-            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+            
+            // we do not run this on the first occurence,
+            // the first occurence could mean that the client is not fully set up
+            // (e.g. it should sync, but it does not know it yet.)
+            // we bypass the first try
+
+            // we are using local static variable here, because 
+            // this function does not have a mut&.
+
+            static IS_FIRST_RUN: AtomicBool = AtomicBool::new(true);
+
+            if IS_FIRST_RUN.load(Ordering::SeqCst) {
+                IS_FIRST_RUN.store(false,Ordering::SeqCst);
+                return;
+            }
 
             // 0: just return if we are syncing.
             // 1: check if we are a validator candidate
@@ -220,15 +234,32 @@ impl IoHandler<()> for TransitionHandler {
             }
             // the engine knows already if it is acting as validator or as regular node.
 
+            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+
             match self.engine.is_staked() {
                 Ok(is_stacked) => {
                     if is_stacked {
+                        debug!(target: "consensus", "is_staked: {}", is_stacked);
                         match self.engine.is_available() {
                             Ok(is_available) => {
                                 if !is_available {
-                                    info!("Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+                                    warn!(target: "consensus", "Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+                                    
+
+                                    if let Some(ref weak) = *self.client.read() {
+                                        if let Some(c) = weak.upgrade() {
+                                            if let Some(id) = c.block_number(BlockId::Latest) {
+                                                warn!(target: "consensus", "BlockID: {id}");
+                                            }
+                                        }
+                                    }
                                     //TODO: implement shutdown.
-                                    panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+                                    // panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+                                    //if let c = self.engine.client.read() {  
+                                    //}
+
+                                    info!("NOT doing a shutdown. faking it right now...");
+                                    
 
                                     // if let Some(ref weak) = *self.client.read() {
                                     //     if let Some(client) = weak.upgrade() {
@@ -813,6 +844,7 @@ impl HoneyBadgerBFT {
                         let mining_address = signer.address();
 
                         if mining_address.is_zero() {
+                            debug!(target: "consensus", "is_available: not available because mining address is zero: ");
                             return Ok(false);
                         }
                         match super::contracts::validator_set::get_validator_available_since(
@@ -820,6 +852,7 @@ impl HoneyBadgerBFT {
                             &mining_address,
                         ) {
                             Ok(available_since) => {
+                                debug!(target: "consensus", "available_since: {}", available_since);
                                 return Ok(!available_since.is_zero());
                             }
                             Err(err) => {
@@ -875,15 +908,19 @@ impl HoneyBadgerBFT {
                                     &staking_address,
                                 ) {
                                     Ok(stake_amount) => {
+                                        debug!(target: "consensus", "stake_amount: {}", stake_amount);
+                                                
                                         // we need to check if the pool stake amount is >= minimum stake
                                         match super::contracts::staking::candidate_min_stake(
                                             engine_client,
                                         ) {
                                             Ok(min_stake) => {
+                                                debug!(target: "consensus", "min_stake: {}", min_stake);
                                                 return Ok(stake_amount.ge(&min_stake));
                                             }
                                             Err(err) => {
                                                 warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
+                                                warn!(target: "consensus", "stake amount: {}", stake_amount);
                                             }
                                         }
                                     }
