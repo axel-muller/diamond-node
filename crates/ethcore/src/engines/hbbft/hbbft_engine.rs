@@ -80,7 +80,7 @@ pub struct HoneyBadgerBFT {
 
 struct TransitionHandler {
     client: Arc<RwLock<Option<Weak<dyn EngineClient>>>>,
-    engine: Arc<HoneyBadgerBFT>
+    engine: Arc<HoneyBadgerBFT>,
 }
 
 const DEFAULT_DURATION: Duration = Duration::from_secs(1);
@@ -142,7 +142,7 @@ impl IoHandler<()> for TransitionHandler {
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
             );
 
-        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(600))
+        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(1200))
             .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
     }
 
@@ -202,19 +202,18 @@ impl IoHandler<()> for TransitionHandler {
                     |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
                 );
         } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
-            
             // we do not run this on the first occurence,
             // the first occurence could mean that the client is not fully set up
             // (e.g. it should sync, but it does not know it yet.)
             // we bypass the first try
 
-            // we are using local static variable here, because 
+            // we are using local static variable here, because
             // this function does not have a mut&.
 
             static IS_FIRST_RUN: AtomicBool = AtomicBool::new(true);
 
             if IS_FIRST_RUN.load(Ordering::SeqCst) {
-                IS_FIRST_RUN.store(false,Ordering::SeqCst);
+                IS_FIRST_RUN.store(false, Ordering::SeqCst);
                 return;
             }
 
@@ -244,7 +243,6 @@ impl IoHandler<()> for TransitionHandler {
                             Ok(is_available) => {
                                 if !is_available {
                                     warn!(target: "consensus", "Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
-                                    
 
                                     if let Some(ref weak) = *self.client.read() {
                                         if let Some(c) = weak.upgrade() {
@@ -255,11 +253,15 @@ impl IoHandler<()> for TransitionHandler {
                                     }
                                     //TODO: implement shutdown.
                                     // panic!("Shutdown hard. Todo: implement Soft Shutdown.");
-                                    //if let c = self.engine.client.read() {  
+                                    //if let c = self.engine.client.read() {
                                     //}
 
-                                    info!("NOT doing a shutdown. faking it right now...");
-                                    
+                                    let id: usize = std::process::id() as usize;
+                                    info!(target: "engine", "Signaling shutdown to process ID...");
+
+                                    unsafe {
+                                        libc::signal(libc::SIGTERM, id);
+                                    }
 
                                     // if let Some(ref weak) = *self.client.read() {
                                     //     if let Some(client) = weak.upgrade() {
@@ -709,7 +711,7 @@ impl HoneyBadgerBFT {
                                     match client.as_full_client() {
                                         Some(c) => {
                                             //debug!(target: "engine", "sending announce availability transaction");
-                                            info!("sending announce availability transaction");
+                                            info!(target: "engine", "sending announce availability transaction");
                                             match send_tx_announce_availability(c, &address) {
                                                 Ok(()) => {}
                                                 Err(call_error) => {
@@ -909,7 +911,7 @@ impl HoneyBadgerBFT {
                                 ) {
                                     Ok(stake_amount) => {
                                         debug!(target: "consensus", "stake_amount: {}", stake_amount);
-                                                
+
                                         // we need to check if the pool stake amount is >= minimum stake
                                         match super::contracts::staking::candidate_min_stake(
                                             engine_client,
