@@ -648,7 +648,7 @@ impl BlockDownloader {
                     .blocks
                     .needed_bodies(number_of_bodies_to_request, false);
 
-                info!(target: "sync", "Downloading blocks from Peer {} sync with better chain. needed Bodies: {}, download receipts: {}", peer_id, needed_bodies.len(),self.download_receipts);
+                    trace_sync!("Downloading blocks from Peer {} sync with better chain. needed Bodies: {}, download receipts: {}", peer_id, needed_bodies.len(),self.download_receipts);
 
                 if !needed_bodies.is_empty() {
                     return Some(BlockRequest::Bodies {
