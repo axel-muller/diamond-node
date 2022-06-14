@@ -259,6 +259,8 @@ impl IoHandler<()> for TransitionHandler {
                                     let id: usize = std::process::id() as usize;
                                     info!(target: "engine", "Signaling shutdown to process ID: {id}");
 
+                                    std::thread::sleep(Duration::from_millis(5000));
+
                                     unsafe {
                                         libc::signal(libc::SIGTERM, id);
                                     }
