@@ -263,7 +263,7 @@ impl IoHandler<()> for TransitionHandler {
 
                                     info!(target: "engine", "Signaling shutdown to process ID: {id}");
                                     unsafe {
-                                        libc::signal(libc::SIGINT, id);
+                                        libc::signal(libc::SIGTERM, id);
                                     }
                                     info!(target: "engine", "Signaling shutdown SENT to process ID: {id}");
 
