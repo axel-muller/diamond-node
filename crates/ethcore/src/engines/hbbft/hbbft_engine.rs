@@ -258,7 +258,13 @@ impl IoHandler<()> for TransitionHandler {
 
                                     let id: usize = std::process::id() as usize;
 
-                                    info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id}");
+                                    let thread_id = std::thread::current().id();
+
+                                    //let child_id = std::process::en;
+
+                                    info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
+
+                                    
                                     std::thread::sleep(Duration::from_millis(5000));
 
                                     info!(target: "engine", "Signaling shutdown to process ID: {id}");
