@@ -52,6 +52,8 @@ use engines::hbbft::{
 };
 use std::{ops::Deref, sync::atomic::Ordering};
 
+use std::process::Command;
+
 type TargetedMessage = hbbft::TargetedMessage<Message, NodeId>;
 
 /// A message sent between validators that is part of Honey Badger BFT or the block sealing process.
@@ -264,14 +266,21 @@ impl IoHandler<()> for TransitionHandler {
 
                                     info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
 
-                                    
-                                    std::thread::sleep(Duration::from_millis(5000));
+                                    // Using libc resulted in errors.
+                                    // can't a process not send a signal to it's own ?!
 
-                                    info!(target: "engine", "Signaling shutdown to process ID: {id}");
-                                    unsafe {
-                                        libc::signal(libc::SIGTERM, id);
-                                    }
-                                    info!(target: "engine", "Signaling shutdown SENT to process ID: {id}");
+                                    // unsafe {
+                                    //    let signal_result = libc::signal(libc::SIGTERM, id);
+                                    //    info!(target: "engine", "Signal result: {signal_result}");
+                                    // }
+
+                                    let child = Command::new("/bin/kill")
+                                        .arg(id.to_string())
+                                        .spawn()
+                                        .expect("failed to execute child");
+
+                                    let kill_id = child.id();
+                                    info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
 
                                     // if let Some(ref weak) = *self.client.read() {
                                     //     if let Some(client) = weak.upgrade() {

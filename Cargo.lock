@@ -1109,7 +1109,6 @@ dependencies = [
  "kvdb-rocksdb",
  "lazy_static",
  "len-caching-lock",
- "libc",
  "log",
  "lru-cache",
  "macros",

@@ -130,7 +130,6 @@ fn main() -> Result<(), i32> {
                         }
                     }
                 });
-                
 
                 let res_set_handler = ctrlc::set_handler({
                     let e = exit.clone();
@@ -146,9 +145,10 @@ fn main() -> Result<(), i32> {
                     }
                 });
 
-                
                 match res_set_handler {
-                    Err(err) => { warn!("could not setup ctrl+c handler: {:?}", err)},
+                    Err(err) => {
+                        warn!("could not setup ctrl+c handler: {:?}", err)
+                    }
                     _ => {}
                 }
 
