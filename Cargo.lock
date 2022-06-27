@@ -3511,7 +3511,7 @@ dependencies = [
 
 [[package]]
 name = "parity-version"
-version = "3.3.4-hbbft-0.8.3-delayed-shutdown-7-subprocess"
+version = "3.3.4-hbbft-0.8.4-rc1"
 dependencies = [
  "parity-bytes",
  "rlp",
