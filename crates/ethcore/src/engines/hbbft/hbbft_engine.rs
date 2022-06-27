@@ -330,6 +330,10 @@ impl HoneyBadgerBFT {
             hbbft_state: RwLock::new(HbbftState::new()),
             hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
+                params
+                    .blocks_to_keep_directory
+                    .clone()
+                    .unwrap_or("data/messages/".to_string()),
             )),
             sealing: RwLock::new(BTreeMap::new()),
             params,
