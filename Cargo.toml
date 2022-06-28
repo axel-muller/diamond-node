@@ -2,7 +2,7 @@
 description = "OpenEthereum"
 name = "openethereum"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "3.3.4-hbbft-0.8.3-delayed-shutdown-7-subprocess"
+version = "3.3.5"
 license = "GPL-3.0"
 authors = [
 	"OpenEthereum developers",
@@ -60,6 +60,8 @@ parity-daemonize = "0.3"
 parity-local-store = { path = "crates/concensus/miner/local-store" }
 parity-runtime = { path = "crates/runtime/runtime" }
 parity-rpc = { path = "crates/rpc" }
+rpc-servers = { path = "crates/rpc-servers", package = "oe-rpc-servers" }
+rpc-common = { path = "crates/rpc-common", package = "oe-rpc-common" }
 parity-version = { path = "crates/util/version" }
 parity-path = "0.1"
 dir = { path = "crates/util/dir" }
