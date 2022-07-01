@@ -1,3 +1,14 @@
+## Diamond Node Software 3.3.4-hbbft-0.8.4
+
+- [Reduced chance of DB corruptions](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+
+## Diamond Node Software 3.3.4-hbbft-0.8.3
+
+Increased availability of nodes.
+
+- [Automatic shutdown on validator candidate unavailability ](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+
+
 ## Diamond Node Software 3.3.4-hbbft-0.8.2
 
 Merge with OpenEthereum 3.3.4.
