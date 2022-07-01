@@ -43,7 +43,6 @@ use std::{
 };
 
 use ansi_term::Colour;
-use ctrlc::CtrlC;
 use ethcore_logger::setup_log;
 use fdlimit::raise_fd_limit;
 use openethereum::{start, ExecutionAction};
@@ -132,7 +131,7 @@ fn main() -> Result<(), i32> {
                     }
                 });
 
-                CtrlC::set_handler({
+                let res_set_handler = ctrlc::set_handler({
                     let e = exit.clone();
                     let exiting = exiting.clone();
                     move || {
@@ -145,6 +144,13 @@ fn main() -> Result<(), i32> {
                         }
                     }
                 });
+
+                match res_set_handler {
+                    Err(err) => {
+                        warn!("could not setup ctrl+c handler: {:?}", err)
+                    }
+                    _ => {}
+                }
 
                 // so the client has started successfully
                 // if this is a daemon, detach from the parent process

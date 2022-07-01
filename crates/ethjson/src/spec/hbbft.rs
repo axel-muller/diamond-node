@@ -51,6 +51,9 @@ pub struct HbbftParams {
     pub block_reward_skips: Option<Vec<HbbftParamsSkipBlockReward>>,
     /// Number of consensus messages to store on the disk. 0 means zero blocks get stored.
     pub blocks_to_keep_on_disk: Option<u64>,
+    /// Directory where to store the Hbbft Messages.
+    /// Usually only the latest HBBFT messages are interesting for Debug, Analytics or Evidence.
+    pub blocks_to_keep_directory: Option<String>,
 }
 
 /// Hbbft engine config.

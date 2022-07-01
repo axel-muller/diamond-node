@@ -52,6 +52,8 @@ use engines::hbbft::{
 };
 use std::{ops::Deref, sync::atomic::Ordering};
 
+use std::process::Command;
+
 type TargetedMessage = hbbft::TargetedMessage<Message, NodeId>;
 
 /// A message sent between validators that is part of Honey Badger BFT or the block sealing process.
@@ -142,7 +144,7 @@ impl IoHandler<()> for TransitionHandler {
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
             );
 
-        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(600))
+        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(1200))
             .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
     }
 
@@ -202,7 +204,20 @@ impl IoHandler<()> for TransitionHandler {
                     |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
                 );
         } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
-            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+            // we do not run this on the first occurence,
+            // the first occurence could mean that the client is not fully set up
+            // (e.g. it should sync, but it does not know it yet.)
+            // we bypass the first try
+
+            // we are using local static variable here, because
+            // this function does not have a mut&.
+
+            static IS_FIRST_RUN: AtomicBool = AtomicBool::new(true);
+
+            if IS_FIRST_RUN.load(Ordering::SeqCst) {
+                IS_FIRST_RUN.store(false, Ordering::SeqCst);
+                return;
+            }
 
             // 0: just return if we are syncing.
             // 1: check if we are a validator candidate
@@ -220,15 +235,52 @@ impl IoHandler<()> for TransitionHandler {
             }
             // the engine knows already if it is acting as validator or as regular node.
 
+            debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
+
             match self.engine.is_staked() {
                 Ok(is_stacked) => {
                     if is_stacked {
+                        debug!(target: "consensus", "is_staked: {}", is_stacked);
                         match self.engine.is_available() {
                             Ok(is_available) => {
                                 if !is_available {
-                                    info!("Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+                                    warn!(target: "consensus", "Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+
+                                    if let Some(ref weak) = *self.client.read() {
+                                        if let Some(c) = weak.upgrade() {
+                                            if let Some(id) = c.block_number(BlockId::Latest) {
+                                                warn!(target: "consensus", "BlockID: {id}");
+                                            }
+                                        }
+                                    }
                                     //TODO: implement shutdown.
-                                    panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+                                    // panic!("Shutdown hard. Todo: implement Soft Shutdown.");
+                                    //if let c = self.engine.client.read() {
+                                    //}
+
+                                    let id: usize = std::process::id() as usize;
+
+                                    let thread_id = std::thread::current().id();
+
+                                    //let child_id = std::process::en;
+
+                                    info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
+
+                                    // Using libc resulted in errors.
+                                    // can't a process not send a signal to it's own ?!
+
+                                    // unsafe {
+                                    //    let signal_result = libc::signal(libc::SIGTERM, id);
+                                    //    info!(target: "engine", "Signal result: {signal_result}");
+                                    // }
+
+                                    let child = Command::new("/bin/kill")
+                                        .arg(id.to_string())
+                                        .spawn()
+                                        .expect("failed to execute child");
+
+                                    let kill_id = child.id();
+                                    info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
 
                                     // if let Some(ref weak) = *self.client.read() {
                                     //     if let Some(client) = weak.upgrade() {
@@ -278,6 +330,10 @@ impl HoneyBadgerBFT {
             hbbft_state: RwLock::new(HbbftState::new()),
             hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
+                params
+                    .blocks_to_keep_directory
+                    .clone()
+                    .unwrap_or("data/messages/".to_string()),
             )),
             sealing: RwLock::new(BTreeMap::new()),
             params,
@@ -678,7 +734,7 @@ impl HoneyBadgerBFT {
                                     match client.as_full_client() {
                                         Some(c) => {
                                             //debug!(target: "engine", "sending announce availability transaction");
-                                            info!("sending announce availability transaction");
+                                            info!(target: "engine", "sending announce availability transaction");
                                             match send_tx_announce_availability(c, &address) {
                                                 Ok(()) => {}
                                                 Err(call_error) => {
@@ -813,6 +869,7 @@ impl HoneyBadgerBFT {
                         let mining_address = signer.address();
 
                         if mining_address.is_zero() {
+                            debug!(target: "consensus", "is_available: not available because mining address is zero: ");
                             return Ok(false);
                         }
                         match super::contracts::validator_set::get_validator_available_since(
@@ -820,6 +877,7 @@ impl HoneyBadgerBFT {
                             &mining_address,
                         ) {
                             Ok(available_since) => {
+                                debug!(target: "consensus", "available_since: {}", available_since);
                                 return Ok(!available_since.is_zero());
                             }
                             Err(err) => {
@@ -875,15 +933,19 @@ impl HoneyBadgerBFT {
                                     &staking_address,
                                 ) {
                                     Ok(stake_amount) => {
+                                        debug!(target: "consensus", "stake_amount: {}", stake_amount);
+
                                         // we need to check if the pool stake amount is >= minimum stake
                                         match super::contracts::staking::candidate_min_stake(
                                             engine_client,
                                         ) {
                                             Ok(min_stake) => {
+                                                debug!(target: "consensus", "min_stake: {}", min_stake);
                                                 return Ok(stake_amount.ge(&min_stake));
                                             }
                                             Err(err) => {
                                                 warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
+                                                warn!(target: "consensus", "stake amount: {}", stake_amount);
                                             }
                                         }
                                     }

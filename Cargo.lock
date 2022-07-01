@@ -763,12 +763,12 @@ dependencies = [
 
 [[package]]
 name = "ctrlc"
-version = "1.1.1"
-source = "git+https://github.com/paritytech/rust-ctrlc.git#b523017108bb2d571a7a69bd97bc406e63bc7a9d"
+version = "3.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b37feaa84e6861e00a1f5e5aa8da3ee56d605c9992d33e082786754828e20865"
 dependencies = [
- "kernel32-sys",
- "libc",
- "winapi 0.2.8",
+ "nix",
+ "winapi 0.3.8",
 ]
 
 [[package]]
@@ -1753,9 +1753,9 @@ checksum = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 
 [[package]]
 name = "fs-swap"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921d332c89b3b61a826de38c61ee5b6e02c56806cade1b0e5d81bd71f57a71bb"
+checksum = "03d47dad3685eceed8488986cad3d5027165ea5edb164331770e2059555f10a5"
 dependencies = [
  "lazy_static",
  "libc",
@@ -2671,9 +2671,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.89"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "538c092e5586f4cdd7dd8078c4a79220e3e168880218124dcbce860f0ea938c6"
+checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
 name = "libloading"
@@ -2990,6 +2990,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f17df307904acd05aa8e32e97bb20f2a0df1728bbc2d771ae8f9a90463441e9"
+dependencies = [
+ "bitflags 1.2.1",
+ "cfg-if 1.0.0",
+ "libc",
+]
+
+[[package]]
 name = "node-filter"
 version = "1.12.0"
 dependencies = [
@@ -3137,7 +3148,7 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "openethereum"
-version = "3.3.4-hbbft-0.8.3"
+version = "3.3.4-hbbft-0.8.3-delayed-shutdown-7-subprocess"
 dependencies = [
  "ansi_term 0.10.2",
  "atty",
@@ -3166,6 +3177,7 @@ dependencies = [
  "fake-fetch",
  "fdlimit",
  "fetch",
+ "fs-swap",
  "futures",
  "hyper 0.12.35",
  "ipnetwork",
@@ -3499,7 +3511,7 @@ dependencies = [
 
 [[package]]
 name = "parity-version"
-version = "3.3.4-hbbft-0.8.3"
+version = "3.3.4-hbbft-0.8.4-rc1"
 dependencies = [
  "parity-bytes",
  "rlp",
