@@ -1210,6 +1210,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_locked_block(&self, block: &crate::block::LockedBlock) {
+
+        error!(target: "engine", "on_locked_block called {} {}", block.header.number(), block.header.hash());
         if let Some(client) = self.client_arc() {
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,
@@ -1217,10 +1219,25 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 BlockId::Number(block.header.number()),
                 false,
             ) {
-                error!(target: "engine", "could not update honey badger after locking the block: update honeybadger failed");
+                error!(target: "engine", "could not update honey badger after locking the block: update honeybadger failed {} {} ", block.header.number(), block.header.hash());
             }
         } else {
-            error!(target: "engine", "could not update honey badger after locking the block: no client");
+            error!(target: "engine", "could not update honey badger after locking the block: no client {} {}", block.header.number(), block.header.hash());
+        }
+    }
+
+    fn on_imported_block_hash(&self, block_hash: H256) {
+        if let Some(client) = self.client_arc() {
+            if let None = self.hbbft_state.write().update_honeybadger(
+                client,
+                &self.signer,
+                BlockId::Hash(block_hash),
+                false,
+            ) {
+                error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed");
+            }
+        } else {
+            error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
         }
     }
 }

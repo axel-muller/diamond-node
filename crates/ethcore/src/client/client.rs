@@ -3342,7 +3342,9 @@ impl ImportExportBlocks for Client {
                 Err(e) => {
                     return Err(format!("Cannot import block #{}: {:?}", number, e));
                 }
-                Ok(_) => {}
+                Ok(block_hash) => {
+                    self.engine.on_imported_block_hash(block_hash);
+                }
             }
             Ok(())
         };

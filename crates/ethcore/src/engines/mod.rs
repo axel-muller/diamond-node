@@ -355,6 +355,9 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// Block was closed an locked.
     fn on_locked_block(&self, _block: &LockedBlock) {}
 
+    /// Block was imported.
+    fn on_imported_block_hash(&self, _block_hash: H256) {} 
+
     /// Allow mutating the header during seal generation. Currently only used by Clique.
     fn on_seal_block(&self, _block: &mut ExecutedBlock) -> Result<(), Error> {
         Ok(())
