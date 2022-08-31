@@ -441,6 +441,7 @@ impl HoneyBadgerBFT {
                 }
             };
             self.process_seal_step(client, step, block_num, network_info);
+            self.on_imported_block_hash(&hash);
         } else {
             error!(target: "consensus", "Could not create pending block for hbbft epoch {}: ", batch.epoch);
         }
@@ -1209,29 +1210,12 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         Ok(())
     }
 
-    fn on_locked_block(&self, block: &crate::block::LockedBlock) {
-
-        error!(target: "engine", "on_locked_block called {} {}", block.header.number(), block.header.hash());
+    fn on_imported_block_hash(&self, block_hash: &H256) {
         if let Some(client) = self.client_arc() {
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,
                 &self.signer,
-                BlockId::Number(block.header.number()),
-                false,
-            ) {
-                error!(target: "engine", "could not update honey badger after locking the block: update honeybadger failed {} {} ", block.header.number(), block.header.hash());
-            }
-        } else {
-            error!(target: "engine", "could not update honey badger after locking the block: no client {} {}", block.header.number(), block.header.hash());
-        }
-    }
-
-    fn on_imported_block_hash(&self, block_hash: H256) {
-        if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
-                client,
-                &self.signer,
-                BlockId::Hash(block_hash),
+                BlockId::Hash(*block_hash),
                 false,
             ) {
                 error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed");
