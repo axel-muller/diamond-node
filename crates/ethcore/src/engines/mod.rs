@@ -353,8 +353,7 @@ pub trait Engine<M: Machine>: Sync + Send {
     }
 
     /// Block was closed an locked.
-    fn on_locked_block(&self, _block: & LockedBlock)
-    -> Result<(), M::Error> {
+    fn on_locked_block(&self, _block: &LockedBlock) -> Result<(), M::Error> {
         Ok(())
     }
 

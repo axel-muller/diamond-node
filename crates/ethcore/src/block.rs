@@ -394,8 +394,6 @@ impl<'x> OpenBlock<'x> {
         s.engine.on_locked_block(&result)?;
 
         Ok(result)
-
-        
     }
 
     #[cfg(test)]
