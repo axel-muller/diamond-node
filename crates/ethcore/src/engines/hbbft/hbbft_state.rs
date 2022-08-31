@@ -57,7 +57,15 @@ impl HbbftState {
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
-        let target_posdao_epoch = get_posdao_epoch(&*client, block_id).ok()?.low_u64();
+        let target_posdao_epoch: u64;
+        match get_posdao_epoch(&*client, block_id) {
+            Ok(value) => target_posdao_epoch = value.low_u64(),
+            Err(error) => {
+                error!(target: "engine", "error calling get_posdao_epoch for block {:?}: {:?}", block_id, error);
+                return None;
+            }
+        }
+
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
