@@ -391,7 +391,7 @@ impl<'x> OpenBlock<'x> {
         );
 
         let result = LockedBlock { block: s.block };
-        s.engine.on_locked_block(&result)?;
+        s.engine.on_locked_block(&result);
 
         Ok(result)
     }

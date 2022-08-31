@@ -1208,6 +1208,21 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
         Ok(())
     }
+
+    fn on_locked_block(&self, block: &crate::block::LockedBlock) {
+        if let Some(client) = self.client_arc() {
+            if let None = self.hbbft_state.write().update_honeybadger(
+                client,
+                &self.signer,
+                BlockId::Number(block.header.number()),
+                false,
+            ) {
+                error!(target: "engine", "could not update honey badger after locking the block: update honeybadger failed");
+            }
+        } else {
+            error!(target: "engine", "could not update honey badger after locking the block: no client");
+        }
+    }
 }
 
 #[cfg(test)]

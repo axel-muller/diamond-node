@@ -353,9 +353,7 @@ pub trait Engine<M: Machine>: Sync + Send {
     }
 
     /// Block was closed an locked.
-    fn on_locked_block(&self, _block: &LockedBlock) -> Result<(), M::Error> {
-        Ok(())
-    }
+    fn on_locked_block(&self, _block: &LockedBlock) {}
 
     /// Allow mutating the header during seal generation. Currently only used by Clique.
     fn on_seal_block(&self, _block: &mut ExecutedBlock) -> Result<(), Error> {

@@ -164,12 +164,16 @@ impl HbbftState {
 
         // Update honey_badger *before* trying to use it to make sure we use the data
         // structures matching the current epoch.
-        self.update_honeybadger(
-            client.clone(),
-            signer,
-            BlockId::Number(latest_block_number),
-            false,
-        );
+
+        // we asume that honey badger instance is up to date here.
+        // it has to be updated after closing each block.
+
+        // self.update_honeybadger(
+        //     client.clone(),
+        //     signer,
+        //     BlockId::Number(latest_block_number),
+        //     false,
+        // );
 
         // If honey_badger is None we are not a validator, nothing to do.
         let honey_badger = self.honey_badger.as_mut()?;
