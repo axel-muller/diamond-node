@@ -27,6 +27,8 @@ mod validator_set;
 pub mod block_reward;
 pub mod signer;
 
+use crate::block::LockedBlock;
+
 pub use self::{
     authority_round::AuthorityRound,
     basic_authority::BasicAuthority,
@@ -349,6 +351,8 @@ pub trait Engine<M: Machine>: Sync + Send {
     fn on_close_block(&self, _block: &mut ExecutedBlock) -> Result<(), M::Error> {
         Ok(())
     }
+
+    
 
     /// Allow mutating the header during seal generation. Currently only used by Clique.
     fn on_seal_block(&self, _block: &mut ExecutedBlock) -> Result<(), Error> {

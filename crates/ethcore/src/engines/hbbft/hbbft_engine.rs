@@ -985,7 +985,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn verify_local_seal(&self, _header: &Header) -> Result<(), Error> {
-        self.check_for_epoch_change();
+        // self.check_for_epoch_change();
         Ok(())
     }
 
@@ -1076,7 +1076,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         &self,
         block: &ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
-        self.check_for_epoch_change();
+        // self.check_for_epoch_change();
         let _random_number = match self.random_numbers.read().get(&block.header.number()) {
             None => {
                 return Err(EngineError::Custom(
@@ -1112,7 +1112,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_transactions_imported(&self) {
-        self.check_for_epoch_change();
+        // self.check_for_epoch_change();
         if let Some(client) = self.client_arc() {
             if self.transaction_queue_and_time_thresholds_reached(&client) {
                 self.start_hbbft_epoch(client);
@@ -1121,7 +1121,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn handle_message(&self, message: &[u8], node_id: Option<H512>) -> Result<(), EngineError> {
-        self.check_for_epoch_change();
+        // self.check_for_epoch_change();
         let node_id = NodeId(node_id.ok_or(EngineError::UnexpectedMessage)?);
         match serde_json::from_slice(message) {
             Ok(Message::HoneyBadger(msg_idx, hb_msg)) => {
@@ -1173,7 +1173,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-        self.check_for_epoch_change();
+        // self.check_for_epoch_change();
 
         if let Some(address) = self.params.block_reward_contract_address {
             // only if no block reward skips are defined for this block.

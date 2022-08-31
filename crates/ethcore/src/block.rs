@@ -390,7 +390,13 @@ impl<'x> OpenBlock<'x> {
                 .map_or_else(U256::zero, |r| r.gas_used),
         );
 
-        Ok(LockedBlock { block: s.block })
+        let result = LockedBlock { block: s.block };
+
+        s.engine.on_block_closed(&result)?;
+
+        Ok(result)
+
+        
     }
 
     #[cfg(test)]
