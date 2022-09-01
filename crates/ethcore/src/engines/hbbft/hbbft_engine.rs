@@ -1063,7 +1063,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         &self,
         block: &ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
-
         let _random_number = match self.random_numbers.read().get(&block.header.number()) {
             None => {
                 return Err(EngineError::Custom(
