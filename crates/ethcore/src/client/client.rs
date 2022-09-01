@@ -780,6 +780,7 @@ impl Importer {
         client.db.read().key_value().write_buffered(batch);
         // t_nb 9.12 commit changed to become current greatest by applying pending insertion updates (Sync point)
         chain.commit();
+        self.engine.on_chain_commit(&header.hash());
 
         // t_nb 9.13 check epoch end. Related only to AuRa and it seems light engine
         self.check_epoch_end(&header, &finalized, &chain, client);

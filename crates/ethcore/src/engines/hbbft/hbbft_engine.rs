@@ -1191,7 +1191,22 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         Ok(())
     }
 
-    fn on_imported_block_hash(&self, block_hash: &H256) {
+    // fn on_imported_block_hash(&self, block_hash: &H256) {
+    //     if let Some(client) = self.client_arc() {
+    //         if let None = self.hbbft_state.write().update_honeybadger(
+    //             client,
+    //             &self.signer,
+    //             BlockId::Hash(*block_hash),
+    //             false,
+    //         ) {
+    //             error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed");
+    //         }
+    //     } else {
+    //         error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
+    //     }
+    // }
+
+    fn on_chain_commit(&self, block_hash: &H256) {
         if let Some(client) = self.client_arc() {
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,

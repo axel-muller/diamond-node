@@ -336,6 +336,9 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// New transactions were imported to the transaction queue
     fn on_transactions_imported(&self) {}
 
+    /// sealed block got commited to the blockchain  
+    fn on_chain_commit(&self, _hash: &H256) {}
+
     /// Block transformation functions, before the transactions.
     /// `epoch_begin` set to true if this block kicks off an epoch.
     fn on_new_block(
