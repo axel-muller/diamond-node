@@ -93,7 +93,7 @@ impl HbbftState {
         self.current_posdao_epoch = target_posdao_epoch;
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
-            trace!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             return Some(());
         }
 
@@ -101,7 +101,7 @@ impl HbbftState {
         self.network_info = Some(network_info.clone());
         self.honey_badger = Some(self.new_honey_badger(network_info)?);
 
-        trace!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
+        info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
         Some(())
     }
 
