@@ -206,11 +206,11 @@ pub fn all_parts_acks_available(
     // v1 should be never used.
     // remove the code:
     // see: https://github.com/DMDcoin/openethereum-3.x/issues/72
-    let trigger_timestamp: u64 = 1646395200; // Friday, March 4, 2022 12:00:00 PM
+    // let trigger_timestamp: u64 = 0; // Friday, March 4, 2022 12:00:00 PM
 
-    if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
-        return Ok(true);
-    }
+    // if block_timestamp > 0 && trigger_timestamp > 0 && block_timestamp < trigger_timestamp {
+    //     return Ok(true);
+    // }
 
     let c = BoundContract::bind(client, BlockId::Latest, *KEYGEN_HISTORY_ADDRESS);
     let (num_parts, num_acks) = call_const_key_history!(c, get_number_of_key_fragments_written)?;
