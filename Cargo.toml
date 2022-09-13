@@ -117,13 +117,51 @@ path = "bin/oe/lib.rs"
 path = "bin/oe/main.rs"
 name = "openethereum"
 
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+rpath = false
+
+
 [profile.test]
 lto = false
 opt-level = 0
 
 [profile.release]
+opt-level = 3
 debug = false
-lto = true
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.perf]
+inherits = 'release'
+opt-level = 0
+debug = true
+debuginfo-level = 1
+jemalloc = false
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+rpath = false
+
+
 
 [workspace]
 # This should only list projects that are not
