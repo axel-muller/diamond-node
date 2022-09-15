@@ -19,7 +19,10 @@ use clap::{App, Arg};
 use ethstore::{KeyFile, SafeAccount};
 use keygen_history_helpers::{enodes_to_pub_keys, generate_keygens, key_sync_history_data};
 use parity_crypto::publickey::{Address, Generator, KeyPair, Public, Random, Secret};
-use std::{collections::BTreeMap, fmt::Write, fs, num::NonZeroU32, str::FromStr, sync::Arc};
+use std::{
+    collections::BTreeMap, convert::TryInto, fmt::Write, fs, num::NonZeroU32, str::FromStr,
+    sync::Arc,
+};
 use toml::{map::Map, Value};
 
 pub fn create_account() -> (Secret, Public, Address) {
@@ -104,6 +107,8 @@ fn to_toml(
     config_type: &ConfigType,
     external_ip: Option<&str>,
     signer_address: &Address,
+    total_num_of_nodes: usize,
+    tx_queue_per_sender: Option<i64>,
 ) -> Value {
     let base_port = 30300i64;
     let base_rpc_port = 8540i64;
@@ -142,7 +147,10 @@ fn to_toml(
         }
     }
 
-    network.insert("min_peers".into(), Value::Integer(50));
+    network.insert(
+        "min_peers".into(),
+        Value::Integer(total_num_of_nodes.try_into().unwrap()),
+    );
     network.insert("max_peers".into(), Value::Integer(50));
 
     match external_ip {
@@ -222,6 +230,13 @@ fn to_toml(
     mining.insert("extra_data".into(), Value::String("Parity".into()));
     mining.insert("reseal_min_period".into(), Value::Integer(0));
 
+    if let Some(tx_queue_per_sender_) = tx_queue_per_sender {
+        mining.insert(
+            "tx_queue_per_sender".into(),
+            Value::Integer(tx_queue_per_sender_),
+        );
+    }
+
     let mut misc = Map::new();
     misc.insert(
         "logging".into(),
@@ -271,7 +286,7 @@ fn write_json_for_secret(secret: Secret, filename: String) {
 fn main() {
     let matches = App::new("hbbft parity config generator")
         .version("1.0")
-        .author("David Forstenlechner <dforsten@gmail.com>")
+        .author("David Forstenlechner <dforsten@gmail.com>, Thomas Haller <thomashaller@gmx.at>")
         .about("Generates n toml files for running a hbbft validator node network")
         .arg(
             Arg::with_name("validator_nodes")
@@ -303,6 +318,12 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("tx_queue_per_sender")
+                .long("tx_queue_per_sender")
+                .required(false)
+                .takes_value(true),
+        )
         .get_matches();
 
     let num_nodes_validators: usize = matches
@@ -316,6 +337,14 @@ fn main() {
         .expect("Number of max_nodes input required")
         .parse()
         .expect("total_nodes must be of integer type");
+
+    let tx_queue_per_sender: Option<i64> =
+        matches.value_of("tx_queue_per_sender").map_or(None, |v| {
+            Some(
+                v.parse::<i64>()
+                    .expect("tx_queue_per_sender need to be of integer type"),
+            )
+        });
 
     assert!(
         num_nodes_total >= num_nodes_validators,
@@ -370,8 +399,15 @@ fn main() {
             .expect("enode should be written to the reserved peers string");
         let i = enode.idx;
         let file_name = format!("hbbft_validator_{}.toml", i);
-        let toml_string = toml::to_string(&to_toml(i, &config_type, external_ip, &enode.address))
-            .expect("TOML string generation should succeed");
+        let toml_string = toml::to_string(&to_toml(
+            i,
+            &config_type,
+            external_ip,
+            &enode.address,
+            num_nodes_total,
+            tx_queue_per_sender.clone(),
+        ))
+        .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
 
         let file_name = format!("hbbft_validator_key_{}", i);
@@ -397,7 +433,9 @@ fn main() {
         0,
         &ConfigType::Rpc,
         external_ip,
-        &Address::default(),
+        &Address::default(), // todo: insert HBBFT Contracts pot here.
+        num_nodes_total,
+        tx_queue_per_sender.clone(),
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");

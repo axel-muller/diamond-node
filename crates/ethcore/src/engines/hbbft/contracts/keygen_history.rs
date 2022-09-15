@@ -194,7 +194,7 @@ impl<'a> SecretKey for KeyPairWrapper {
 
 pub fn all_parts_acks_available(
     client: &dyn EngineClient,
-    block_timestamp: u64,
+    _block_timestamp: u64,
     num_validators: usize,
 ) -> Result<bool, CallError> {
     // backward compatibility:
