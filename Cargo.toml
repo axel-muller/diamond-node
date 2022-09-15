@@ -142,23 +142,23 @@ debug-assertions = false
 overflow-checks = false
 lto = false
 panic = 'unwind'
-incremental = false
+incremental = true
 codegen-units = 1
 rpath = false
 
 [profile.perf]
 inherits = 'release'
-opt-level = 0
+opt-level = 3
 debug = true
 debuginfo-level = 1
 jemalloc = false
 split-debuginfo = '...'  # Platform-specific.
-debug-assertions = true
-overflow-checks = true
+debug-assertions = false
+overflow-checks = false
 lto = false
 panic = 'unwind'
 incremental = true
-codegen-units = 256
+codegen-units = 1
 rpath = false
 
 
