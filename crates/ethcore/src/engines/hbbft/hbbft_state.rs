@@ -57,7 +57,15 @@ impl HbbftState {
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
-        let target_posdao_epoch = get_posdao_epoch(&*client, block_id).ok()?.low_u64();
+        let target_posdao_epoch: u64;
+        match get_posdao_epoch(&*client, block_id) {
+            Ok(value) => target_posdao_epoch = value.low_u64(),
+            Err(error) => {
+                error!(target: "engine", "error calling get_posdao_epoch for block {:?}: {:?}", block_id, error);
+                return None;
+            }
+        }
+
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
@@ -85,7 +93,7 @@ impl HbbftState {
         self.current_posdao_epoch = target_posdao_epoch;
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
-            trace!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             return Some(());
         }
 
@@ -93,7 +101,7 @@ impl HbbftState {
         self.network_info = Some(network_info.clone());
         self.honey_badger = Some(self.new_honey_badger(network_info)?);
 
-        trace!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
+        info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
         Some(())
     }
 
@@ -157,19 +165,16 @@ impl HbbftState {
     fn skip_to_current_epoch(
         &mut self,
         client: Arc<dyn EngineClient>,
-        signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
+        _signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     ) -> Option<()> {
         // Ensure we evaluate at the same block # in the entire upward call graph to avoid inconsistent state.
         let latest_block_number = client.block_number(BlockId::Latest)?;
 
         // Update honey_badger *before* trying to use it to make sure we use the data
         // structures matching the current epoch.
-        self.update_honeybadger(
-            client.clone(),
-            signer,
-            BlockId::Number(latest_block_number),
-            false,
-        );
+
+        // we asume that honey badger instance is up to date here.
+        // it has to be updated after closing each block.
 
         // If honey_badger is None we are not a validator, nothing to do.
         let honey_badger = self.honey_badger.as_mut()?;
