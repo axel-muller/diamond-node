@@ -58,7 +58,7 @@ extern crate reth_util;
 extern crate rlp;
 extern crate rustc_hex;
 extern crate serde;
-extern crate serde_json;
+extern crate rmp_serde;
 extern crate stats;
 extern crate time_utils;
 extern crate trie_db as trie;

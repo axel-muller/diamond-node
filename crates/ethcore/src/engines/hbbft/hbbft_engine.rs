@@ -16,7 +16,7 @@ use machine::EthereumMachine;
 use parking_lot::RwLock;
 use rlp;
 use serde::Deserialize;
-use serde_json;
+use rmp_serde;
 use std::{
     cmp::{max, min},
     collections::BTreeMap,
@@ -528,8 +528,9 @@ impl HoneyBadgerBFT {
         I: IntoIterator<Item = TargetedMessage>,
     {
         for m in messages {
+            
             let ser =
-                serde_json::to_vec(&m.message).expect("Serialization of consensus message failed");
+                rmp_serde::to_vec(&m.message).expect("Serialization of consensus message failed");
             match m.target {
                 Target::Nodes(set) => {
                     trace!(target: "consensus", "Dispatching message {:?} to {:?}", m.message, set);
@@ -1106,7 +1107,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn handle_message(&self, message: &[u8], node_id: Option<H512>) -> Result<(), EngineError> {
         let node_id = NodeId(node_id.ok_or(EngineError::UnexpectedMessage)?);
-        match serde_json::from_slice(message) {
+        match rmp_serde::from_slice(message) {
             Ok(Message::HoneyBadger(msg_idx, hb_msg)) => {
                 self.process_hb_message(msg_idx, hb_msg, node_id)
             }
