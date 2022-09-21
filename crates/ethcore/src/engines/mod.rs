@@ -27,8 +27,6 @@ mod validator_set;
 pub mod block_reward;
 pub mod signer;
 
-use crate::block::LockedBlock;
-
 pub use self::{
     authority_round::AuthorityRound,
     basic_authority::BasicAuthority,
