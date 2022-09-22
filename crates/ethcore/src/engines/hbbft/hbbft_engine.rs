@@ -15,8 +15,8 @@ use itertools::Itertools;
 use machine::EthereumMachine;
 use parking_lot::RwLock;
 use rlp;
-use serde::Deserialize;
 use rmp_serde;
+use serde::Deserialize;
 use std::{
     cmp::{max, min},
     collections::BTreeMap,
@@ -528,7 +528,6 @@ impl HoneyBadgerBFT {
         I: IntoIterator<Item = TargetedMessage>,
     {
         for m in messages {
-            
             let ser =
                 rmp_serde::to_vec(&m.message).expect("Serialization of consensus message failed");
             match m.target {

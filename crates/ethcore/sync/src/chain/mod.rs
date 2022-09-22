@@ -366,6 +366,8 @@ pub struct PeerInfo {
     snapshot_number: Option<BlockNumber>,
     /// Block set requested
     block_set: Option<BlockSet>,
+    #[allow(dead_code)]
+    // used in a test + it would be good to be able to access the client_version for diagnostic reasons.
     /// Version of the software the peer is running
     client_version: ClientVersion,
 }

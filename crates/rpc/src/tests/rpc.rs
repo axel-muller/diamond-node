@@ -20,6 +20,7 @@ use rpc_servers::{HttpServer, MetaIoHandler};
 use tests::{helpers::Server, http_client};
 use v1::{extractors, Metadata};
 
+#[cfg(any(test, feature = "test-helpers"))]
 fn serve(handler: Option<MetaIoHandler<Metadata>>) -> Server<HttpServer> {
     let address = "127.0.0.1:0".parse().unwrap();
     let handler = handler.unwrap_or_default();
@@ -43,6 +44,7 @@ fn serve(handler: Option<MetaIoHandler<Metadata>>) -> Server<HttpServer> {
     })
 }
 
+#[cfg(any(test, feature = "test-helpers"))]
 /// Test a single request to running server
 fn request(server: Server<HttpServer>, request: &str) -> http_client::Response {
     http_client::request(server.server.address(), request)
