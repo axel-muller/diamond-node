@@ -481,9 +481,11 @@ impl HoneyBadgerBFT {
         block_num: BlockNumber,
     ) -> Result<(), EngineError> {
         // store received messages here.
-        self.hbbft_message_dispatcher
-            .write()
-            .on_sealing_message_received(&message, block_num);
+        // self.hbbft_message_dispatcher
+        //     .write()
+        //     .on_sealing_message_received(&message, block_num, &sender_id);
+
+        
 
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
         trace!(target: "consensus", "Received sealing message for block {} from {} : {:?} ",block_num, sender_id, message);
@@ -513,8 +515,14 @@ impl HoneyBadgerBFT {
             .or_insert_with(|| self.new_sealing(&network_info))
             .handle_message(&sender_id, message);
         match step_result {
-            Ok(step) => self.process_seal_step(client, step, block_num, &network_info),
-            Err(err) => error!(target: "consensus", "Error on ThresholdSign step: {:?}", err), // TODO: Errors
+            Ok(step) => {
+                self.hbbft_message_dispatcher.write().report_seal_good(&sender_id, block_num);
+                self.process_seal_step(client, step, block_num, &network_info);
+            }
+            Err(err) => {
+                error!(target: "consensus", "Error on ThresholdSign step: {:?}", err);
+                self.hbbft_message_dispatcher.write().report_seal_bad(&sender_id, block_num);
+            }
         }
         Ok(())
     }
@@ -1233,6 +1241,8 @@ mod tests {
             HoneyBadger::builder(Arc::new(net_info.clone()));
 
         let mut honey_badger = builder.build();
+
+        
 
         let mut pending: Vec<SignedTransaction> = Vec::new();
         let keypair = Random.generate();

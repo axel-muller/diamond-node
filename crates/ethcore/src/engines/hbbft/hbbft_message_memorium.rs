@@ -1,3 +1,4 @@
+
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
@@ -31,6 +32,19 @@ Hbbft Message Process
 //
 */
 
+
+pub(crate) enum SealMessageState {
+
+    Good,
+    Late(u64),
+    Error(Box<sealing::Message>)
+}
+
+pub(crate) struct DispatchedSealMessage {
+    message: Option<sealing::Message>
+
+}
+
 pub(crate) struct HbbftMessageMemorium {
     // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     // signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
@@ -44,7 +58,8 @@ pub(crate) struct HbbftMessageMemorium {
     // */
     // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
     message_tracking_id: u64,
-
+    /// how many bad message should we keep on disk ?
+    config_bad_message_evidence_reporting: u64,
     config_blocks_to_keep_on_disk: u64,
     config_block_to_keep_directory: String,
     last_block_deleted_from_disk: u64,
@@ -53,13 +68,20 @@ pub(crate) struct HbbftMessageMemorium {
 }
 
 pub(crate) struct HbbftMessageDispatcher {
+    num_blocks_to_keep_on_disk: u64,
     thread: Option<std::thread::JoinHandle<Self>>,
     memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>,
+}
+
+struct GoodSealEvent {
+    node_id: NodeId,
+    block_num: u64
 }
 
 impl HbbftMessageDispatcher {
     pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
         HbbftMessageDispatcher {
+            num_blocks_to_keep_on_disk,
             thread: None,
             memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new(
                 num_blocks_to_keep_on_disk,
@@ -69,26 +91,31 @@ impl HbbftMessageDispatcher {
     }
 
     pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
-        self.memorial
-            .write()
-            .dispatched_seals
-            .push_back((message.clone(), epoch));
 
-        self.ensure_worker_thread();
+        if self.num_blocks_to_keep_on_disk > 0 { 
+            self.memorial
+                .write()
+                .dispatched_seals
+                .push_back((message.clone(), epoch));
+
+            self.ensure_worker_thread();
+        }
     }
 
     pub fn on_message_received(&mut self, message: &HbMessage) {
-        //performance: dispatcher pattern + multithreading could improve performance a lot.
 
-        self.memorial
+        if self.num_blocks_to_keep_on_disk > 0 {
+            self.memorial
             .write()
             .dispatched_messages
             .push_back(message.clone());
 
-        self.ensure_worker_thread();
+            self.ensure_worker_thread();
+        }
     }
 
     fn ensure_worker_thread(&mut self) {
+        
         if self.thread.is_none() {
             // let mut memo = self;
             // let mut arc = std::sync::Arc::new(&self);
@@ -100,6 +127,23 @@ impl HbbftMessageDispatcher {
                 }
             }));
         }
+    }
+
+    pub fn report_seal_good(&mut self, node_id: &NodeId, block_num: u64) {
+
+    }
+
+
+    pub fn report_seal_bad(&mut self, node_id: &NodeId, block_num: u64) {
+
+        let goodEvent = GoodSealEvent { node_id: node_id.clone(), block_num };
+        // self.memorial
+        // .write()
+        // .dispatched_messages
+        // .push_back(message.clone());
+
+        
+
     }
 
     pub fn free_memory(&mut self, _current_block: u64) {
@@ -114,6 +158,7 @@ impl HbbftMessageMemorium {
             // decryption_shares: BTreeMap::new(),
             // agreements: BTreeMap::new(),
             message_tracking_id: 0,
+            config_bad_message_evidence_reporting: 0,
             config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
             config_block_to_keep_directory: block_to_keep_directory,
             last_block_deleted_from_disk: 0,
@@ -199,7 +244,10 @@ impl HbbftMessageMemorium {
     fn work_message(&mut self) -> bool {
         if let Some(message) = self.dispatched_messages.pop_front() {
             let epoch = message.epoch();
-
+            // match message.content() {
+            //     honey_badger::MessageContent::Subset(subset) => todo!(),
+            //     honey_badger::MessageContent::DecryptionShare { proposer_id, share } => todo!(),
+            // }
             match serde_json::to_string(&message) {
                 Ok(json_string) => {
                     self.on_message_string_received(json_string, epoch);
