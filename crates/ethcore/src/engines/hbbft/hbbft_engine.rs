@@ -488,7 +488,7 @@ impl HoneyBadgerBFT {
         
 
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
-        trace!(target: "consensus", "Received sealing message for block {} from {} : {:?} ",block_num, sender_id, message);
+        trace!(target: "consensus", "Received sealing message for block {} from {}",block_num, sender_id);
         if let Some(latest) = client.block_number(BlockId::Latest) {
             if latest >= block_num {
                 return Ok(()); // Message is obsolete.
