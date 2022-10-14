@@ -78,6 +78,13 @@ struct GoodSealEvent {
     block_num: u64
 }
 
+struct BadSealEvent {
+    node_id: NodeId,
+    block_num: u64
+}
+
+
+
 impl HbbftMessageDispatcher {
     pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
         HbbftMessageDispatcher {
@@ -130,13 +137,13 @@ impl HbbftMessageDispatcher {
     }
 
     pub fn report_seal_good(&mut self, node_id: &NodeId, block_num: u64) {
-
+        let goodEvent = GoodSealEvent { node_id: node_id.clone(), block_num };
     }
 
 
     pub fn report_seal_bad(&mut self, node_id: &NodeId, block_num: u64) {
 
-        let goodEvent = GoodSealEvent { node_id: node_id.clone(), block_num };
+        
         // self.memorial
         // .write()
         // .dispatched_messages
