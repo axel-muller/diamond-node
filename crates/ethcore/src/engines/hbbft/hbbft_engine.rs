@@ -375,7 +375,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Batch received for epoch {}, creating new Block.", batch.epoch);
 
         // Decode and de-duplicate transactions
-        let batch_txns: Vec<_> = batch
+        let mut batch_txns: Vec<_> = batch
             .contributions
             .iter()
             .flat_map(|(_, c)| &c.transactions)
@@ -389,6 +389,13 @@ impl HoneyBadgerBFT {
                 SignedTransaction::new(txn).ok()
             })
             .collect();
+
+        info!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
+            .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
+
+        // Make sure lower nonces come before higher nonces.
+        // TODO: Sort per sender address instead of globally, otherwise frontrunning may be possible for accounts with very high nonces!
+        batch_txns.sort_by(|left, right| left.tx().nonce.cmp(&right.tx().nonce));
 
         // We use the median of all contributions' timestamps
         let timestamps = batch
