@@ -105,11 +105,7 @@ impl HbbftMessageDispatcher {
             memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new(
                 num_blocks_to_keep_on_disk,
                 block_to_keep_directory,
-                // seal_event_channel_good.1,
-                // seal_event_channel_bad.1,
             ))),
-            //seal_events_sender_good: seal_event_channel_good.0,
-            //seal_events_sender_bad: seal_event_channel_bad.0,
         };
 
         result.ensure_worker_thread();
