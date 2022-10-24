@@ -117,7 +117,7 @@ impl HbbftMessageDispatcher {
         return result;
     }
 
-    pub fn on_sealing_message_received(&mut self, message: &sealing::Message, epoch: u64) {
+    pub fn on_sealing_message_received(&self, message: &sealing::Message, epoch: u64) {
 
         if self.num_blocks_to_keep_on_disk > 0 { 
             self.memorial
@@ -127,7 +127,7 @@ impl HbbftMessageDispatcher {
         }
     }
 
-    pub fn on_message_received(&mut self, message: &HbMessage) {
+    pub fn on_message_received(&self, message: &HbMessage) {
 
         if self.num_blocks_to_keep_on_disk > 0 {
             self.memorial
@@ -152,21 +152,21 @@ impl HbbftMessageDispatcher {
         }
     }
 
-    pub fn report_seal_good(&mut self, node_id: &NodeId, block_num: u64) {
+    pub fn report_seal_good(&self, node_id: &NodeId, block_num: u64) {
         let goodEvent = SealEventGood { node_id: node_id.clone(), block_num };
         // self.seal_events_good.push(goodEvent);
         
     }
 
 
-    pub fn report_seal_bad(&mut self, node_id: &NodeId, block_num: u64) {
+    pub fn report_seal_bad(&self, node_id: &NodeId, block_num: u64) {
 
         let badEvent = SealEventBad { node_id: node_id.clone(), block_num };
         // self.seal_events_bad.push(badEvent);
 
     }
 
-    pub fn free_memory(&mut self, _current_block: u64) {
+    pub fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
 }

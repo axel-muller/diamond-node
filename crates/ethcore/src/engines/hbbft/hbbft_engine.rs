@@ -72,7 +72,7 @@ pub struct HoneyBadgerBFT {
     signer: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     machine: EthereumMachine,
     hbbft_state: RwLock<HbbftState>,
-    hbbft_message_dispatcher: RwLock<HbbftMessageDispatcher>,
+    hbbft_message_dispatcher: HbbftMessageDispatcher,
     sealing: RwLock<BTreeMap<BlockNumber, Sealing>>,
     params: HbbftParams,
     message_counter: RwLock<usize>,
@@ -328,13 +328,13 @@ impl HoneyBadgerBFT {
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new(
+            hbbft_message_dispatcher: HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
                 params
                     .blocks_to_keep_directory
                     .clone()
                     .unwrap_or("data/messages/".to_string()),
-            )),
+            ),
             sealing: RwLock::new(BTreeMap::new()),
             params,
             message_counter: RwLock::new(0),
@@ -457,7 +457,6 @@ impl HoneyBadgerBFT {
 
         // store received messages here.
         self.hbbft_message_dispatcher
-            .write()
             .on_message_received(&message);
 
         let step = self.hbbft_state.write().process_message(
@@ -516,12 +515,12 @@ impl HoneyBadgerBFT {
             .handle_message(&sender_id, message);
         match step_result {
             Ok(step) => {
-                self.hbbft_message_dispatcher.write().report_seal_good(&sender_id, block_num);
+                self.hbbft_message_dispatcher.report_seal_good(&sender_id, block_num);
                 self.process_seal_step(client, step, block_num, &network_info);
             }
             Err(err) => {
                 error!(target: "consensus", "Error on ThresholdSign step: {:?}", err);
-                self.hbbft_message_dispatcher.write().report_seal_bad(&sender_id, block_num);
+                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num);
             }
         }
         Ok(())
@@ -1192,7 +1191,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
 
         self.hbbft_message_dispatcher
-            .write()
             .free_memory(block.header.number());
 
         Ok(())
