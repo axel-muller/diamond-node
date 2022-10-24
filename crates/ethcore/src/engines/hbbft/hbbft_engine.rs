@@ -1,3 +1,5 @@
+use crate::engines::hbbft::hbbft_message_memorium::BadSealReason;
+
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
@@ -502,6 +504,7 @@ impl HoneyBadgerBFT {
             Some(n) => n,
             None => {
                 error!(target: "consensus", "Sealing message for block #{} could not be processed due to missing/mismatching network info.", block_num);
+                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num, BadSealReason::MismatchedNetworkInfo);
                 return Err(EngineError::UnexpectedMessage);
             }
         };
@@ -520,7 +523,7 @@ impl HoneyBadgerBFT {
             }
             Err(err) => {
                 error!(target: "consensus", "Error on ThresholdSign step: {:?}", err);
-                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num);
+                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num, BadSealReason::ErrorTresholdSignStep);
             }
         }
         Ok(())

@@ -69,17 +69,14 @@ pub(crate) struct HbbftMessageMemorium {
     last_block_deleted_from_disk: u64,
     dispatched_messages: VecDeque<HbMessage>,
     dispatched_seals: VecDeque<(sealing::Message, u64)>,
-    //seal_event_good_receiver: Receiver<SealEventGood>,
-    //seal_event_bad_receiver: Receiver<SealEventBad>,
+    dispatched_seal_event_good: VecDeque<SealEventGood>,
+    dispatched_seal_event_bad: VecDeque<SealEventBad>,
 }
 
 pub(crate) struct HbbftMessageDispatcher {
     num_blocks_to_keep_on_disk: u64,
     thread: Option<std::thread::JoinHandle<Self>>,
     memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>,
-
-    // seal_events_sender_good: Sender<SealEventGood>,
-    // seal_events_sender_bad: Sender<SealEventBad>,
 }
 
 struct SealEventGood {
@@ -89,9 +86,14 @@ struct SealEventGood {
 
 struct SealEventBad {
     node_id: NodeId,
-    block_num: u64
+    block_num: u64,
+    reason: BadSealReason
 }
 
+pub enum BadSealReason {
+    ErrorTresholdSignStep,
+    MismatchedNetworkInfo
+}
 
 
 impl HbbftMessageDispatcher {
@@ -143,7 +145,12 @@ impl HbbftMessageDispatcher {
             // let mut memo = self;
             // let mut arc = std::sync::Arc::new(&self);
             let arc_clone = self.memorial.clone();
-            self.thread = Some(std::thread::spawn(move || loop {
+            self.thread = Some(std::thread::spawn(move || 
+                
+                loop {
+                // one loop cycle is very fast.
+                // so report_ function have their chance to aquire a write lock soon.
+                // and don't block the work thread for too long.
                 let work_result = arc_clone.write().work_message();
                 if !work_result {
                     std::thread::sleep(std::time::Duration::from_millis(250));
@@ -153,17 +160,25 @@ impl HbbftMessageDispatcher {
     }
 
     pub fn report_seal_good(&self, node_id: &NodeId, block_num: u64) {
-        let goodEvent = SealEventGood { node_id: node_id.clone(), block_num };
+        let event = SealEventGood { node_id: node_id.clone(), block_num };
         // self.seal_events_good.push(goodEvent);
-        
+        self.memorial
+        .write()
+        .dispatched_seal_event_good
+        .push_back(event);
     }
 
 
-    pub fn report_seal_bad(&self, node_id: &NodeId, block_num: u64) {
+    pub fn report_seal_bad(&self, node_id: &NodeId, block_num: u64, reason: BadSealReason) {
 
-        let badEvent = SealEventBad { node_id: node_id.clone(), block_num };
+        let event = SealEventBad { node_id: node_id.clone(), block_num, reason };
         // self.seal_events_bad.push(badEvent);
-
+        
+        // self.seal_events_good.push(goodEvent);
+        self.memorial
+        .write()
+        .dispatched_seal_event_bad
+        .push_back(event);
     }
 
     pub fn free_memory(&self, _current_block: u64) {
@@ -184,8 +199,8 @@ impl HbbftMessageMemorium {
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
-            // seal_event_good_receiver,
-            // seal_event_bad_receiver,
+            dispatched_seal_event_good: VecDeque::new(),
+            dispatched_seal_event_bad: VecDeque::new(),
         }
     }
 
