@@ -2,7 +2,7 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
-use std::{collections::VecDeque, sync::mpsc::{self, Receiver, Sender}};
+use std::{collections::VecDeque};
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -98,9 +98,6 @@ pub enum BadSealReason {
 
 impl HbbftMessageDispatcher {
     pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
-
-        let seal_event_channel_good = mpsc::channel::<SealEventGood>();
-        let seal_event_channel_bad = mpsc::channel::<SealEventBad>();
 
         let mut result = HbbftMessageDispatcher {
             num_blocks_to_keep_on_disk,
