@@ -45,8 +45,79 @@ pub(crate) struct DispatchedSealMessage {
 
 }
 
-pub(crate) struct NodeBlockHistory {
+/// holds up the history of a node for a staking epoch history.
+pub(crate) struct NodeStakingEpochHistory {
     // sealing_messages: HashMap<SealMessageState>,
+    staking_epoch: u64,
+    staking_epoch_start_block: u64,
+    node_id: NodeId,
+    total_good_sealing_messages: u64,
+    total_late_sealing_messages: u64,
+    total_error_sealing_messages: u64,
+    last_good_sealing_message: u64,
+    last_late_sealing_message: u64,
+    last_error_sealing_message: u64,
+
+
+    // total_contributions_good: u64,
+    // total_contributions_bad: u64,
+    good_sealing_blocks: Vec<u64>,
+
+}
+
+impl NodeStakingEpochHistory {
+
+    pub fn new(staking_epoch: u64, staking_epoch_start_block: u64, node_id: NodeId) -> Self {
+        let x = u32::MAX;
+        NodeStakingEpochHistory {
+            staking_epoch,
+            staking_epoch_start_block,
+            node_id,
+            total_good_sealing_messages: 0,
+            total_late_sealing_messages: 0,
+            total_error_sealing_messages: 0,
+            last_good_sealing_message: 0,
+            last_late_sealing_message: 0,
+            last_error_sealing_message: 0,
+            good_sealing_blocks: Vec::new(),
+        }
+    }
+
+    /// mut ADD_...
+
+    pub fn add_good_seal_event(&mut self, event: &SealEventGood) {
+        self.total_good_sealing_messages += 1;
+        self.last_good_sealing_message = event.block_num;
+        self.good_sealing_blocks.push(event.block_num);
+    }
+
+    
+
+    /// GETTERS
+
+    pub fn get_total_good_sealing_messages(&self) -> u64 {
+        self.total_good_sealing_messages
+    }
+
+    pub fn get_total_late_sealing_messages(&self) -> u64 {
+        self.total_late_sealing_messages
+    }
+
+    pub fn get_total_error_sealing_messages(&self) -> u64 {
+        self.total_error_sealing_messages
+    }
+
+    pub fn get_total_sealing_messages(&self) -> u64 {
+        self.total_good_sealing_messages + self.total_late_sealing_messages + self.total_error_sealing_messages
+    }
+
+    pub fn get_staking_epoch(&self) -> u64 {
+        self.staking_epoch
+    }
+
+    pub fn get_node_id(&self) -> NodeId {
+        self.node_id
+    }
 }
 
 pub(crate) struct HbbftMessageMemorium {
