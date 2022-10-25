@@ -76,7 +76,7 @@ impl NodeStakingEpochHistory {
     /// mut ADD_...
 
     /// protocols a good seal event.
-    pub(crate) fn add_good_seal_event(&mut self, event: &SealEventGood) {
+    pub fn add_good_seal_event(&mut self, event: &SealEventGood) {
         // by definition a "good sealing" is always on the latest block.
         let block_num = event.block_num;
         let last_good_sealing_message = self.last_good_sealing_message;
@@ -132,6 +132,28 @@ impl NodeStakingEpochHistory {
     }
 }
 
+
+/// holds up the history of all nodes for a staking epoch history.
+pub(crate) struct StakingEpochHistory {
+    staking_epoch: u64,
+    staking_epoch_start_block: u64,
+    staking_epoch_end_block: u64,
+    // stored the node staking epoch history.
+    // since 25 is the exected maximum, a Vec has about the same perforamnce than a HashMap.
+    node_staking_epoch_histories: Vec<NodeStakingEpochHistory>,
+}
+
+impl StakingEpochHistory {
+    fn new(staking_epoch: u64, staking_epoch_start_block: u64, staking_epoch_end_block: u64) -> Self {
+        StakingEpochHistory {
+            staking_epoch,
+            staking_epoch_start_block,
+            staking_epoch_end_block,
+            node_staking_epoch_histories: Vec::new(),
+        }
+    }
+}
+
 pub(crate) struct HbbftMessageMemorium {
     // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     // signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
@@ -154,6 +176,12 @@ pub(crate) struct HbbftMessageMemorium {
     dispatched_seals: VecDeque<(sealing::Message, u64)>,
     dispatched_seal_event_good: VecDeque<SealEventGood>,
     dispatched_seal_event_bad: VecDeque<SealEventBad>,
+    // stores the history for staking epochs.
+    // this should be only a hand full of epochs.
+    // since old ones are not needed anymore.
+    // they are stored as a VecDeque, in the assumption that
+    // we never have to add an epoch in the middle.
+    staking_epoch_history: VecDeque<StakingEpochHistory>,
 }
 
 pub(crate) struct HbbftMessageDispatcher {
@@ -162,15 +190,21 @@ pub(crate) struct HbbftMessageDispatcher {
     memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>,
 }
 
-struct SealEventGood {
+pub struct SealEventGood {
     node_id: NodeId,
     block_num: u64,
 }
 
-struct SealEventBad {
+pub struct SealEventBad {
     node_id: NodeId,
     block_num: u64,
     reason: BadSealReason,
+}
+
+struct StakingEpochRange {
+    staking_epoch: u64,
+    start_block: u64,
+    end_block: u64,
 }
 
 
@@ -256,9 +290,15 @@ impl HbbftMessageDispatcher {
             .push_back(event);
     }
 
-    pub(self) fn free_memory(&self, _current_block: u64) {
+    pub fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
+
+    pub fn report_new_epoch(&self, staking_epoch: u64, staking_epoch_start_block: u64) {
+        // we write this sync so it get's written as fast as possible.
+        self.memorial.write().report_new_epoch(staking_epoch, staking_epoch_start_block);
+    }
+
 }
 
 impl HbbftMessageMemorium {
@@ -279,6 +319,7 @@ impl HbbftMessageMemorium {
             dispatched_seals: VecDeque::new(),
             dispatched_seal_event_good: VecDeque::new(),
             dispatched_seal_event_bad: VecDeque::new(),
+            staking_epoch_history: VecDeque::new(),
         }
     }
 
@@ -356,6 +397,43 @@ impl HbbftMessageMemorium {
         }
     }
 
+    fn on_good_seal(&mut self, seal: &SealEventGood) -> bool {
+        
+        if let Some(epoch_history) = self.get_staking_epoch_history(seal.block_num) {
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
+        if let Ok(_) = self.staking_epoch_history.binary_search_by_key(&staking_epoch, | x | x.staking_epoch) {
+            warn!(target: "consensus", "New staking epoch reported twice: {}", staking_epoch);
+        } else {
+            info!(target: "consensus", "New staking epoch reported : {staking_epoch}");
+            // if we have already a staking epoch stored, we need to ensure 
+            if self.staking_epoch_history.len() > 0 {
+
+            }
+        }
+    }
+
+    fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
+        
+        for x in self
+            .staking_epoch_history
+            .iter_mut() {
+
+            if block_num > x.staking_epoch_start_block 
+                && (x.staking_epoch_end_block == 0 || block_num <= x.staking_epoch_end_block) {
+                return Some(x);
+            }
+        }
+
+        return None;
+
+    }
+
     fn work_message(&mut self) -> bool {
         let mut had_worked = false;
 
@@ -394,6 +472,10 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
+        if let Some(good_seal) = self.dispatched_seal_event_good.pop_front() {
+            
+
+        }
         // if let Some(next) = self.seal_event_good_receiver.iter().next() {
 
         //     had_worked = true;
