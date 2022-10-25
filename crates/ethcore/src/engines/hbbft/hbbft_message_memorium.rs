@@ -43,9 +43,7 @@ pub(crate) struct DispatchedSealMessage {
 
 /// holds up the history of a node for a staking epoch history.
 pub(crate) struct NodeStakingEpochHistory {
-    // sealing_messages: HashMap<SealMessageState>,
-    staking_epoch: u64,
-    staking_epoch_start_block: u64,
+    
     node_id: NodeId,
     last_good_sealing_message: u64,
     last_late_sealing_message: u64,
@@ -58,11 +56,9 @@ pub(crate) struct NodeStakingEpochHistory {
 }
 
 impl NodeStakingEpochHistory {
-    pub fn new(staking_epoch: u64, staking_epoch_start_block: u64, node_id: NodeId) -> Self {
+    pub fn new(node_id: NodeId) -> Self {
         let x = u32::MAX;
         NodeStakingEpochHistory {
-            staking_epoch,
-            staking_epoch_start_block,
             node_id,
             last_good_sealing_message: 0,
             last_late_sealing_message: 0,
@@ -123,10 +119,6 @@ impl NodeStakingEpochHistory {
             + self.get_total_error_sealing_messages()
     }
 
-    pub fn get_staking_epoch(&self) -> u64 {
-        self.staking_epoch
-    }
-
     pub fn get_node_id(&self) -> NodeId {
         self.node_id
     }
@@ -155,6 +147,35 @@ impl StakingEpochHistory {
             node_staking_epoch_histories: Vec::new(),
         }
     }
+
+    pub fn on_good_seal<'a>(&mut self, event: &SealEventGood) {
+
+        let node_id = &event.node_id;
+        let block_num = event.block_num;
+        // let staking_epoch = event.staking_epoch;
+        //let staking_epoch_start_block = event.staking_epoch_start_block;
+        //let staking_epoch_end_block = event.staking_epoch_end_block;
+
+
+        let node_staking_epoch_history = self.node_staking_epoch_histories
+            .iter()
+            .find(|x| &x.get_node_id() == node_id);
+
+        if node_staking_epoch_history.is_none() {
+            let node_staking_epoch_history = NodeStakingEpochHistory::new(
+                node_id.clone(),
+            );
+            self.node_staking_epoch_histories.push(node_staking_epoch_history);
+        }
+
+        let node_staking_epoch_history = self.node_staking_epoch_histories
+            .iter_mut()
+            .find(|x| x.get_node_id().cmp(node_id) == std::cmp::Ordering::Equal)
+            .unwrap();
+
+        node_staking_epoch_history.add_good_seal_event(event);
+
+    }
 }
 
 pub(crate) struct HbbftMessageDispatcher {
@@ -163,6 +184,7 @@ pub(crate) struct HbbftMessageDispatcher {
     memorial: std::sync::Arc<RwLock<HbbftMessageMemorium>>,
 }
 
+#[derive(Debug, Clone)]
 pub struct SealEventGood {
     node_id: NodeId,
     block_num: u64,
@@ -400,9 +422,16 @@ impl HbbftMessageMemorium {
         }
     }
 
-    fn on_good_seal(&mut self, seal: &SealEventGood) -> bool {
-        if let Some(epoch_history) = self.get_staking_epoch_history(seal.block_num) {
+    // process a good seal message in to the history.
+    fn on_good_seal<'a>(&mut self, seal: &SealEventGood) -> bool {
+        let block_num = seal.block_num;
+        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+
+            epoch_history.on_good_seal(seal);
             return true;
+        } else {
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
         }
 
         return false;
@@ -422,13 +451,14 @@ impl HbbftMessageMemorium {
     }
 
     fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-        for x in self.staking_epoch_history.iter_mut() {
-            if block_num > x.staking_epoch_start_block
-                && (x.staking_epoch_end_block == 0 || block_num <= x.staking_epoch_end_block)
+        for e in self.staking_epoch_history.iter_mut() {
+            if block_num > e.staking_epoch_start_block
+                && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
             {
-                return Some(x);
+                return Some(e);
             }
         }
+
 
         return None;
     }
@@ -471,32 +501,30 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
-        if let Some(good_seal) = self.dispatched_seal_event_good.pop_front() {}
+        
+        if let Some(good_seal) =  self.dispatched_seal_event_good.front() {
+
+            // rust borrow system forced me into this useless clone...
+            if self.on_good_seal(&good_seal.clone()) {
+                self.dispatched_seal_event_good.pop_front();
+                had_worked = true;
+            }
+        }
         // if let Some(next) = self.seal_event_good_receiver.iter().next() {
 
         //     had_worked = true;
         // }
 
-        return false;
-
-        // let content = message.content();
-        //match content {
-        //    MessageContent::Subset(subset) => {}
-        //    MessageContent::DecryptionShare { proposer_id, share } => {
-        // debug!("got decryption share from {} {:?}", proposer_id, share);
-        //        if !self.decryption_shares.contains_key(&epoch) {
-        //            match self.decryption_shares.insert(epoch, Vec::new()) {
-        //                None => {}
-        //                Some(vec) => {
-        //                    //Vec<(NodeId, message)
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
+        return had_worked;
     }
 
     pub fn free_memory(&mut self, _current_block: u64) {
         // self.signature_shares.remove(&epoch);
     }
+}
+
+
+#[cfg(test)]
+mod tests { 
+
 }
