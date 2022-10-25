@@ -1,8 +1,7 @@
-
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
-use std::{collections::VecDeque};
+use std::collections::VecDeque;
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -32,17 +31,14 @@ Hbbft Message Process
 //
 */
 
-
 pub(crate) enum SealMessageState {
-
     Good,
     Late(u64),
-    Error(Box<sealing::Message>)
+    Error(Box<sealing::Message>),
 }
 
 pub(crate) struct DispatchedSealMessage {
-    message: Option<sealing::Message>
-
+    message: Option<sealing::Message>,
 }
 
 /// holds up the history of a node for a staking epoch history.
@@ -51,64 +47,80 @@ pub(crate) struct NodeStakingEpochHistory {
     staking_epoch: u64,
     staking_epoch_start_block: u64,
     node_id: NodeId,
-    total_good_sealing_messages: u64,
-    total_late_sealing_messages: u64,
-    total_error_sealing_messages: u64,
     last_good_sealing_message: u64,
     last_late_sealing_message: u64,
     last_error_sealing_message: u64,
-
-
+    sealing_blocks_good: Vec<u64>,
+    sealing_blocks_late: Vec<u64>,
+    sealing_blocks_bad: Vec<u64>,
     // total_contributions_good: u64,
     // total_contributions_bad: u64,
-    good_sealing_blocks: Vec<u64>,
-
 }
 
 impl NodeStakingEpochHistory {
-
     pub fn new(staking_epoch: u64, staking_epoch_start_block: u64, node_id: NodeId) -> Self {
         let x = u32::MAX;
         NodeStakingEpochHistory {
             staking_epoch,
             staking_epoch_start_block,
             node_id,
-            total_good_sealing_messages: 0,
-            total_late_sealing_messages: 0,
-            total_error_sealing_messages: 0,
             last_good_sealing_message: 0,
             last_late_sealing_message: 0,
             last_error_sealing_message: 0,
-            good_sealing_blocks: Vec::new(),
+            sealing_blocks_good: Vec::new(),
+            sealing_blocks_late: Vec::new(),
+            sealing_blocks_bad: Vec::new(),
         }
     }
 
     /// mut ADD_...
 
-    pub fn add_good_seal_event(&mut self, event: &SealEventGood) {
-        self.total_good_sealing_messages += 1;
-        self.last_good_sealing_message = event.block_num;
-        self.good_sealing_blocks.push(event.block_num);
+    /// protocols a good seal event.
+    pub(crate) fn add_good_seal_event(&mut self, event: &SealEventGood) {
+        // by definition a "good sealing" is always on the latest block.
+        let block_num = event.block_num;
+        let last_good_sealing_message = self.last_good_sealing_message;
+
+        if block_num > last_good_sealing_message {
+            self.last_good_sealing_message = event.block_num;
+        } else {
+            warn!(target: "consensus", "add_good_seal_event: event.block_num {block_num} <= self.last_good_sealing_message {last_good_sealing_message}");
+        }
+        self.sealing_blocks_good.push(event.block_num);
     }
 
-    
+    pub(crate) fn add_bad_seal_event(&mut self, event: &SealEventBad) {
+        // by definition a "good sealing" is always on the latest block.
+
+        let block_num = event.block_num;
+        let last_bad_sealing_message = self.last_error_sealing_message;
+
+        if block_num > last_bad_sealing_message {
+            self.last_good_sealing_message = event.block_num;
+        } else {
+            warn!(target: "consensus", "add_bad_seal_event: event.block_num {block_num} <= self.last_bad_sealing_message {last_bad_sealing_message}");
+        }
+        self.sealing_blocks_good.push(event.block_num);
+    }
 
     /// GETTERS
 
-    pub fn get_total_good_sealing_messages(&self) -> u64 {
-        self.total_good_sealing_messages
+    pub fn get_total_good_sealing_messages(&self) -> usize {
+        self.sealing_blocks_good.len()
     }
 
-    pub fn get_total_late_sealing_messages(&self) -> u64 {
-        self.total_late_sealing_messages
+    pub fn get_total_late_sealing_messages(&self) -> usize {
+        self.sealing_blocks_late.len()
     }
 
-    pub fn get_total_error_sealing_messages(&self) -> u64 {
-        self.total_error_sealing_messages
+    pub fn get_total_error_sealing_messages(&self) -> usize {
+        self.sealing_blocks_bad.len()
     }
 
-    pub fn get_total_sealing_messages(&self) -> u64 {
-        self.total_good_sealing_messages + self.total_late_sealing_messages + self.total_error_sealing_messages
+    pub fn get_total_sealing_messages(&self) -> usize {
+        self.get_total_good_sealing_messages()
+            + self.get_total_late_sealing_messages()
+            + self.get_total_error_sealing_messages()
     }
 
     pub fn get_staking_epoch(&self) -> u64 {
@@ -152,24 +164,23 @@ pub(crate) struct HbbftMessageDispatcher {
 
 struct SealEventGood {
     node_id: NodeId,
-    block_num: u64
+    block_num: u64,
 }
 
 struct SealEventBad {
     node_id: NodeId,
     block_num: u64,
-    reason: BadSealReason
+    reason: BadSealReason,
 }
+
 
 pub enum BadSealReason {
     ErrorTresholdSignStep,
-    MismatchedNetworkInfo
+    MismatchedNetworkInfo,
 }
-
 
 impl HbbftMessageDispatcher {
     pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
-
         let mut result = HbbftMessageDispatcher {
             num_blocks_to_keep_on_disk,
             thread: None,
@@ -184,8 +195,7 @@ impl HbbftMessageDispatcher {
     }
 
     pub fn on_sealing_message_received(&self, message: &sealing::Message, epoch: u64) {
-
-        if self.num_blocks_to_keep_on_disk > 0 { 
+        if self.num_blocks_to_keep_on_disk > 0 {
             self.memorial
                 .write()
                 .dispatched_seals
@@ -194,24 +204,20 @@ impl HbbftMessageDispatcher {
     }
 
     pub fn on_message_received(&self, message: &HbMessage) {
-
         if self.num_blocks_to_keep_on_disk > 0 {
             self.memorial
-            .write()
-            .dispatched_messages
-            .push_back(message.clone());
+                .write()
+                .dispatched_messages
+                .push_back(message.clone());
         }
     }
 
     fn ensure_worker_thread(&mut self) {
-        
         if self.thread.is_none() {
             // let mut memo = self;
             // let mut arc = std::sync::Arc::new(&self);
             let arc_clone = self.memorial.clone();
-            self.thread = Some(std::thread::spawn(move || 
-                
-                loop {
+            self.thread = Some(std::thread::spawn(move || loop {
                 // one loop cycle is very fast.
                 // so report_ function have their chance to aquire a write lock soon.
                 // and don't block the work thread for too long.
@@ -223,35 +229,43 @@ impl HbbftMessageDispatcher {
         }
     }
 
-    pub fn report_seal_good(&self, node_id: &NodeId, block_num: u64) {
-        let event = SealEventGood { node_id: node_id.clone(), block_num };
+    pub(super) fn report_seal_good(&self, node_id: &NodeId, block_num: u64) {
+        let event = SealEventGood {
+            node_id: node_id.clone(),
+            block_num,
+        };
         // self.seal_events_good.push(goodEvent);
         self.memorial
-        .write()
-        .dispatched_seal_event_good
-        .push_back(event);
+            .write()
+            .dispatched_seal_event_good
+            .push_back(event);
     }
 
-
-    pub fn report_seal_bad(&self, node_id: &NodeId, block_num: u64, reason: BadSealReason) {
-
-        let event = SealEventBad { node_id: node_id.clone(), block_num, reason };
+    pub(super) fn report_seal_bad(&self, node_id: &NodeId, block_num: u64, reason: BadSealReason) {
+        let event = SealEventBad {
+            node_id: node_id.clone(),
+            block_num,
+            reason,
+        };
         // self.seal_events_bad.push(badEvent);
-        
+
         // self.seal_events_good.push(goodEvent);
         self.memorial
-        .write()
-        .dispatched_seal_event_bad
-        .push_back(event);
+            .write()
+            .dispatched_seal_event_bad
+            .push_back(event);
     }
 
-    pub fn free_memory(&self, _current_block: u64) {
+    pub(self) fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
 }
 
 impl HbbftMessageMemorium {
-    pub fn new(config_blocks_to_keep_on_disk: u64, block_to_keep_directory: String,/* seal_event_good_receiver: Receiver<SealEventGood>, seal_event_bad_receiver: Receiver<SealEventBad>,  */) -> Self {
+    pub fn new(
+        config_blocks_to_keep_on_disk: u64,
+        block_to_keep_directory: String, /* seal_event_good_receiver: Receiver<SealEventGood>, seal_event_bad_receiver: Receiver<SealEventBad>,  */
+    ) -> Self {
         HbbftMessageMemorium {
             // signature_shares: BTreeMap::new(),
             // decryption_shares: BTreeMap::new(),
@@ -343,7 +357,6 @@ impl HbbftMessageMemorium {
     }
 
     fn work_message(&mut self) -> bool {
-
         let mut had_worked = false;
 
         if let Some(message) = self.dispatched_messages.pop_front() {
