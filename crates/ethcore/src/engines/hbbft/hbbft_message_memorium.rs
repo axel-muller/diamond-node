@@ -132,7 +132,6 @@ impl NodeStakingEpochHistory {
     }
 }
 
-
 /// holds up the history of all nodes for a staking epoch history.
 pub(crate) struct StakingEpochHistory {
     staking_epoch: u64,
@@ -144,7 +143,11 @@ pub(crate) struct StakingEpochHistory {
 }
 
 impl StakingEpochHistory {
-    fn new(staking_epoch: u64, staking_epoch_start_block: u64, staking_epoch_end_block: u64) -> Self {
+    fn new(
+        staking_epoch: u64,
+        staking_epoch_start_block: u64,
+        staking_epoch_end_block: u64,
+    ) -> Self {
         StakingEpochHistory {
             staking_epoch,
             staking_epoch_start_block,
@@ -152,36 +155,6 @@ impl StakingEpochHistory {
             node_staking_epoch_histories: Vec::new(),
         }
     }
-}
-
-pub(crate) struct HbbftMessageMemorium {
-    // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
-    // signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
-
-    // decryption_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
-    //*
-    // u64: epoch
-    // NodeId: proposer
-    // NodeId: node
-    // HbMessage: message
-    // */
-    // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
-    message_tracking_id: u64,
-    /// how many bad message should we keep on disk ?
-    config_bad_message_evidence_reporting: u64,
-    config_blocks_to_keep_on_disk: u64,
-    config_block_to_keep_directory: String,
-    last_block_deleted_from_disk: u64,
-    dispatched_messages: VecDeque<HbMessage>,
-    dispatched_seals: VecDeque<(sealing::Message, u64)>,
-    dispatched_seal_event_good: VecDeque<SealEventGood>,
-    dispatched_seal_event_bad: VecDeque<SealEventBad>,
-    // stores the history for staking epochs.
-    // this should be only a hand full of epochs.
-    // since old ones are not needed anymore.
-    // they are stored as a VecDeque, in the assumption that
-    // we never have to add an epoch in the middle.
-    staking_epoch_history: VecDeque<StakingEpochHistory>,
 }
 
 pub(crate) struct HbbftMessageDispatcher {
@@ -206,7 +179,6 @@ struct StakingEpochRange {
     start_block: u64,
     end_block: u64,
 }
-
 
 pub enum BadSealReason {
     ErrorTresholdSignStep,
@@ -296,9 +268,40 @@ impl HbbftMessageDispatcher {
 
     pub fn report_new_epoch(&self, staking_epoch: u64, staking_epoch_start_block: u64) {
         // we write this sync so it get's written as fast as possible.
-        self.memorial.write().report_new_epoch(staking_epoch, staking_epoch_start_block);
+        self.memorial
+            .write()
+            .report_new_epoch(staking_epoch, staking_epoch_start_block);
     }
+}
 
+pub(crate) struct HbbftMessageMemorium {
+    // future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    // signature_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+
+    // decryption_shares: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    //*
+    // u64: epoch
+    // NodeId: proposer
+    // NodeId: node
+    // HbMessage: message
+    // */
+    // agreements: BTreeMap<u64, Vec<(NodeId, NodeId, HbMessage)>>,
+    message_tracking_id: u64,
+    /// how many bad message should we keep on disk ?
+    config_bad_message_evidence_reporting: u64,
+    config_blocks_to_keep_on_disk: u64,
+    config_block_to_keep_directory: String,
+    last_block_deleted_from_disk: u64,
+    dispatched_messages: VecDeque<HbMessage>,
+    dispatched_seals: VecDeque<(sealing::Message, u64)>,
+    dispatched_seal_event_good: VecDeque<SealEventGood>,
+    dispatched_seal_event_bad: VecDeque<SealEventBad>,
+    // stores the history for staking epochs.
+    // this should be only a hand full of epochs.
+    // since old ones are not needed anymore.
+    // they are stored as a VecDeque, in the assumption that
+    // we never have to add an epoch in the middle.
+    staking_epoch_history: VecDeque<StakingEpochHistory>,
 }
 
 impl HbbftMessageMemorium {
@@ -398,7 +401,6 @@ impl HbbftMessageMemorium {
     }
 
     fn on_good_seal(&mut self, seal: &SealEventGood) -> bool {
-        
         if let Some(epoch_history) = self.get_staking_epoch_history(seal.block_num) {
             return true;
         }
@@ -407,31 +409,28 @@ impl HbbftMessageMemorium {
     }
 
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
-        if let Ok(_) = self.staking_epoch_history.binary_search_by_key(&staking_epoch, | x | x.staking_epoch) {
+        if let Ok(_) = self
+            .staking_epoch_history
+            .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
+        {
             warn!(target: "consensus", "New staking epoch reported twice: {}", staking_epoch);
         } else {
             info!(target: "consensus", "New staking epoch reported : {staking_epoch}");
-            // if we have already a staking epoch stored, we need to ensure 
-            if self.staking_epoch_history.len() > 0 {
-
-            }
+            // if we have already a staking epoch stored, we need to ensure
+            if self.staking_epoch_history.len() > 0 {}
         }
     }
 
     fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-        
-        for x in self
-            .staking_epoch_history
-            .iter_mut() {
-
-            if block_num > x.staking_epoch_start_block 
-                && (x.staking_epoch_end_block == 0 || block_num <= x.staking_epoch_end_block) {
+        for x in self.staking_epoch_history.iter_mut() {
+            if block_num > x.staking_epoch_start_block
+                && (x.staking_epoch_end_block == 0 || block_num <= x.staking_epoch_end_block)
+            {
                 return Some(x);
             }
         }
 
         return None;
-
     }
 
     fn work_message(&mut self) -> bool {
@@ -472,10 +471,7 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
-        if let Some(good_seal) = self.dispatched_seal_event_good.pop_front() {
-            
-
-        }
+        if let Some(good_seal) = self.dispatched_seal_event_good.pop_front() {}
         // if let Some(next) = self.seal_event_good_receiver.iter().next() {
 
         //     had_worked = true;
