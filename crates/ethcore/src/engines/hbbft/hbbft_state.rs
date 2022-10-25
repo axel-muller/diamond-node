@@ -30,6 +30,7 @@ pub(crate) struct HbbftState {
     honey_badger: Option<HoneyBadger>,
     public_master_key: Option<PublicKey>,
     current_posdao_epoch: u64,
+    current_posdao_epoch_start_block: u64,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
 }
 
@@ -40,6 +41,7 @@ impl HbbftState {
             honey_badger: None,
             public_master_key: None,
             current_posdao_epoch: 0,
+            current_posdao_epoch_start_block: 0,
             future_messages_cache: BTreeMap::new(),
         }
     }
@@ -91,6 +93,7 @@ impl HbbftState {
         self.honey_badger = None;
         // Set the current POSDAO epoch #
         self.current_posdao_epoch = target_posdao_epoch;
+        self.current_posdao_epoch_start_block = posdao_epoch_start.as_u64();
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
