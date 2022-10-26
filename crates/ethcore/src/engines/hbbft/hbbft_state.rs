@@ -52,6 +52,11 @@ impl HbbftState {
         return Some(builder.build());
     }
 
+    /**
+     * Updates the underlying honeybadger instance, possible switching into a new 
+     * honeybadger instance if according to contracts a new staking epoch has started.
+     * true if a new epoch has started and a new honeybadger instance has been created
+     */
     pub fn update_honeybadger(
         &mut self,
         client: Arc<dyn EngineClient>,
@@ -94,6 +99,7 @@ impl HbbftState {
         // Set the current POSDAO epoch #
         self.current_posdao_epoch = target_posdao_epoch;
         self.current_posdao_epoch_start_block = posdao_epoch_start.as_u64();
+
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
@@ -391,4 +397,9 @@ impl HbbftState {
 
         self.network_info.clone()
     }
+
+    pub fn get_current_posdao_epoch(&self) -> u64 {
+        self.current_posdao_epoch
+    }
+
 }

@@ -496,6 +496,8 @@ impl HoneyBadgerBFT {
             }
         }
 
+        // client.staking
+
         let network_info = match self.hbbft_state.write().network_info_for(
             client.clone(),
             &self.signer,
@@ -1201,13 +1203,27 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn on_chain_commit(&self, block_hash: &H256) {
         if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
-                client,
+            let mut state = self.hbbft_state.write();
+            let old_posdao_epoch = state.get_current_posdao_epoch();
+            match state.update_honeybadger(
+                client.clone(),
                 &self.signer,
-                BlockId::Hash(*block_hash),
+                BlockId::Hash(block_hash.clone()),
                 false,
             ) {
-                error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed");
+                Some(_) => {
+                    let new_posdao_epoch = state.get_current_posdao_epoch();
+                    if new_posdao_epoch != old_posdao_epoch {
+                        info!(target: "consensus", "POSDAO epoch changed from {old_posdao_epoch} to {new_posdao_epoch}.");
+                        if let Some(block_number) = client.block_number(BlockId::Hash(*block_hash)) {
+                            self.hbbft_message_dispatcher.report_new_epoch(new_posdao_epoch, block_number);
+                        } else {
+                            error!(target: "engine", "could not retrieve Block on_chain_commit for updating message memoriumaupdate honey badger after importing block {block_hash}: update honeybadger failed")
+                        }
+                        
+                    }
+                },
+                None => error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed"),
             }
         } else {
             error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
