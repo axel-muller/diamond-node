@@ -353,9 +353,6 @@ pub(crate) struct HbbftMessageMemorium {
     // timestamp when the last stat report for hbbft node health was written.
     timestamp_last_validator_stats_written: u64,
     // interval in seconds how often we write the hbbft node health report.
-
-    // location of the file where we write the hbbft node health report.
-    validator_stats_output_file: String,
 }
 
 impl HbbftMessageMemorium {
@@ -372,7 +369,7 @@ impl HbbftMessageMemorium {
             config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
             config_block_to_keep_directory: block_to_keep_directory,
             config_validator_stats_write_interval: 60,
-            config_validator_stats_directory: "data/validator_stats".to_string(),
+            config_validator_stats_directory: "data".to_string(),
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
@@ -380,7 +377,6 @@ impl HbbftMessageMemorium {
             dispatched_seal_event_bad: VecDeque::new(),
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
-            validator_stats_output_file: "data/messages/hbbft_node_stats.csv".to_string(),
         }
     }
 
@@ -562,7 +558,7 @@ impl HbbftMessageMemorium {
                 < current_time
         {
             if let Some(latest_epoch_history) = self.staking_epoch_history.back() {
-                let filename = format!("{}/epoch_{}.csv", self.validator_stats_output_file, latest_epoch_history.staking_epoch);
+                let filename = format!("{}/epoch_{}.csv", self.config_validator_stats_directory, latest_epoch_history.staking_epoch);
                 let csv = latest_epoch_history.get_epoch_stats_as_csv();
                 let output_path = std::path::Path::new(&filename);
 
@@ -571,10 +567,13 @@ impl HbbftMessageMemorium {
                 } else {
                     std::fs::File::open(output_path)
                 } {
-                    file.write_all(csv.as_bytes());
+                    if let Err(err) = file.write_all(csv.as_bytes()) {
+                        error!(target: "consensus", "could not write validator stats to disk:{} {:?}",filename, err);
+                    }
+                    // even on error we want to update the timestamp, so we do not try to write the file again.
                     self.timestamp_last_validator_stats_written = current_time;
                 } else {
-                    error!(target: "consensus", "could not create validator stats output file: {}", self.validator_stats_output_file);
+                    error!(target: "consensus", "could not create validator stats output file: {}", filename);
                 }
             }
         }
