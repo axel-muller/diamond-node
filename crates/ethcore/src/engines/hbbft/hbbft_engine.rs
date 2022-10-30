@@ -177,14 +177,14 @@ impl IoHandler<()> for TransitionHandler {
                         // Always create blocks if we are in the keygen phase.
                         self.engine.start_hbbft_epoch_if_next_phase();
 
-                        // Transactions may have been submitted during creation of the last block, trigger the
-                        // creation of a new block if the transaction threshold has been reached.
-                        self.engine.on_transactions_imported();
-
                         // If the maximum block time has been reached we trigger a new block in any case.
                         if self.max_block_time_remaining(c.clone()) == Duration::from_secs(0) {
                             self.engine.start_hbbft_epoch(c);
                         }
+
+                        // Transactions may have been submitted during creation of the last block, trigger the
+                        // creation of a new block if the transaction threshold has been reached.
+                        self.engine.start_hbbft_epoch_if_ready();
 
                         // Set timer duration to the default period (1s)
                         timer_duration = DEFAULT_DURATION;
@@ -963,6 +963,14 @@ impl HoneyBadgerBFT {
         }
         return Ok(false);
     }
+
+    fn start_hbbft_epoch_if_ready(&self) {
+        if let Some(client) = self.client_arc() {
+            if self.transaction_queue_and_time_thresholds_reached(&client) {
+                self.start_hbbft_epoch(client);
+            }
+        }
+    }
 }
 
 impl Engine<EthereumMachine> for HoneyBadgerBFT {
@@ -1104,10 +1112,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_transactions_imported(&self) {
-        if let Some(client) = self.client_arc() {
-            if self.transaction_queue_and_time_thresholds_reached(&client) {
-                self.start_hbbft_epoch(client);
-            }
+        if self.params.is_unit_test.unwrap_or(false) {
+            self.start_hbbft_epoch_if_ready();
         }
     }
 
