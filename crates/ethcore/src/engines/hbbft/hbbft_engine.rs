@@ -393,9 +393,14 @@ impl HoneyBadgerBFT {
         info!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
             .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
 
-        // Make sure lower nonces come before higher nonces.
-        // TODO: Sort per sender address instead of globally, otherwise frontrunning may be possible for accounts with very high nonces!
-        batch_txns.sort_by(|left, right| left.tx().nonce.cmp(&right.tx().nonce));
+        // Make sure the resulting transactions do not contain nonces out of order.
+        // Not necessary any more - we select contribution transactions by sender, contributing all transactions by that sender or none.
+        // The transaction queue's "pending" transactions already guarantee there are no nonce gaps for a selected sender.
+        // Even if different validators contribute a different number of transactions for the same sender the transactions stay sorted
+        // by nonce after de-duplication.
+        // Note: The following sorting would also allow front-running of addresses with higher nonces. If sorting became necessary in
+        // the future for some reason replace this simplistic sort with one which preserves the relative order of senders.
+        //batch_txns.sort_by(|left, right| left.tx().nonce.cmp(&right.tx().nonce));
 
         // We use the median of all contributions' timestamps
         let timestamps = batch
