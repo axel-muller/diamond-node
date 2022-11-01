@@ -1,6 +1,6 @@
 use client::traits::EngineClient;
 use engines::signer::EngineSigner;
-use ethcore_miner::pool::PoolVerifiedTransaction;
+use ethcore_miner::pool::{PoolVerifiedTransaction, ScoredTransaction};
 use hbbft::{
     crypto::{PublicKey, Signature},
     honey_badger::{self, HoneyBadgerBuilder},
@@ -313,6 +313,14 @@ impl HbbftState {
         // until we at least reached the target contribution size.
         let mut transactions_subset = Vec::new();
         let mut my_rng = rand::thread_rng();
+
+        let full_client = if let Some(full_client) = client.as_full_client() {
+            full_client
+        } else {
+            error!(target: "consensus", "Contribution creation: Full client could not be obtained.");
+            return None;
+        };
+
         while transactions_subset.len() < transactions_subset_size {
             let chosen_key = match transactions_by_sender.keys().choose(&mut my_rng) {
                 None => break,
@@ -320,11 +328,16 @@ impl HbbftState {
             };
             // add all transactions for that sender and delete the sender from the map.
             if let Some(mut ts) = transactions_by_sender.remove(&chosen_key) {
-                // Double-check if the there are nonce gaps in the sender's transactions.
-                // Unclear what to do in this case. The transaction queue may already take care of this case.
-                // If not then other validators may have the transaction filling that gap, so we
-                // have to be cautious with removing transactions in this case.
-                transactions_subset.append(&mut ts);
+                // Even after block import there may still be transactions in the pending set which already
+                // have been included on the chain. We filter out transactions where the nonce is too low.
+                let min_nonce = full_client.latest_nonce(&chosen_key);
+                for tx in ts {
+                    if tx.nonce() >= min_nonce {
+                        transactions_subset.push(tx);
+                    } else {
+                        info!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
+                    }
+                }
             }
         }
 
