@@ -1054,6 +1054,21 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
+    fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
+        *self.signer.write() = signer;
+        if let Some(client) = self.client_arc() {
+            warn!(target: "engine", "set_signer - update_honeybadger...");
+            if let None = self.hbbft_state.write().update_honeybadger(
+                client,
+                &self.signer,
+                BlockId::Latest,
+                true,
+            ) {
+                info!(target: "engine", "HoneyBadger Algorithm could not be created, Client possibly not set yet.");
+            }
+        }
+    }
+
 
     fn sign(&self, hash: H256) -> Result<Signature, Error> {
         match self.signer.read().as_ref() {
