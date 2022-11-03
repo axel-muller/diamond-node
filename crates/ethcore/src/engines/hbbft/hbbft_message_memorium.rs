@@ -127,7 +127,6 @@ impl NodeStakingEpochHistory {
     }
 
     pub fn as_csv_lines(&self, staking_epoch: u64) -> String {
-        
         let node_id = self.node_id;
         let total_good_sealing_messages = self.get_total_good_sealing_messages();
         let total_late_sealing_messages = self.get_total_late_sealing_messages();
@@ -146,6 +145,8 @@ pub(crate) struct StakingEpochHistory {
     // stored the node staking epoch history.
     // since 25 is the exected maximum, a Vec has about the same perforamnce than a HashMap.
     node_staking_epoch_histories: Vec<NodeStakingEpochHistory>,
+    // does this epoch have been exported already with this data ?
+    exported: bool,
 }
 
 impl StakingEpochHistory {
@@ -159,34 +160,32 @@ impl StakingEpochHistory {
             staking_epoch_start_block,
             staking_epoch_end_block,
             node_staking_epoch_histories: Vec::new(),
+            exported: false
         }
     }
 
-    pub fn on_good_seal<'a>(&mut self, event: &SealEventGood) {
+    pub fn on_good_seal(&mut self, event: &SealEventGood) {
         let node_id = &event.node_id;
-        let block_num = event.block_num;
-        // let staking_epoch = event.staking_epoch;
-        //let staking_epoch_start_block = event.staking_epoch_start_block;
-        //let staking_epoch_end_block = event.staking_epoch_end_block;
+        // let block_num = event.block_num;
 
-        let node_staking_epoch_history = self
-            .node_staking_epoch_histories
-            .iter()
-            .find(|x| &x.get_node_id() == node_id);
-
-        if node_staking_epoch_history.is_none() {
-            let node_staking_epoch_history = NodeStakingEpochHistory::new(node_id.clone());
-            self.node_staking_epoch_histories
-                .push(node_staking_epoch_history);
-        }
-
-        let node_staking_epoch_history = self
+        let mut node_staking_epoch_history = self
             .node_staking_epoch_histories
             .iter_mut()
-            .find(|x| x.get_node_id().cmp(node_id) == std::cmp::Ordering::Equal)
-            .unwrap();
+            .find(|x| &x.get_node_id() == node_id);
 
-        node_staking_epoch_history.add_good_seal_event(event);
+        match node_staking_epoch_history {
+            Some(mut node_staking_epoch_history) => {
+                node_staking_epoch_history.add_good_seal_event(event);
+            }
+            None => {
+                let mut node_staking_epoch_history = NodeStakingEpochHistory::new(node_id.clone());
+                node_staking_epoch_history.add_good_seal_event(event);
+                self.node_staking_epoch_histories.push(node_staking_epoch_history);
+            }
+        }
+
+        self.exported = false;
+        
     }
 
     pub fn get_epoch_stats_as_csv(&self) -> String {
@@ -214,6 +213,7 @@ pub struct SealEventGood {
     block_num: u64,
 }
 
+#[derive(Debug, Clone)]
 pub struct SealEventBad {
     node_id: NodeId,
     block_num: u64,
@@ -226,6 +226,7 @@ struct StakingEpochRange {
     end_block: u64,
 }
 
+#[derive(Debug, Clone)]
 pub enum BadSealReason {
     ErrorTresholdSignStep,
     MismatchedNetworkInfo,
@@ -368,7 +369,7 @@ impl HbbftMessageMemorium {
             config_bad_message_evidence_reporting: 0,
             config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
             config_block_to_keep_directory: block_to_keep_directory,
-            config_validator_stats_write_interval: 60,
+            config_validator_stats_write_interval: 5,
             config_validator_stats_directory: "data".to_string(),
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
@@ -455,7 +456,8 @@ impl HbbftMessageMemorium {
     }
 
     // process a good seal message in to the history.
-    fn on_good_seal<'a>(&mut self, seal: &SealEventGood) -> bool {
+    fn on_good_seal(&mut self, seal: &SealEventGood) -> bool {
+        info!(target: "consensus", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_good_seal(seal);
@@ -469,6 +471,7 @@ impl HbbftMessageMemorium {
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
+        warn!(target: "consensus", "report new epoch: {}", staking_epoch);
         if let Ok(_) = self
             .staking_epoch_history
             .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
@@ -480,6 +483,13 @@ impl HbbftMessageMemorium {
             if let Some(previous) = self.staking_epoch_history.back_mut() {
                 previous.staking_epoch_end_block = staking_epoch_start_block - 1;
             }
+
+            self.staking_epoch_history
+                .push_back(StakingEpochHistory::new(
+                    staking_epoch,
+                    staking_epoch_start_block,
+                    0,
+                ));
         }
     }
 
@@ -500,6 +510,7 @@ impl HbbftMessageMemorium {
     // }
 
     fn work_message(&mut self) -> bool {
+
         let mut had_worked = false;
 
         if let Some(message) = self.dispatched_messages.pop_front() {
@@ -539,8 +550,11 @@ impl HbbftMessageMemorium {
 
         if let Some(good_seal) = self.dispatched_seal_event_good.front() {
             // rust borrow system forced me into this useless clone...
+            info!(target: "consensus", "work: good Seal!");
             if self.on_good_seal(&good_seal.clone()) {
                 self.dispatched_seal_event_good.pop_front();
+                info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
+
                 had_worked = true;
             }
         }
@@ -557,24 +571,57 @@ impl HbbftMessageMemorium {
                 + (self.config_validator_stats_write_interval as u64)
                 < current_time
         {
-            if let Some(latest_epoch_history) = self.staking_epoch_history.back() {
-                let filename = format!("{}/epoch_{}.csv", self.config_validator_stats_directory, latest_epoch_history.staking_epoch);
-                let csv = latest_epoch_history.get_epoch_stats_as_csv();
-                let output_path = std::path::Path::new(&filename);
-
-                if let Ok(mut file) = if output_path.exists() {
-                    std::fs::File::create(output_path)
-                } else {
-                    std::fs::File::open(output_path)
-                } {
-                    if let Err(err) = file.write_all(csv.as_bytes()) {
-                        error!(target: "consensus", "could not write validator stats to disk:{} {:?}",filename, err);
-                    }
-                    // even on error we want to update the timestamp, so we do not try to write the file again.
-                    self.timestamp_last_validator_stats_written = current_time;
-                } else {
-                    error!(target: "consensus", "could not create validator stats output file: {}", filename);
+            for epoch_history in self.staking_epoch_history.iter_mut() {
+                if epoch_history.exported {
+                    continue;
                 }
+                let filename = format!(
+                    "{}/epoch_{}.csv",
+                    self.config_validator_stats_directory, epoch_history.staking_epoch
+                );
+                // get current executable path.
+                let mut path: PathBuf;
+
+                if let Ok(path_) = std::env::current_dir() {
+                    path = path_;
+                } else {
+                    return had_worked;
+                }
+                path.push(PathBuf::from(filename));
+
+                let output_path: &std::path::Path = path.as_path();
+                
+                match std::fs::File::create(output_path)
+                {
+                    Ok(mut file) => {
+                        let csv = epoch_history.get_epoch_stats_as_csv();
+                        if let Err(err) = file.write_all(csv.as_bytes()) {
+                            error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
+                        } else {
+                            epoch_history.exported = true;
+                            self.timestamp_last_validator_stats_written = current_time;
+                        }
+                    }
+                    Err(error) => {
+                        error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
+                    }
+                }
+
+                // if let Ok(mut file) = if output_path.exists() {
+                //     warn!(target: "consensus", "could not write validator stats to disk:{}", filename);
+                //     std::fs::File::create(output_path)
+                // } else {
+                //     std::fs::File::open(output_path)
+                // } {
+                //
+                //    if let Err(err) = file.write_all(csv.as_bytes()) {
+                //         error!(target: "consensus", "could not write validator stats to disk:{} {:?}",filename, err);
+                //     }
+                //     // even on error we want to update the timestamp, so we do not try to write the file again.
+                //     self.timestamp_last_validator_stats_written = current_time;
+                // } else {
+                //     error!(target: "consensus", "could not create validator stats output file: {}", filename);
+                // }
             }
         }
         return had_worked;

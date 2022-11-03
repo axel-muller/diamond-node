@@ -402,4 +402,8 @@ impl HbbftState {
         self.current_posdao_epoch
     }
 
+    pub fn get_current_posdao_epoch_start_block(&self) -> u64 {
+        self.current_posdao_epoch_start_block
+    }
+
 }

@@ -1033,33 +1033,27 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn register_client(&self, client: Weak<dyn EngineClient>) {
+        warn!(target: "engine", "register_client");
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
+            let mut state = self.hbbft_state.write();
+            match state.update_honeybadger(
                 client,
                 &self.signer,
                 BlockId::Latest,
                 true,
             ) {
-                // As long as the client is set we should be able to initialize as a regular node.
-                error!(target: "engine", "Error during HoneyBadger initialization!");
+                Some(_) => {
+                    let posdao_epoch = state.get_current_posdao_epoch();
+                    let epoch_start_block = state.get_current_posdao_epoch_start_block();
+                    warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
+                    self.hbbft_message_dispatcher.report_new_epoch(posdao_epoch, epoch_start_block);   
+                },
+                None => error!(target: "engine", "Error during HoneyBadger initialization!"),
             }
         }
     }
 
-    fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
-        *self.signer.write() = signer;
-        if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
-                client,
-                &self.signer,
-                BlockId::Latest,
-                true,
-            ) {
-                info!(target: "engine", "HoneyBadger Algorithm could not be created, Client possibly not set yet.");
-            }
-        }
-    }
 
     fn sign(&self, hash: H256) -> Result<Signature, Error> {
         match self.signer.read().as_ref() {
