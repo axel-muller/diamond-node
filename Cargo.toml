@@ -74,6 +74,7 @@ journaldb = { path = "crates/db/journaldb" }
 stats = { path = "crates/util/stats" }
 prometheus = "0.9.0"
 fs-swap = "0.2.6"
+net2 = "0.2.38"
 
 # ethcore-secretstore = { path = "crates/util/secret-store", optional = true }
 
