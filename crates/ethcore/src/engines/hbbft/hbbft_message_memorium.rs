@@ -194,7 +194,6 @@ impl StakingEpochHistory {
 
         for history in self.node_staking_epoch_histories.iter() {
             result.push_str(history.as_csv_lines(self.staking_epoch).as_str());
-            result.push('\n');
         }
 
         return result;
