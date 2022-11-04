@@ -144,7 +144,7 @@ impl NodeStakingEpochHistory {
     }
 
     pub fn get_epoch_stats_csv_header() -> String {
-        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\",\"last_good_sealing_message\",\"last_late_sealing_message\",\"last_error_sealing_message\"\n".to_string();
+        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\",\"last_good_sealing_message\",\"last_late_sealing_message\",\"last_error_sealing_message\",\"cumulative_lateness\"\n".to_string();
     }
 
     pub fn as_csv_lines(&self, staking_epoch: u64) -> String {
@@ -157,8 +157,9 @@ impl NodeStakingEpochHistory {
         
         let last_error_sealing_message = self.last_late_sealing_message;
         let last_late_sealing_message = self.last_error_sealing_message;
+        let cumulative_lateness = self.cumulative_lateness;
 
-        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message}\n");
+        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness}\n");
     }
 }
 
