@@ -47,6 +47,7 @@ pub(crate) struct NodeStakingEpochHistory {
     last_good_sealing_message: u64,
     last_late_sealing_message: u64,
     last_error_sealing_message: u64,
+    cumulative_lateness: u64,
     sealing_blocks_good: Vec<u64>,
     sealing_blocks_late: Vec<u64>,
     sealing_blocks_bad: Vec<u64>,
@@ -62,6 +63,7 @@ impl NodeStakingEpochHistory {
             last_good_sealing_message: 0,
             last_late_sealing_message: 0,
             last_error_sealing_message: 0,
+            cumulative_lateness: 0,
             sealing_blocks_good: Vec::new(),
             sealing_blocks_late: Vec::new(),
             sealing_blocks_bad: Vec::new(),
@@ -82,6 +84,21 @@ impl NodeStakingEpochHistory {
             warn!(target: "consensus", "add_good_seal_event: event.block_num {block_num} <= self.last_good_sealing_message {last_good_sealing_message}");
         }
         self.sealing_blocks_good.push(event.block_num);
+    }
+
+    /// protocols a good seal event.
+    pub fn add_seal_event_late(&mut self, event: &SealEventLate) {
+        // by definition a "good sealing" is always on the latest block.
+        let block_num = event.block_num;
+        let last_late_sealing_message = self.last_late_sealing_message;
+
+        if block_num > last_late_sealing_message {
+            self.last_late_sealing_message = event.block_num;
+        } else {
+            warn!(target: "consensus", "add_late_seal_event: event.block_num {block_num} <= self.last_late_sealing_message {last_late_sealing_message}");
+        }
+        self.cumulative_lateness += event.get_lateness();
+        self.sealing_blocks_late.push(event.block_num);
     }
 
     pub(crate) fn add_bad_seal_event(&mut self, event: &SealEventBad) {
@@ -131,7 +148,7 @@ impl NodeStakingEpochHistory {
     }
 
     pub fn as_csv_lines(&self, staking_epoch: u64) -> String {
-        let node_id = self.node_id;
+        let node_id = self.node_id.0;
         let total_good_sealing_messages = self.get_total_good_sealing_messages();
         let total_late_sealing_messages = self.get_total_late_sealing_messages();
         let total_error_sealing_messages = self.get_total_error_sealing_messages();
@@ -172,28 +189,39 @@ impl StakingEpochHistory {
         }
     }
 
-    pub fn on_good_seal(&mut self, event: &SealEventGood) {
-        let node_id = &event.node_id;
-        // let block_num = event.block_num;
+    fn get_history_for_node(&mut self, node_id: &NodeId) -> &mut NodeStakingEpochHistory {
 
-        let mut node_staking_epoch_history = self
+        let index_result = self
             .node_staking_epoch_histories
             .iter_mut()
-            .find(|x| &x.get_node_id() == node_id);
+            .position(|x| &x.get_node_id() == node_id);
 
-        match node_staking_epoch_history {
-            Some(mut node_staking_epoch_history) => {
-                node_staking_epoch_history.add_good_seal_event(event);
+        
+        match index_result {
+            Some(index) => {
+                return &mut self.node_staking_epoch_histories[index];
             }
             None => {
-                let mut node_staking_epoch_history = NodeStakingEpochHistory::new(node_id.clone());
-                node_staking_epoch_history.add_good_seal_event(event);
-                self.node_staking_epoch_histories.push(node_staking_epoch_history);
+                self.node_staking_epoch_histories.push(NodeStakingEpochHistory::new(node_id.clone()));
+                return self.node_staking_epoch_histories.last_mut().unwrap();
             }
-        }
+        };
 
-        self.exported = false;
         
+    }
+
+    pub fn on_seal_good(&mut self, event: &SealEventGood) {
+        
+        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        node_staking_epoch_history.add_good_seal_event(event);
+        self.exported = false;
+    }
+
+    pub fn on_seal_late(&mut self, event: &SealEventLate) {
+        
+        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        node_staking_epoch_history.add_seal_event_late(event);
+        self.exported = false;
     }
 
     pub fn get_epoch_stats_as_csv(&self) -> String {
@@ -225,6 +253,20 @@ pub struct SealEventBad {
     node_id: NodeId,
     block_num: u64,
     reason: BadSealReason,
+}
+
+#[derive(Debug, Clone)]
+pub struct SealEventLate {
+    node_id: NodeId,
+    block_num: u64,
+    received_block_num: u64,
+}
+
+impl SealEventLate {
+    // get's the block lateness in blocks.
+    pub fn get_lateness(&self) -> u64 {
+        self.received_block_num - self.block_num
+    }
 }
 
 struct StakingEpochRange {
@@ -316,6 +358,20 @@ impl HbbftMessageDispatcher {
             .push_back(event);
     }
 
+    pub(super) fn report_seal_late(&self, node_id: &NodeId, block_num: u64, current_block: u64) {
+
+        let event = SealEventLate {
+            node_id: node_id.clone(),
+            block_num,
+            received_block_num: current_block,
+        };
+        
+        self.memorial
+        .write()
+        .dispatched_seal_event_late
+        .push_back(event);
+    }
+
     pub fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
@@ -352,6 +408,7 @@ pub(crate) struct HbbftMessageMemorium {
     dispatched_seals: VecDeque<(sealing::Message, u64)>,
     dispatched_seal_event_good: VecDeque<SealEventGood>,
     dispatched_seal_event_bad: VecDeque<SealEventBad>,
+    dispatched_seal_event_late: VecDeque<SealEventLate>,
     // stores the history for staking epochs.
     // this should be only a hand full of epochs.
     // since old ones are not needed anymore.
@@ -383,6 +440,7 @@ impl HbbftMessageMemorium {
             dispatched_seals: VecDeque::new(),
             dispatched_seal_event_good: VecDeque::new(),
             dispatched_seal_event_bad: VecDeque::new(),
+            dispatched_seal_event_late: VecDeque::new(),
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
         }
@@ -463,11 +521,26 @@ impl HbbftMessageMemorium {
     }
 
     // process a good seal message in to the history.
-    fn on_good_seal(&mut self, seal: &SealEventGood) -> bool {
+    fn on_seal_good(&mut self, seal: &SealEventGood) -> bool {
         info!(target: "consensus", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
-            epoch_history.on_good_seal(seal);
+            epoch_history.on_seal_good(seal);
+            return true;
+        } else {
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+        }
+        return false;
+    }
+
+    // process a late seal message in to the history.
+    fn on_seal_late(&mut self, seal: &SealEventLate) -> bool {
+        info!(target: "consensus", "working on  good seal!: {:?}", seal);
+        let block_num = seal.block_num;
+        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+            
+            epoch_history.on_seal_late(seal);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
@@ -551,12 +624,26 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
+        // good seals
+
         if let Some(good_seal) = self.dispatched_seal_event_good.front() {
             // rust borrow system forced me into this useless clone...
             info!(target: "consensus", "work: good Seal!");
-            if self.on_good_seal(&good_seal.clone()) {
+            if self.on_seal_good(&good_seal.clone()) {
                 self.dispatched_seal_event_good.pop_front();
                 info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
+
+                had_worked = true;
+            }
+        }
+
+        // late seals
+
+        if let Some(late_seal) = self.dispatched_seal_event_late.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_seal_late(&late_seal.clone()) {
+                self.dispatched_seal_event_late.pop_front();
+                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
 
                 had_worked = true;
             }

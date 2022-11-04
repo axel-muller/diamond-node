@@ -492,6 +492,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Received sealing message for block {} from {}",block_num, sender_id);
         if let Some(latest) = client.block_number(BlockId::Latest) {
             if latest >= block_num {
+                self.hbbft_message_dispatcher.report_seal_late(&sender_id, block_num, latest);
                 return Ok(()); // Message is obsolete.
             }
         }
