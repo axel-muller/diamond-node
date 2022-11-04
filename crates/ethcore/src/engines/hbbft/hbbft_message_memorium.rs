@@ -118,12 +118,16 @@ impl NodeStakingEpochHistory {
             + self.get_total_error_sealing_messages()
     }
 
+    pub fn get_last_good_sealing_message(&self) -> u64 {
+        self.last_good_sealing_message
+    }
+
     pub fn get_node_id(&self) -> NodeId {
         self.node_id
     }
 
     pub fn get_epoch_stats_csv_header() -> String {
-        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\"\n".to_string();
+        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\",\"last_good_sealing_message\",\"last_late_sealing_message\",\"last_error_sealing_message\"\n".to_string();
     }
 
     pub fn as_csv_lines(&self, staking_epoch: u64) -> String {
@@ -132,8 +136,12 @@ impl NodeStakingEpochHistory {
         let total_late_sealing_messages = self.get_total_late_sealing_messages();
         let total_error_sealing_messages = self.get_total_error_sealing_messages();
         let total_sealing_messages = self.get_total_sealing_messages();
+        let last_good_sealing_message = self.get_last_good_sealing_message();
+        
+        let last_error_sealing_message = self.last_late_sealing_message;
+        let last_late_sealing_message = self.last_error_sealing_message;
 
-        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages}\n");
+        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message}\n");
     }
 }
 
@@ -504,10 +512,6 @@ impl HbbftMessageMemorium {
         return None;
     }
 
-    // fn create_validator_stats_csv_report() -> String {
-
-    // }
-
     fn work_message(&mut self) -> bool {
 
         let mut had_worked = false;
@@ -605,22 +609,6 @@ impl HbbftMessageMemorium {
                         error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
                     }
                 }
-
-                // if let Ok(mut file) = if output_path.exists() {
-                //     warn!(target: "consensus", "could not write validator stats to disk:{}", filename);
-                //     std::fs::File::create(output_path)
-                // } else {
-                //     std::fs::File::open(output_path)
-                // } {
-                //
-                //    if let Err(err) = file.write_all(csv.as_bytes()) {
-                //         error!(target: "consensus", "could not write validator stats to disk:{} {:?}",filename, err);
-                //     }
-                //     // even on error we want to update the timestamp, so we do not try to write the file again.
-                //     self.timestamp_last_validator_stats_written = current_time;
-                // } else {
-                //     error!(target: "consensus", "could not create validator stats output file: {}", filename);
-                // }
             }
         }
         return had_worked;
