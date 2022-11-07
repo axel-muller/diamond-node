@@ -11,7 +11,7 @@ use engines::{
 use error::{BlockError, Error};
 use ethereum_types::{H256, H512, U256};
 use ethjson::spec::HbbftParams;
-use hbbft::{NetworkInfo, Target};
+use hbbft::{NetworkInfo, Target, honey_badger::FaultKind};
 use io::{IoContext, IoHandler, IoService, TimerToken};
 use itertools::Itertools;
 use machine::EthereumMachine;
@@ -461,17 +461,37 @@ impl HoneyBadgerBFT {
         self.hbbft_message_dispatcher
             .on_message_received(&message);
 
-        let step = self.hbbft_state.write().process_message(
+        let message_block = message.epoch();
+
+        match self.hbbft_state.write().process_message(
             client.clone(),
             &self.signer,
             sender_id,
             message,
-        );
+        ) {
+            Ok(Some((step, network_info))) => {
+                if step.fault_log.0.is_empty() {
+                    //TODO:  report good message here.
+                } else {
+                for f in step.fault_log.0.iter() {
+                    warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, f.node_id, f.kind);
+                    self.hbbft_message_dispatcher.report_message_faulty(&f.node_id, message_block, Some(f.kind.clone()));
+                }
 
-        if let Some((step, network_info)) = step {
-            self.process_step(client, step, &network_info);
-            self.join_hbbft_epoch()?;
+                self.process_step(client, step, &network_info);
+                self.join_hbbft_epoch()?;
+                }
+            }
+            Ok(None) => {
+
+            }
+            Err(err) => {
+                // this error is thrown on a step error.
+                warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, &sender_id, err);
+                self.hbbft_message_dispatcher.report_message_faulty(&sender_id, message_block, None);
+            }
         }
+
         Ok(())
     }
 

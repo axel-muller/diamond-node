@@ -115,6 +115,10 @@ impl NodeStakingEpochHistory {
         self.sealing_blocks_good.push(event.block_num);
     }
 
+    pub(crate) fn add_message_event_faulty(&mut self, event: &MessageEventFaulty) {
+        // todo: add to faulty message history
+    }
+
     /// GETTERS
 
     pub fn get_total_good_sealing_messages(&self) -> usize {
@@ -225,6 +229,12 @@ impl StakingEpochHistory {
         self.exported = false;
     }
 
+    pub fn on_message_faulty(&mut self, event: &MessageEventFaulty) {
+        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        node_staking_epoch_history.add_message_event_faulty(event);
+        self.exported = false;
+    }
+
     pub fn get_epoch_stats_as_csv(&self) -> String {
         let mut result = String::with_capacity(1024);
         result.push_str(NodeStakingEpochHistory::get_epoch_stats_csv_header().as_str());
@@ -268,6 +278,13 @@ impl SealEventLate {
     pub fn get_lateness(&self) -> u64 {
         self.received_block_num - self.block_num
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct MessageEventFaulty {
+    node_id: NodeId,
+    block_num: u64,
+    fault_kind: Option<honey_badger::FaultKind>,
 }
 
 struct StakingEpochRange {
@@ -373,6 +390,21 @@ impl HbbftMessageDispatcher {
         .push_back(event);
     }
 
+    pub(crate) fn report_message_faulty(&self, node_id: &NodeId, block_num: u64, fault_kind: Option<honey_badger::FaultKind>) {
+
+        let event = MessageEventFaulty {
+            node_id: node_id.clone(),
+            block_num,
+            fault_kind
+        };
+ 
+        self.memorial
+            .write()
+            .dispatched_message_event_faulty
+            .push_back(event);
+
+    }
+
     pub fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
@@ -383,6 +415,8 @@ impl HbbftMessageDispatcher {
             .write()
             .report_new_epoch(staking_epoch, staking_epoch_start_block);
     }
+
+
 }
 
 pub(crate) struct HbbftMessageMemorium {
@@ -410,6 +444,7 @@ pub(crate) struct HbbftMessageMemorium {
     dispatched_seal_event_good: VecDeque<SealEventGood>,
     dispatched_seal_event_bad: VecDeque<SealEventBad>,
     dispatched_seal_event_late: VecDeque<SealEventLate>,
+    dispatched_message_event_faulty: VecDeque<MessageEventFaulty>,
     // stores the history for staking epochs.
     // this should be only a hand full of epochs.
     // since old ones are not needed anymore.
@@ -442,6 +477,7 @@ impl HbbftMessageMemorium {
             dispatched_seal_event_good: VecDeque::new(),
             dispatched_seal_event_bad: VecDeque::new(),
             dispatched_seal_event_late: VecDeque::new(),
+            dispatched_message_event_faulty: VecDeque::new(),
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
         }
@@ -550,6 +586,22 @@ impl HbbftMessageMemorium {
         return false;
     }
 
+    fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
+
+        info!(target: "consensus", "working on faulty event!: {:?}", event);
+        let block_num = event.block_num;
+        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+            
+            epoch_history.on_message_faulty(event);
+            return true;
+
+        } else {
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+        }
+        return false;
+    }
+
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
         warn!(target: "consensus", "report new epoch: {}", staking_epoch);
@@ -645,6 +697,17 @@ impl HbbftMessageMemorium {
             if self.on_seal_late(&late_seal.clone()) {
                 self.dispatched_seal_event_late.pop_front();
                 info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+
+                had_worked = true;
+            }
+        }
+
+        // faulty messages
+        if let Some(message_faulty) = self.dispatched_message_event_faulty.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_message_faulty(&message_faulty.clone()) {
+                self.dispatched_message_event_faulty.pop_front();
+                info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
 
                 had_worked = true;
             }

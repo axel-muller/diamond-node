@@ -53,7 +53,7 @@ impl HbbftState {
     }
 
     /**
-     * Updates the underlying honeybadger instance, possible switching into a new 
+     * Updates the underlying honeybadger instance, possible switching into a new
      * honeybadger instance if according to contracts a new staking epoch has started.
      * true if a new epoch has started and a new honeybadger instance has been created
      */
@@ -203,36 +203,53 @@ impl HbbftState {
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
         sender_id: NodeId,
         message: HbMessage,
-    ) -> Option<(HoneyBadgerStep, NetworkInfo<NodeId>)> {
-        self.skip_to_current_epoch(client, signer)?;
+    ) -> Result<Option<(HoneyBadgerStep, NetworkInfo<NodeId>)>, honey_badger::Error> {
+        match self.skip_to_current_epoch(client, signer) {
+            Some(_) => (),
+            None => return Ok(None),
+        }
 
         // If honey_badger is None we are not a validator, nothing to do.
-        let honey_badger = self.honey_badger.as_mut()?;
+        let honey_badger = match self.honey_badger.as_mut() {
+            Some(hb) => hb,
+            None => return Ok(None),
+        };
 
         let message_epoch = message.epoch();
+        let hb_epoch = honey_badger.epoch();
         // Note that if the message is for a future epoch we do not know if the current honey_badger
         // instance is the correct one to use. Tt may change if the the POSDAO epoch changes, causing
         // consensus messages to get lost.
-        if message_epoch > honey_badger.epoch() {
+        if message_epoch > hb_epoch {
             trace!(target: "consensus", "Message from future epoch, caching it for handling it in when the epoch is current. Current hbbft epoch is: {}", honey_badger.epoch());
             self.future_messages_cache
                 .entry(message.epoch())
                 .or_default()
                 .push((sender_id, message));
-            return None;
+            return Ok(None);
         }
 
-        let network_info = self.network_info.as_ref()?.clone();
+        match self.network_info.as_ref() {
+            Some(network_info) => {
+                match honey_badger.handle_message(&sender_id, message) {
+                    Ok(step) => return Ok(Some((step, network_info.clone()))),
+                    Err(err) =>  {
+                        // TODO: Report consensus step errors
+                        // maybe we are not part of the HBBFT Set anymore ?
+                        // maybe the sender is not Part of the hbbft set ?
+                        // maybe we have the wrong hbbft for decryption ?
 
-        match honey_badger.handle_message(&sender_id, message) {
-            Ok(step) => Some((step, network_info)),
-            Err(err) => {
-                // TODO: Report consensus step errors
-                // maybe we are not part of the HBBFT Set anymore ?
-                // maybe the sender is not Part of the hbbft set ?
-                // maybe we have the wrong hbbft for decryption ?
-                error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}",sender_id, message_epoch, err);
-                None
+                        error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}", sender_id, message_epoch, err);
+                        return Err(err);
+                    }
+                }
+            }
+            None => {
+                // We are not a validator, but we still need to handle the message to keep the
+                // network in sync.
+                // honey_badger.handle_message(&sender_id, message);
+                warn!(target: "consensus", "Message from node {} for block {} received - but no network info available.: current Block: {}", sender_id.0, message_epoch, hb_epoch);
+                return Ok(None);
             }
         }
     }
@@ -405,5 +422,4 @@ impl HbbftState {
     pub fn get_current_posdao_epoch_start_block(&self) -> u64 {
         self.current_posdao_epoch_start_block
     }
-
 }
