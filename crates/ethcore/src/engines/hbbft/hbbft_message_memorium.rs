@@ -51,6 +51,11 @@ pub(crate) struct NodeStakingEpochHistory {
     sealing_blocks_good: Vec<u64>,
     sealing_blocks_late: Vec<u64>,
     sealing_blocks_bad: Vec<u64>,
+    // messages.
+    last_message_faulty: u64,
+    last_message_good: u64,
+    
+    num_faulty_messages: u64,
     // total_contributions_good: u64,
     // total_contributions_bad: u64,
 }
@@ -67,6 +72,9 @@ impl NodeStakingEpochHistory {
             sealing_blocks_good: Vec::new(),
             sealing_blocks_late: Vec::new(),
             sealing_blocks_bad: Vec::new(),
+            last_message_faulty: 0,
+            last_message_good: 0,
+            num_faulty_messages: 0,
         }
     }
 
@@ -117,6 +125,15 @@ impl NodeStakingEpochHistory {
 
     pub(crate) fn add_message_event_faulty(&mut self, event: &MessageEventFaulty) {
         // todo: add to faulty message history
+        let block_num = event.block_num;
+        let last_message_faulty = self.last_message_faulty;
+
+        if block_num > last_message_faulty {
+            self.last_message_faulty = block_num;
+        } else {
+            warn!(target: "consensus", "add_bad_seal_event: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
+        }
+        self.num_faulty_messages += 1;
     }
 
     /// GETTERS
@@ -226,6 +243,13 @@ impl StakingEpochHistory {
         
         let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
         node_staking_epoch_history.add_seal_event_late(event);
+        self.exported = false;
+    }
+
+    pub fn on_seal_bad(&mut self, event: &SealEventBad) {
+        
+        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        node_staking_epoch_history.add_bad_seal_event(event);
         self.exported = false;
     }
 
@@ -586,6 +610,20 @@ impl HbbftMessageMemorium {
         return false;
     }
 
+    fn on_seal_bad(&mut self, seal: &SealEventBad) -> bool {
+        info!(target: "consensus", "working on  good seal!: {:?}", seal);
+        let block_num = seal.block_num;
+        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+
+            epoch_history.on_seal_bad(seal);
+            return true;
+        } else {
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+        }
+        return false;
+    }
+
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
 
         info!(target: "consensus", "working on faulty event!: {:?}", event);
@@ -696,6 +734,17 @@ impl HbbftMessageMemorium {
             // rust borrow system forced me into this useless clone...
             if self.on_seal_late(&late_seal.clone()) {
                 self.dispatched_seal_event_late.pop_front();
+                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+
+                had_worked = true;
+            }
+        }
+
+        // faulty seals.
+        if let Some(late_seal) = self.dispatched_seal_event_bad.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_seal_bad(&late_seal.clone()) {
+                self.dispatched_seal_event_bad.pop_front();
                 info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
 
                 had_worked = true;
