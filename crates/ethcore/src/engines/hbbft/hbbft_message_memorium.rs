@@ -186,7 +186,6 @@ impl NodeStakingEpochHistory {
         let last_message_good = self.last_message_good;
         // faulty messages
         let last_message_faulty = self.last_message_faulty;
-        let diff_messages : i64 = total_good_messages as i64 - total_faulty_messages as i64;
         
         return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness},{total_good_messages},{total_faulty_messages},{last_message_good},{last_message_faulty}\n");
     }
