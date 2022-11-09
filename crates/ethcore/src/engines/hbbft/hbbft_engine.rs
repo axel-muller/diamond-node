@@ -1,3 +1,5 @@
+use crate::{engines::hbbft::contracts::random_hbbft::set_current_seed_tx};
+
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
@@ -568,6 +570,7 @@ impl HoneyBadgerBFT {
             trace!(target: "consensus", "Signature for block {} is ready", block_num);
             let state = Sealing::Complete(sig);
             self.sealing.write().insert(block_num, state);
+            
             client.update_sealing(ForceUpdateSealing::No);
         }
     }
@@ -1062,7 +1065,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         &self,
         block: &ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
-        let _random_number = match self.random_numbers.read().get(&block.header.number()) {
+        warn!("generate_engine_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        let random_numbers = self.random_numbers.read();
+        let random_number = match random_numbers.get(&block.header.number()) {
             None => {
                 return Err(EngineError::Custom(
                     "No value available for calling randomness contract.".into(),
@@ -1071,7 +1076,19 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             }
             Some(r) => r,
         };
-        Ok(Vec::new())
+        warn!("random number: {:?}", random_number);
+        match self.client_arc()  {
+            Some(client_arc) => {
+                warn!("got client arc.");
+                let tx = set_current_seed_tx(client_arc.as_ref() , random_number)?;
+                Ok(vec![tx])
+            },
+            None => {
+                return Err(EngineError::Custom(
+                    "No value available for calling randomness contract.".into(),
+                ).into());
+            },
+        }
     }
 
     fn sealing_state(&self) -> SealingState {
