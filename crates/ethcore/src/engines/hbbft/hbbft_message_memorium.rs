@@ -165,7 +165,7 @@ impl NodeStakingEpochHistory {
     }
 
     pub fn get_epoch_stats_csv_header() -> String {
-        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\",\"last_good_sealing_message\",\"last_late_sealing_message\",\"last_error_sealing_message\",\"cumulative_lateness\"\n".to_string();
+        return "\"staking_epoch\",\"node_id\",\"total_sealing_messages\",\"total_good_sealing_messages\",\"total_late_sealing_messages\",\"total_error_sealing_messages\",\"last_good_sealing_message\",\"last_late_sealing_message\",\"last_error_sealing_message\",\"cumulative_lateness\",\"total_good_messages\",\"total_faulty_messages\",\"last_message_good\",\"last_message_faulty\"".to_string();
     }
 
     pub fn as_csv_lines(&self, staking_epoch: u64) -> String {
@@ -174,13 +174,21 @@ impl NodeStakingEpochHistory {
         let total_late_sealing_messages = self.get_total_late_sealing_messages();
         let total_error_sealing_messages = self.get_total_error_sealing_messages();
         let total_sealing_messages = self.get_total_sealing_messages();
+
         let last_good_sealing_message = self.get_last_good_sealing_message();
         
         let last_error_sealing_message = self.last_late_sealing_message;
         let last_late_sealing_message = self.last_error_sealing_message;
         let cumulative_lateness = self.cumulative_lateness;
-
-        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness}\n");
+        // totals messages
+        let total_good_messages = self.get_total_good_sealing_messages();
+        let total_faulty_messages = self.num_faulty_messages;
+        let last_message_good = self.last_message_good;
+        // faulty messages
+        let last_message_faulty = self.last_message_faulty;
+        let diff_messages : i64 = total_good_messages as i64 - total_faulty_messages as i64;
+        
+        return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness},{total_good_messages},{total_faulty_messages},{last_message_good},{last_message_faulty}\n");
     }
 }
 
