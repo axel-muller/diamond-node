@@ -1939,7 +1939,7 @@ impl Engine<EthereumMachine> for AuthorityRound {
 
     fn generate_engine_transactions(
         &self,
-        block: &mut ExecutedBlock,
+        block: &ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
         let mut transactions = self.run_randomness_phase(block)?;
         let nonce = transactions.last().map(|tx| tx.tx().nonce + U256::one());

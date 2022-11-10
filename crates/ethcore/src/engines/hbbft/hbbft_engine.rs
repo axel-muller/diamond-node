@@ -1061,41 +1061,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
-    fn generate_engine_transactions(
-        &self,
-        block: &mut ExecutedBlock,
-    ) -> Result<Vec<SignedTransaction>, Error> {
-        warn!("generate_engine_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
-        let random_numbers = self.random_numbers.read();
-        let random_number = match random_numbers.get(&block.header.number()) {
-            None => {
-                return Err(EngineError::Custom(
-                    "No value available for calling randomness contract.".into(),
-                )
-                .into())
-            }
-            Some(r) => r,
-        };
-        warn!("random number: {:?}", random_number);
-        match self.client_arc()  {
-            Some(client_arc) => {
-                warn!("got client arc.");
-                let tx = set_current_seed_tx_raw(random_number);
-                
-                //  let mut call = engines::default_system_or_code_call(&self.machine, block);
-                let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
-                warn!("execution result: {result:?}");
-            },
-            None => {
-                return Err(EngineError::Custom(
-                    "No value available for calling randomness contract.".into(),
-                ).into());
-            },
-        }
 
-        Ok(vec![])
+    //     Ok(vec![])
 
-    }
+    // }
 
     fn sealing_state(&self) -> SealingState {
         // Purge obsolete sealing processes.
@@ -1176,6 +1145,39 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn use_block_author(&self) -> bool {
         false
+    }
+
+    fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+
+        warn!("generate_engine_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        let random_numbers = self.random_numbers.read();
+        let random_number = match random_numbers.get(&block.header.number()) {
+            None => {
+                return Err(EngineError::Custom(
+                    "No value available for calling randomness contract.".into(),
+                )
+                .into())
+            }
+            Some(r) => r,
+        };
+        warn!("random number: {:?}", random_number);
+        match self.client_arc()  {
+            Some(client_arc) => {
+                warn!("got client arc.");
+                let tx = set_current_seed_tx_raw(random_number);
+                
+                //  let mut call = engines::default_system_or_code_call(&self.machine, block);
+                let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
+                warn!("execution result: {result:?}");
+                return result.map(|_| ());
+            },
+            None => {
+                return Err(EngineError::Custom(
+                    "No value available for calling randomness contract.".into(),
+                ).into());
+            },
+        }
+
     }
 
     /// Allow mutating the header during seal generation. Currently only used by Clique.
