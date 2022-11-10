@@ -1178,6 +1178,29 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         false
     }
 
+    /// Allow mutating the header during seal generation. Currently only used by Clique.
+    fn on_seal_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+
+        let random_numbers = self.random_numbers.read();
+        match random_numbers.get(&block.header.number()) { 
+            None => { 
+                warn!("No rng value available for header.");
+                return Ok(());
+            }
+            Some(r) => {
+                
+                let mut bytes : [u8; 32] = [0; 32];
+                r.to_big_endian(&mut bytes);
+                
+                block.header.set_extra_data(bytes.to_vec());
+            },
+        };
+        
+
+        
+        Ok(())
+    }
+
     fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         if let Some(address) = self.params.block_reward_contract_address {
             // only if no block reward skips are defined for this block.
