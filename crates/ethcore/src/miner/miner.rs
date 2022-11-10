@@ -459,7 +459,7 @@ impl Miner {
     {
         let params = self.params.read().clone();
 
-        let block = match chain.prepare_open_block(
+        let mut block = match chain.prepare_open_block(
             if self.engine.use_block_author() {
                 params.author
             } else {
@@ -476,8 +476,9 @@ impl Miner {
             }
         };
 
-        // Before adding from the queue to the new block, give the engine a chance to add transactions.
-        let engine_pending = match self.engine.generate_engine_transactions(&block) {
+
+        // Before adding from the queue to the new block, give the engine a chancblocke to add transactions.
+        let engine_pending = match self.engine.generate_engine_transactions(block.block_mut()) {
             Ok(transactions) => transactions,
             Err(err) => {
                 error!(target: "miner", "Failed to prepare engine transactions for new block: {:?}. \

@@ -548,7 +548,7 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// Added for AuRa needs.
     fn generate_engine_transactions(
         &self,
-        _block: &ExecutedBlock,
+        _block: &mut ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
         Ok(Vec::new())
     }

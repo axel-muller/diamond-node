@@ -1,4 +1,4 @@
-use crate::{engines::hbbft::contracts::random_hbbft::set_current_seed_tx};
+use crate::{engines::{hbbft::contracts::random_hbbft::{set_current_seed_tx_raw}, self}};
 
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
@@ -1063,7 +1063,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn generate_engine_transactions(
         &self,
-        block: &ExecutedBlock,
+        block: &mut ExecutedBlock,
     ) -> Result<Vec<SignedTransaction>, Error> {
         warn!("generate_engine_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
         let random_numbers = self.random_numbers.read();
@@ -1080,8 +1080,11 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         match self.client_arc()  {
             Some(client_arc) => {
                 warn!("got client arc.");
-                let tx = set_current_seed_tx(client_arc.as_ref() , random_number)?;
-                Ok(vec![tx])
+                let tx = set_current_seed_tx_raw(random_number);
+                
+                //  let mut call = engines::default_system_or_code_call(&self.machine, block);
+                let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
+                warn!("execution result: {result:?}");
             },
             None => {
                 return Err(EngineError::Custom(
@@ -1089,6 +1092,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 ).into());
             },
         }
+
+        Ok(vec![])
+
     }
 
     fn sealing_state(&self) -> SealingState {
