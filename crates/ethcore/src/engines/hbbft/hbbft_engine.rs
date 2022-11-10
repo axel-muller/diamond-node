@@ -1161,22 +1161,14 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             Some(r) => r,
         };
         warn!("random number: {:?}", random_number);
-        match self.client_arc()  {
-            Some(client_arc) => {
-                warn!("got client arc.");
-                let tx = set_current_seed_tx_raw(random_number);
-                
-                //  let mut call = engines::default_system_or_code_call(&self.machine, block);
-                let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
-                warn!("execution result: {result:?}");
-                return result.map(|_| ());
-            },
-            None => {
-                return Err(EngineError::Custom(
-                    "No value available for calling randomness contract.".into(),
-                ).into());
-            },
-        }
+        
+        let tx = set_current_seed_tx_raw(random_number);
+        
+        //  let mut call = engines::default_system_or_code_call(&self.machine, block);
+        let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
+        warn!("execution result: {result:?}");
+        return result.map(|_| ());
+    
 
     }
 
