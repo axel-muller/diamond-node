@@ -1149,20 +1149,40 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
 
-        warn!("generate_engine_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
         let random_numbers = self.random_numbers.read();
-        let random_number = match random_numbers.get(&block.header.number()) {
+        let random_number: U256 = match random_numbers.get(&block.header.number()) {
             None => {
-                return Err(EngineError::Custom(
-                    "No value available for calling randomness contract.".into(),
-                )
-                .into())
+                // if we do not have random data for this block,
+                // because we are performant vaidator, the block is comming over the block import.
+                // the RNG is stored in the extra data field.
+                let extra_data = block.header.extra_data();
+
+                // extra data 0 and the value "Parity" is not considered as random number.
+                // so we only accept data with the correct length.
+                let r_ = if extra_data.len() == 32 {
+                    let r = U256::from_big_endian(extra_data);
+                    warn!("restored random number from header for block {} random number: {:?}", block.header.number(), r);
+                    r
+                } else {
+                    return Err(EngineError::Custom(
+                        "No value available for calling randomness contract.".into(),
+                    )
+                    .into())
+                };
+                r_
             }
-            Some(r) => r,
+            Some(r) => {
+                // we also need to write this extra data into the header.
+                let mut bytes : [u8; 32] = [0; 32];
+                r.to_big_endian(&mut bytes);
+                block.header.set_extra_data(bytes.to_vec());
+                r.clone()
+            },
         };
         warn!("random number: {:?}", random_number);
         
-        let tx = set_current_seed_tx_raw(random_number);
+        let tx = set_current_seed_tx_raw(&random_number);
         
         //  let mut call = engines::default_system_or_code_call(&self.machine, block);
         let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
@@ -1172,7 +1192,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     }
 
-    /// Allow mutating the header during seal generation. Currently only used by Clique.
+    /// Allow mutating the header during seal generation.
     fn on_seal_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
 
         let random_numbers = self.random_numbers.read();
