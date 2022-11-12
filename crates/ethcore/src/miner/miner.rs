@@ -459,7 +459,7 @@ impl Miner {
     {
         let params = self.params.read().clone();
 
-        let mut block = match chain.prepare_open_block(
+        let block = match chain.prepare_open_block(
             if self.engine.use_block_author() {
                 params.author
             } else {
