@@ -583,7 +583,7 @@ pub(crate) fn enact(
     b.populate_from(&header);
 
     // t_nb 8.2.1 give engine the chance to call system transaction that should get included in the block
-    b.on_before_transactions();
+    b.on_before_transactions()?;
 
     // t_nb 8.3 execute transactions one by one
     b.push_transactions(transactions)?;
