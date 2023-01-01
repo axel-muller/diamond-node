@@ -348,6 +348,12 @@ pub trait Engine<M: Machine>: Sync + Send {
         Ok(())
     }
 
+    /// Block is prepared to accept transactions.
+    /// good place to call system transactions that need to be the first in the block.
+    fn on_before_transactions(&self,_block: &mut ExecutedBlock) -> Result<(), M::Error> {
+        Ok(())
+    }
+
     /// Block transformation functions, after the transactions.
     fn on_close_block(&self, _block: &mut ExecutedBlock) -> Result<(), M::Error> {
         Ok(())

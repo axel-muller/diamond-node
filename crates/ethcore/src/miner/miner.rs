@@ -476,7 +476,8 @@ impl Miner {
             }
         };
 
-        // Before adding from the queue to the new block, give the engine a chance to add transactions.
+
+        // Before adding from the queue to the new block, give the engine a chancblocke to add transactions.
         let engine_pending = match self.engine.generate_engine_transactions(&block) {
             Ok(transactions) => transactions,
             Err(err) => {
@@ -539,6 +540,8 @@ impl Miner {
                 }
             }
         };
+        
+        // self.engine.on_opened_block(open_block,chain);
 
         if self.options.infinite_pending_block {
             open_block.remove_gas_limit();
@@ -623,6 +626,11 @@ impl Miner {
         };
 
         let block_start = Instant::now();
+    
+        if let Err(e) = open_block.on_before_transactions() {
+            warn!(target: "miner", "Error calling on_before_transactions: {:?}", e);
+            return None;
+        };
 
         for transaction in pending {
             let start = Instant::now();
