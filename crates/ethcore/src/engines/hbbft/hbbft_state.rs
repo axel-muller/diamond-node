@@ -8,7 +8,10 @@ use hbbft::{
 };
 use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
-use std::{collections::BTreeMap, collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use types::{header::Header, ids::BlockId};
 
 use super::{
