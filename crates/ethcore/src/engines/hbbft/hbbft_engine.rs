@@ -1,4 +1,4 @@
-use crate::{engines::{hbbft::contracts::random_hbbft::{set_current_seed_tx_raw}, self}};
+use crate::engines::{self, hbbft::contracts::random_hbbft::set_current_seed_tx_raw};
 
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
@@ -582,7 +582,7 @@ impl HoneyBadgerBFT {
             trace!(target: "consensus", "Signature for block {} is ready", block_num);
             let state = Sealing::Complete(sig);
             self.sealing.write().insert(block_num, state);
-            
+
             client.update_sealing(ForceUpdateSealing::No);
         }
     }
@@ -1081,7 +1081,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
-
     //     Ok(vec![])
 
     // }
@@ -1166,7 +1165,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-
         trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
         let random_numbers = self.random_numbers.read();
         let random_number: U256 = match random_numbers.get(&block.header.number()) {
@@ -1180,56 +1178,56 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 // so we only accept data with the correct length.
                 let r_ = if extra_data.len() == 32 {
                     let r = U256::from_big_endian(extra_data);
-                    warn!("restored random number from header for block {} random number: {:?}", block.header.number(), r);
+                    warn!(
+                        "restored random number from header for block {} random number: {:?}",
+                        block.header.number(),
+                        r
+                    );
                     r
                 } else {
                     return Err(EngineError::Custom(
                         "No value available for calling randomness contract.".into(),
                     )
-                    .into())
+                    .into());
                 };
                 r_
             }
             Some(r) => {
                 // we also need to write this extra data into the header.
-                let mut bytes : [u8; 32] = [0; 32];
+                let mut bytes: [u8; 32] = [0; 32];
                 r.to_big_endian(&mut bytes);
                 block.header.set_extra_data(bytes.to_vec());
                 r.clone()
-            },
+            }
         };
         warn!("random number: {:?}", random_number);
-        
+
         let tx = set_current_seed_tx_raw(&random_number);
-        
+
         //  let mut call = engines::default_system_or_code_call(&self.machine, block);
-        let result = self.machine.execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
+        let result = self
+            .machine
+            .execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
         warn!("execution result: {result:?}");
         return result.map(|_| ());
-    
-
     }
 
     /// Allow mutating the header during seal generation.
     fn on_seal_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-
         let random_numbers = self.random_numbers.read();
-        match random_numbers.get(&block.header.number()) { 
-            None => { 
+        match random_numbers.get(&block.header.number()) {
+            None => {
                 warn!("No rng value available for header.");
                 return Ok(());
             }
             Some(r) => {
-                
-                let mut bytes : [u8; 32] = [0; 32];
+                let mut bytes: [u8; 32] = [0; 32];
                 r.to_big_endian(&mut bytes);
-                
-                block.header.set_extra_data(bytes.to_vec());
-            },
-        };
-        
 
-        
+                block.header.set_extra_data(bytes.to_vec());
+            }
+        };
+
         Ok(())
     }
 
