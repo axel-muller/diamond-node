@@ -177,14 +177,14 @@ impl IoHandler<()> for TransitionHandler {
                         // Always create blocks if we are in the keygen phase.
                         self.engine.start_hbbft_epoch_if_next_phase();
 
-                        // Transactions may have been submitted during creation of the last block, trigger the
-                        // creation of a new block if the transaction threshold has been reached.
-                        self.engine.on_transactions_imported();
-
                         // If the maximum block time has been reached we trigger a new block in any case.
                         if self.max_block_time_remaining(c.clone()) == Duration::from_secs(0) {
                             self.engine.start_hbbft_epoch(c);
                         }
+
+                        // Transactions may have been submitted during creation of the last block, trigger the
+                        // creation of a new block if the transaction threshold has been reached.
+                        self.engine.start_hbbft_epoch_if_ready();
 
                         // Set timer duration to the default period (1s)
                         timer_duration = DEFAULT_DURATION;
@@ -375,7 +375,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Batch received for epoch {}, creating new Block.", batch.epoch);
 
         // Decode and de-duplicate transactions
-        let batch_txns: Vec<_> = batch
+        let mut batch_txns: Vec<_> = batch
             .contributions
             .iter()
             .flat_map(|(_, c)| &c.transactions)
@@ -389,6 +389,18 @@ impl HoneyBadgerBFT {
                 SignedTransaction::new(txn).ok()
             })
             .collect();
+
+        info!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
+            .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
+
+        // Make sure the resulting transactions do not contain nonces out of order.
+        // Not necessary any more - we select contribution transactions by sender, contributing all transactions by that sender or none.
+        // The transaction queue's "pending" transactions already guarantee there are no nonce gaps for a selected sender.
+        // Even if different validators contribute a different number of transactions for the same sender the transactions stay sorted
+        // by nonce after de-duplication.
+        // Note: The following sorting would also allow front-running of addresses with higher nonces. If sorting became necessary in
+        // the future for some reason replace this simplistic sort with one which preserves the relative order of senders.
+        //batch_txns.sort_by(|left, right| left.tx().nonce.cmp(&right.tx().nonce));
 
         // We use the median of all contributions' timestamps
         let timestamps = batch
@@ -956,6 +968,14 @@ impl HoneyBadgerBFT {
         }
         return Ok(false);
     }
+
+    fn start_hbbft_epoch_if_ready(&self) {
+        if let Some(client) = self.client_arc() {
+            if self.transaction_queue_and_time_thresholds_reached(&client) {
+                self.start_hbbft_epoch(client);
+            }
+        }
+    }
 }
 
 impl Engine<EthereumMachine> for HoneyBadgerBFT {
@@ -1097,10 +1117,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_transactions_imported(&self) {
-        if let Some(client) = self.client_arc() {
-            if self.transaction_queue_and_time_thresholds_reached(&client) {
-                self.start_hbbft_epoch(client);
-            }
+        if self.params.is_unit_test.unwrap_or(false) {
+            self.start_hbbft_epoch_if_ready();
         }
     }
 
