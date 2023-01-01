@@ -230,7 +230,6 @@ impl HbbftMessageMemorium {
         }
 
         return false;
-
     }
 
     // pub fn free_memory(&mut self, _current_block: u64) {
