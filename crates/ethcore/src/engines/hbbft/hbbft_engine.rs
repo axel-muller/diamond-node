@@ -1184,6 +1184,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                         r
                     );
                     r
+                } else if extra_data.len() == 6 && extra_data == &[80, 97, 114, 105, 116, 121] {
+                    warn!("detected Parity as random number, ignoring.",);
+                    return Ok(());
                 } else {
                     return Err(EngineError::Custom(
                         "No value available for calling randomness contract.".into(),
