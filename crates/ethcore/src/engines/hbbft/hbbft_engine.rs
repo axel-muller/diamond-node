@@ -1,5 +1,7 @@
-use crate::engines::{hbbft::{contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason}};
 use super::block_reward_hbbft::BlockRewardContract;
+use crate::engines::hbbft::{
+    contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason,
+};
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
 use crypto::publickey::Signature;
@@ -469,8 +471,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Received message of idx {}  {:?} from {}", msg_idx, message, sender_id);
 
         // store received messages here.
-        self.hbbft_message_dispatcher
-            .on_message_received(&message);
+        self.hbbft_message_dispatcher.on_message_received(&message);
 
         let message_block = message.epoch();
 
@@ -484,22 +485,28 @@ impl HoneyBadgerBFT {
                 if step.fault_log.0.is_empty() {
                     //TODO:  report good message here.
                 } else {
-                for f in step.fault_log.0.iter() {
-                    warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, f.node_id, f.kind);
-                    self.hbbft_message_dispatcher.report_message_faulty(&f.node_id, message_block, Some(f.kind.clone()));
-                }
+                    for f in step.fault_log.0.iter() {
+                        warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, f.node_id, f.kind);
+                        self.hbbft_message_dispatcher.report_message_faulty(
+                            &f.node_id,
+                            message_block,
+                            Some(f.kind.clone()),
+                        );
+                    }
 
-                self.process_step(client, step, &network_info);
-                self.join_hbbft_epoch()?;
+                    self.process_step(client, step, &network_info);
+                    self.join_hbbft_epoch()?;
                 }
             }
-            Ok(None) => {
-
-            }
+            Ok(None) => {}
             Err(err) => {
                 // this error is thrown on a step error.
                 warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, &sender_id, err);
-                self.hbbft_message_dispatcher.report_message_faulty(&sender_id, message_block, None);
+                self.hbbft_message_dispatcher.report_message_faulty(
+                    &sender_id,
+                    message_block,
+                    None,
+                );
             }
         }
 
@@ -517,13 +524,12 @@ impl HoneyBadgerBFT {
         //     .write()
         //     .on_sealing_message_received(&message, block_num, &sender_id);
 
-        
-
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
         trace!(target: "consensus", "Received sealing message for block {} from {}",block_num, sender_id);
         if let Some(latest) = client.block_number(BlockId::Latest) {
             if latest >= block_num {
-                self.hbbft_message_dispatcher.report_seal_late(&sender_id, block_num, latest);
+                self.hbbft_message_dispatcher
+                    .report_seal_late(&sender_id, block_num, latest);
                 return Ok(()); // Message is obsolete.
             }
         }
@@ -538,7 +544,11 @@ impl HoneyBadgerBFT {
             Some(n) => n,
             None => {
                 error!(target: "consensus", "Sealing message for block #{} could not be processed due to missing/mismatching network info.", block_num);
-                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num, BadSealReason::MismatchedNetworkInfo);
+                self.hbbft_message_dispatcher.report_seal_bad(
+                    &sender_id,
+                    block_num,
+                    BadSealReason::MismatchedNetworkInfo,
+                );
                 return Err(EngineError::UnexpectedMessage);
             }
         };
@@ -552,12 +562,17 @@ impl HoneyBadgerBFT {
             .handle_message(&sender_id, message);
         match step_result {
             Ok(step) => {
-                self.hbbft_message_dispatcher.report_seal_good(&sender_id, block_num);
+                self.hbbft_message_dispatcher
+                    .report_seal_good(&sender_id, block_num);
                 self.process_seal_step(client, step, block_num, &network_info);
             }
             Err(err) => {
                 error!(target: "consensus", "Error on ThresholdSign step: {:?}", err);
-                self.hbbft_message_dispatcher.report_seal_bad(&sender_id, block_num, BadSealReason::ErrorTresholdSignStep);
+                self.hbbft_message_dispatcher.report_seal_bad(
+                    &sender_id,
+                    block_num,
+                    BadSealReason::ErrorTresholdSignStep,
+                );
             }
         }
         Ok(())
@@ -1078,18 +1093,14 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();
-            match state.update_honeybadger(
-                client,
-                &self.signer,
-                BlockId::Latest,
-                true,
-            ) {
+            match state.update_honeybadger(client, &self.signer, BlockId::Latest, true) {
                 Some(_) => {
                     let posdao_epoch = state.get_current_posdao_epoch();
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
                     warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
-                    self.hbbft_message_dispatcher.report_new_epoch(posdao_epoch, epoch_start_block);   
-                },
+                    self.hbbft_message_dispatcher
+                        .report_new_epoch(posdao_epoch, epoch_start_block);
+                }
                 None => error!(target: "engine", "Error during HoneyBadger initialization!"),
             }
         }
@@ -1109,7 +1120,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             }
         }
     }
-
 
     fn sign(&self, hash: H256) -> Result<Signature, Error> {
         match self.signer.read().as_ref() {
@@ -1321,15 +1331,18 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                     let new_posdao_epoch = state.get_current_posdao_epoch();
                     if new_posdao_epoch != old_posdao_epoch {
                         info!(target: "consensus", "POSDAO epoch changed from {old_posdao_epoch} to {new_posdao_epoch}.");
-                        if let Some(block_number) = client.block_number(BlockId::Hash(*block_hash)) {
-                            self.hbbft_message_dispatcher.report_new_epoch(new_posdao_epoch, block_number);
+                        if let Some(block_number) = client.block_number(BlockId::Hash(*block_hash))
+                        {
+                            self.hbbft_message_dispatcher
+                                .report_new_epoch(new_posdao_epoch, block_number);
                         } else {
                             error!(target: "engine", "could not retrieve Block on_chain_commit for updating message memoriumaupdate honey badger after importing block {block_hash}: update honeybadger failed")
                         }
-                        
                     }
-                },
-                None => error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed"),
+                }
+                None => {
+                    error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed")
+                }
             }
         } else {
             error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
@@ -1364,8 +1377,6 @@ mod tests {
             HoneyBadger::builder(Arc::new(net_info.clone()));
 
         let mut honey_badger = builder.build();
-
-        
 
         let mut pending: Vec<SignedTransaction> = Vec::new();
         let keypair = Random.generate();

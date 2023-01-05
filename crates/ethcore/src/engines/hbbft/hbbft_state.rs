@@ -238,7 +238,7 @@ impl HbbftState {
             Some(network_info) => {
                 match honey_badger.handle_message(&sender_id, message) {
                     Ok(step) => return Ok(Some((step, network_info.clone()))),
-                    Err(err) =>  {
+                    Err(err) => {
                         // TODO: Report consensus step errors
                         // maybe we are not part of the HBBFT Set anymore ?
                         // maybe the sender is not Part of the hbbft set ?

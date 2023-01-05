@@ -54,7 +54,7 @@ pub(crate) struct NodeStakingEpochHistory {
     // messages.
     last_message_faulty: u64,
     last_message_good: u64,
-    
+
     num_faulty_messages: u64,
     // total_contributions_good: u64,
     // total_contributions_bad: u64,
@@ -176,7 +176,7 @@ impl NodeStakingEpochHistory {
         let total_sealing_messages = self.get_total_sealing_messages();
 
         let last_good_sealing_message = self.get_last_good_sealing_message();
-        
+
         let last_error_sealing_message = self.last_late_sealing_message;
         let last_late_sealing_message = self.last_error_sealing_message;
         let cumulative_lateness = self.cumulative_lateness;
@@ -186,7 +186,7 @@ impl NodeStakingEpochHistory {
         let last_message_good = self.last_message_good;
         // faulty messages
         let last_message_faulty = self.last_message_faulty;
-        
+
         return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness},{total_good_messages},{total_faulty_messages},{last_message_good},{last_message_faulty}\n");
     }
 }
@@ -214,47 +214,41 @@ impl StakingEpochHistory {
             staking_epoch_start_block,
             staking_epoch_end_block,
             node_staking_epoch_histories: Vec::new(),
-            exported: false
+            exported: false,
         }
     }
 
     fn get_history_for_node(&mut self, node_id: &NodeId) -> &mut NodeStakingEpochHistory {
-
         let index_result = self
             .node_staking_epoch_histories
             .iter_mut()
             .position(|x| &x.get_node_id() == node_id);
 
-        
         match index_result {
             Some(index) => {
                 return &mut self.node_staking_epoch_histories[index];
             }
             None => {
-                self.node_staking_epoch_histories.push(NodeStakingEpochHistory::new(node_id.clone()));
+                self.node_staking_epoch_histories
+                    .push(NodeStakingEpochHistory::new(node_id.clone()));
                 return self.node_staking_epoch_histories.last_mut().unwrap();
             }
         };
-
-        
     }
 
     pub fn on_seal_good(&mut self, event: &SealEventGood) {
-        
         let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
         node_staking_epoch_history.add_good_seal_event(event);
         self.exported = false;
     }
 
     pub fn on_seal_late(&mut self, event: &SealEventLate) {
-        
         let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
         node_staking_epoch_history.add_seal_event_late(event);
         self.exported = false;
     }
 
     pub fn on_seal_bad(&mut self, event: &SealEventBad) {
-        
         let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
         node_staking_epoch_history.add_bad_seal_event(event);
         self.exported = false;
@@ -408,32 +402,34 @@ impl HbbftMessageDispatcher {
     }
 
     pub(super) fn report_seal_late(&self, node_id: &NodeId, block_num: u64, current_block: u64) {
-
         let event = SealEventLate {
             node_id: node_id.clone(),
             block_num,
             received_block_num: current_block,
         };
-        
+
         self.memorial
-        .write()
-        .dispatched_seal_event_late
-        .push_back(event);
+            .write()
+            .dispatched_seal_event_late
+            .push_back(event);
     }
 
-    pub(crate) fn report_message_faulty(&self, node_id: &NodeId, block_num: u64, fault_kind: Option<honey_badger::FaultKind>) {
-
+    pub(crate) fn report_message_faulty(
+        &self,
+        node_id: &NodeId,
+        block_num: u64,
+        fault_kind: Option<honey_badger::FaultKind>,
+    ) {
         let event = MessageEventFaulty {
             node_id: node_id.clone(),
             block_num,
-            fault_kind
+            fault_kind,
         };
- 
+
         self.memorial
             .write()
             .dispatched_message_event_faulty
             .push_back(event);
-
     }
 
     pub fn free_memory(&self, _current_block: u64) {
@@ -446,8 +442,6 @@ impl HbbftMessageDispatcher {
             .write()
             .report_new_epoch(staking_epoch, staking_epoch_start_block);
     }
-
-
 }
 
 pub(crate) struct HbbftMessageMemorium {
@@ -607,7 +601,6 @@ impl HbbftMessageMemorium {
         info!(target: "consensus", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
-            
             epoch_history.on_seal_late(seal);
             return true;
         } else {
@@ -621,7 +614,6 @@ impl HbbftMessageMemorium {
         info!(target: "consensus", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
-
             epoch_history.on_seal_bad(seal);
             return true;
         } else {
@@ -632,14 +624,11 @@ impl HbbftMessageMemorium {
     }
 
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
-
         info!(target: "consensus", "working on faulty event!: {:?}", event);
         let block_num = event.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
-            
             epoch_history.on_message_faulty(event);
             return true;
-
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
             warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
@@ -684,7 +673,6 @@ impl HbbftMessageMemorium {
     }
 
     fn work_message(&mut self) -> bool {
-
         let mut had_worked = false;
 
         if let Some(message) = self.dispatched_messages.pop_front() {
@@ -722,109 +710,108 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
-            // good seals
+        // good seals
 
-            if let Some(good_seal) = self.dispatched_seal_event_good.front() {
-                // rust borrow system forced me into this useless clone...
-                info!(target: "consensus", "work: good Seal!");
-                if self.on_seal_good(&good_seal.clone()) {
-                    self.dispatched_seal_event_good.pop_front();
-                    info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
-    
-                    had_worked = true;
-                }
+        if let Some(good_seal) = self.dispatched_seal_event_good.front() {
+            // rust borrow system forced me into this useless clone...
+            info!(target: "consensus", "work: good Seal!");
+            if self.on_seal_good(&good_seal.clone()) {
+                self.dispatched_seal_event_good.pop_front();
+                info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
+
+                had_worked = true;
             }
-    
-            // late seals
-    
-            if let Some(late_seal) = self.dispatched_seal_event_late.front() {
-                // rust borrow system forced me into this useless clone...
-                if self.on_seal_late(&late_seal.clone()) {
-                    self.dispatched_seal_event_late.pop_front();
-                    info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
-    
-                    had_worked = true;
-                }
+        }
+
+        // late seals
+
+        if let Some(late_seal) = self.dispatched_seal_event_late.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_seal_late(&late_seal.clone()) {
+                self.dispatched_seal_event_late.pop_front();
+                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+
+                had_worked = true;
             }
-    
-            // faulty seals.
-            if let Some(late_seal) = self.dispatched_seal_event_bad.front() {
-                // rust borrow system forced me into this useless clone...
-                if self.on_seal_bad(&late_seal.clone()) {
-                    self.dispatched_seal_event_bad.pop_front();
-                    info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
-    
-                    had_worked = true;
-                }
+        }
+
+        // faulty seals.
+        if let Some(late_seal) = self.dispatched_seal_event_bad.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_seal_bad(&late_seal.clone()) {
+                self.dispatched_seal_event_bad.pop_front();
+                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+
+                had_worked = true;
             }
-    
-            // faulty messages
-            if let Some(message_faulty) = self.dispatched_message_event_faulty.front() {
-                // rust borrow system forced me into this useless clone...
-                if self.on_message_faulty(&message_faulty.clone()) {
-                    self.dispatched_message_event_faulty.pop_front();
-                    info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
-    
-                    had_worked = true;
-                }
+        }
+
+        // faulty messages
+        if let Some(message_faulty) = self.dispatched_message_event_faulty.front() {
+            // rust borrow system forced me into this useless clone...
+            if self.on_message_faulty(&message_faulty.clone()) {
+                self.dispatched_message_event_faulty.pop_front();
+                info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
+
+                had_worked = true;
             }
-    
-            // write the validator stats output report to disk if data is available and enough time has passed.
-            //  self.timestamp_last_validator_stats_written
-            // get current time.
-            let current_time = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            if self.staking_epoch_history.len() > 0
-                && self.timestamp_last_validator_stats_written
-                    + (self.config_validator_stats_write_interval as u64)
-                    < current_time
-            {
-                for epoch_history in self.staking_epoch_history.iter_mut() {
-                    if epoch_history.exported {
-                        continue;
-                    }
-                    let filename = format!(
-                        "{}/epoch_{}.csv",
-                        self.config_validator_stats_directory, epoch_history.staking_epoch
-                    );
-                    // get current executable path.
-                    let mut path: PathBuf;
-    
-                    if let Ok(path_) = std::env::current_dir() {
-                        path = path_;
-                    } else {
-                        return had_worked;
-                    }
-                    path.push(PathBuf::from(filename));
-    
-                    let output_path: &std::path::Path = path.as_path();
-                    
-                    match std::fs::File::create(output_path)
-                    {
-                        Ok(mut file) => {
-                            let csv = epoch_history.get_epoch_stats_as_csv();
-                            if let Err(err) = file.write_all(csv.as_bytes()) {
-                                error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
-                            } else {
-                                epoch_history.exported = true;
-                                self.timestamp_last_validator_stats_written = current_time;
-                            }
-                        }
-                        Err(error) => {
-                            error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
+        }
+
+        // write the validator stats output report to disk if data is available and enough time has passed.
+        //  self.timestamp_last_validator_stats_written
+        // get current time.
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if self.staking_epoch_history.len() > 0
+            && self.timestamp_last_validator_stats_written
+                + (self.config_validator_stats_write_interval as u64)
+                < current_time
+        {
+            for epoch_history in self.staking_epoch_history.iter_mut() {
+                if epoch_history.exported {
+                    continue;
+                }
+                let filename = format!(
+                    "{}/epoch_{}.csv",
+                    self.config_validator_stats_directory, epoch_history.staking_epoch
+                );
+                // get current executable path.
+                let mut path: PathBuf;
+
+                if let Ok(path_) = std::env::current_dir() {
+                    path = path_;
+                } else {
+                    return had_worked;
+                }
+                path.push(PathBuf::from(filename));
+
+                let output_path: &std::path::Path = path.as_path();
+
+                match std::fs::File::create(output_path) {
+                    Ok(mut file) => {
+                        let csv = epoch_history.get_epoch_stats_as_csv();
+                        if let Err(err) = file.write_all(csv.as_bytes()) {
+                            error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
+                        } else {
+                            epoch_history.exported = true;
+                            self.timestamp_last_validator_stats_written = current_time;
                         }
                     }
+                    Err(error) => {
+                        error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
+                    }
                 }
             }
-            
-            return had_worked;
         }
-    
-        pub fn free_memory(&mut self, _current_block: u64) {
-            // self.signature_shares.remove(&epoch);
-        }
+
+        return had_worked;
+    }
+
+    pub fn free_memory(&mut self, _current_block: u64) {
+        // self.signature_shares.remove(&epoch);
+    }
 }
 
 #[cfg(test)]
