@@ -722,108 +722,110 @@ impl HbbftMessageMemorium {
             had_worked = true;
         }
 
-        // good seals
+            // good seals
 
-        if let Some(good_seal) = self.dispatched_seal_event_good.front() {
-            // rust borrow system forced me into this useless clone...
-            info!(target: "consensus", "work: good Seal!");
-            if self.on_seal_good(&good_seal.clone()) {
-                self.dispatched_seal_event_good.pop_front();
-                info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
-
-                had_worked = true;
-            }
-        }
-
-        // late seals
-
-        if let Some(late_seal) = self.dispatched_seal_event_late.front() {
-            // rust borrow system forced me into this useless clone...
-            if self.on_seal_late(&late_seal.clone()) {
-                self.dispatched_seal_event_late.pop_front();
-                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
-
-                had_worked = true;
-            }
-        }
-
-        // faulty seals.
-        if let Some(late_seal) = self.dispatched_seal_event_bad.front() {
-            // rust borrow system forced me into this useless clone...
-            if self.on_seal_bad(&late_seal.clone()) {
-                self.dispatched_seal_event_bad.pop_front();
-                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
-
-                had_worked = true;
-            }
-        }
-
-        // faulty messages
-        if let Some(message_faulty) = self.dispatched_message_event_faulty.front() {
-            // rust borrow system forced me into this useless clone...
-            if self.on_message_faulty(&message_faulty.clone()) {
-                self.dispatched_message_event_faulty.pop_front();
-                info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
-
-                had_worked = true;
-            }
-        }
-
-        // write the validator stats output report to disk if data is available and enough time has passed.
-        //  self.timestamp_last_validator_stats_written
-        // get current time.
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        if self.staking_epoch_history.len() > 0
-            && self.timestamp_last_validator_stats_written
-                + (self.config_validator_stats_write_interval as u64)
-                < current_time
-        {
-            for epoch_history in self.staking_epoch_history.iter_mut() {
-                if epoch_history.exported {
-                    continue;
+            if let Some(good_seal) = self.dispatched_seal_event_good.front() {
+                // rust borrow system forced me into this useless clone...
+                info!(target: "consensus", "work: good Seal!");
+                if self.on_seal_good(&good_seal.clone()) {
+                    self.dispatched_seal_event_good.pop_front();
+                    info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
+    
+                    had_worked = true;
                 }
-                let filename = format!(
-                    "{}/epoch_{}.csv",
-                    self.config_validator_stats_directory, epoch_history.staking_epoch
-                );
-                // get current executable path.
-                let mut path: PathBuf;
-
-                if let Ok(path_) = std::env::current_dir() {
-                    path = path_;
-                } else {
-                    return had_worked;
+            }
+    
+            // late seals
+    
+            if let Some(late_seal) = self.dispatched_seal_event_late.front() {
+                // rust borrow system forced me into this useless clone...
+                if self.on_seal_late(&late_seal.clone()) {
+                    self.dispatched_seal_event_late.pop_front();
+                    info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+    
+                    had_worked = true;
                 }
-                path.push(PathBuf::from(filename));
-
-                let output_path: &std::path::Path = path.as_path();
-                
-                match std::fs::File::create(output_path)
-                {
-                    Ok(mut file) => {
-                        let csv = epoch_history.get_epoch_stats_as_csv();
-                        if let Err(err) = file.write_all(csv.as_bytes()) {
-                            error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
-                        } else {
-                            epoch_history.exported = true;
-                            self.timestamp_last_validator_stats_written = current_time;
+            }
+    
+            // faulty seals.
+            if let Some(late_seal) = self.dispatched_seal_event_bad.front() {
+                // rust borrow system forced me into this useless clone...
+                if self.on_seal_bad(&late_seal.clone()) {
+                    self.dispatched_seal_event_bad.pop_front();
+                    info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+    
+                    had_worked = true;
+                }
+            }
+    
+            // faulty messages
+            if let Some(message_faulty) = self.dispatched_message_event_faulty.front() {
+                // rust borrow system forced me into this useless clone...
+                if self.on_message_faulty(&message_faulty.clone()) {
+                    self.dispatched_message_event_faulty.pop_front();
+                    info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
+    
+                    had_worked = true;
+                }
+            }
+    
+            // write the validator stats output report to disk if data is available and enough time has passed.
+            //  self.timestamp_last_validator_stats_written
+            // get current time.
+            let current_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            if self.staking_epoch_history.len() > 0
+                && self.timestamp_last_validator_stats_written
+                    + (self.config_validator_stats_write_interval as u64)
+                    < current_time
+            {
+                for epoch_history in self.staking_epoch_history.iter_mut() {
+                    if epoch_history.exported {
+                        continue;
+                    }
+                    let filename = format!(
+                        "{}/epoch_{}.csv",
+                        self.config_validator_stats_directory, epoch_history.staking_epoch
+                    );
+                    // get current executable path.
+                    let mut path: PathBuf;
+    
+                    if let Ok(path_) = std::env::current_dir() {
+                        path = path_;
+                    } else {
+                        return had_worked;
+                    }
+                    path.push(PathBuf::from(filename));
+    
+                    let output_path: &std::path::Path = path.as_path();
+                    
+                    match std::fs::File::create(output_path)
+                    {
+                        Ok(mut file) => {
+                            let csv = epoch_history.get_epoch_stats_as_csv();
+                            if let Err(err) = file.write_all(csv.as_bytes()) {
+                                error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
+                            } else {
+                                epoch_history.exported = true;
+                                self.timestamp_last_validator_stats_written = current_time;
+                            }
+                        }
+                        Err(error) => {
+                            error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
                         }
                     }
-                    Err(error) => {
-                        error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
-                    }
                 }
             }
+            
+            return had_worked;
         }
-        return had_worked;
-    }
+    
+        pub fn free_memory(&mut self, _current_block: u64) {
+            // self.signature_shares.remove(&epoch);
+        }
 
-    pub fn free_memory(&mut self, _current_block: u64) {
-        // self.signature_shares.remove(&epoch);
-    }
 }
 
 #[cfg(test)]

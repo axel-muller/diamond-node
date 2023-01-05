@@ -469,7 +469,7 @@ impl Importer {
         );
 
         if let Err(e) = verify_family_result {
-            warn!(target: "client", "Stage 3 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
+            warn!(target: "client", "Stage 3 block verification failed for #{} extra data: {:?} ({})\nError: {:?}", header.number(), header.extra_data(), header.hash(), e);
             bail!(e);
         };
 

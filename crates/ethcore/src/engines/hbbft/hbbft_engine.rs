@@ -1,5 +1,4 @@
-use crate::engines::hbbft::hbbft_message_memorium::BadSealReason;
-
+use crate::engines::{hbbft::{contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason}};
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
@@ -11,7 +10,7 @@ use engines::{
 use error::{BlockError, Error};
 use ethereum_types::{H256, H512, U256};
 use ethjson::spec::HbbftParams;
-use hbbft::{NetworkInfo, Target, honey_badger::FaultKind};
+use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
 use itertools::Itertools;
 use machine::EthereumMachine;
@@ -179,14 +178,14 @@ impl IoHandler<()> for TransitionHandler {
                         // Always create blocks if we are in the keygen phase.
                         self.engine.start_hbbft_epoch_if_next_phase();
 
-                        // Transactions may have been submitted during creation of the last block, trigger the
-                        // creation of a new block if the transaction threshold has been reached.
-                        self.engine.on_transactions_imported();
-
                         // If the maximum block time has been reached we trigger a new block in any case.
                         if self.max_block_time_remaining(c.clone()) == Duration::from_secs(0) {
                             self.engine.start_hbbft_epoch(c);
                         }
+
+                        // Transactions may have been submitted during creation of the last block, trigger the
+                        // creation of a new block if the transaction threshold has been reached.
+                        self.engine.start_hbbft_epoch_if_ready();
 
                         // Set timer duration to the default period (1s)
                         timer_duration = DEFAULT_DURATION;
@@ -377,7 +376,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Batch received for epoch {}, creating new Block.", batch.epoch);
 
         // Decode and de-duplicate transactions
-        let batch_txns: Vec<_> = batch
+        let mut batch_txns: Vec<_> = batch
             .contributions
             .iter()
             .flat_map(|(_, c)| &c.transactions)
@@ -391,6 +390,18 @@ impl HoneyBadgerBFT {
                 SignedTransaction::new(txn).ok()
             })
             .collect();
+
+        info!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
+            .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
+
+        // Make sure the resulting transactions do not contain nonces out of order.
+        // Not necessary any more - we select contribution transactions by sender, contributing all transactions by that sender or none.
+        // The transaction queue's "pending" transactions already guarantee there are no nonce gaps for a selected sender.
+        // Even if different validators contribute a different number of transactions for the same sender the transactions stay sorted
+        // by nonce after de-duplication.
+        // Note: The following sorting would also allow front-running of addresses with higher nonces. If sorting became necessary in
+        // the future for some reason replace this simplistic sort with one which preserves the relative order of senders.
+        //batch_txns.sort_by(|left, right| left.tx().nonce.cmp(&right.tx().nonce));
 
         // We use the median of all contributions' timestamps
         let timestamps = batch
@@ -601,6 +612,7 @@ impl HoneyBadgerBFT {
             trace!(target: "consensus", "Signature for block {} is ready", block_num);
             let state = Sealing::Complete(sig);
             self.sealing.write().insert(block_num, state);
+
             client.update_sealing(ForceUpdateSealing::No);
         }
     }
@@ -989,6 +1001,14 @@ impl HoneyBadgerBFT {
         }
         return Ok(false);
     }
+
+    fn start_hbbft_epoch_if_ready(&self) {
+        if let Some(client) = self.client_arc() {
+            if self.transaction_queue_and_time_thresholds_reached(&client) {
+                self.start_hbbft_epoch(client);
+            }
+        }
+    }
 }
 
 impl Engine<EthereumMachine> for HoneyBadgerBFT {
@@ -1100,21 +1120,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
-    fn generate_engine_transactions(
-        &self,
-        block: &ExecutedBlock,
-    ) -> Result<Vec<SignedTransaction>, Error> {
-        let _random_number = match self.random_numbers.read().get(&block.header.number()) {
-            None => {
-                return Err(EngineError::Custom(
-                    "No value available for calling randomness contract.".into(),
-                )
-                .into())
-            }
-            Some(r) => r,
-        };
-        Ok(Vec::new())
-    }
+    //     Ok(vec![])
+
+    // }
 
     fn sealing_state(&self) -> SealingState {
         // Purge obsolete sealing processes.
@@ -1139,10 +1147,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_transactions_imported(&self) {
-        if let Some(client) = self.client_arc() {
-            if self.transaction_queue_and_time_thresholds_reached(&client) {
-                self.start_hbbft_epoch(client);
-            }
+        if self.params.is_unit_test.unwrap_or(false) {
+            self.start_hbbft_epoch_if_ready();
         }
     }
 
@@ -1195,6 +1201,76 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn use_block_author(&self) -> bool {
         false
+    }
+
+    fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+        trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        let random_numbers = self.random_numbers.read();
+        let random_number: U256 = match random_numbers.get(&block.header.number()) {
+            None => {
+                // if we do not have random data for this block,
+                // because we are performant vaidator, the block is comming over the block import.
+                // the RNG is stored in the extra data field.
+                let extra_data = block.header.extra_data();
+
+                // extra data 0 and the value "Parity" is not considered as random number.
+                // so we only accept data with the correct length.
+                let r_ = if extra_data.len() == 32 {
+                    let r = U256::from_big_endian(extra_data);
+                    warn!(
+                        "restored random number from header for block {} random number: {:?}",
+                        block.header.number(),
+                        r
+                    );
+                    r
+                } else if extra_data.len() == 6 && extra_data == &[80, 97, 114, 105, 116, 121] {
+                    warn!("detected Parity as random number, ignoring.",);
+                    return Ok(());
+                } else {
+                    return Err(EngineError::Custom(
+                        "No value available for calling randomness contract.".into(),
+                    )
+                    .into());
+                };
+                r_
+            }
+            Some(r) => {
+                // we also need to write this extra data into the header.
+                let mut bytes: [u8; 32] = [0; 32];
+                r.to_big_endian(&mut bytes);
+                block.header.set_extra_data(bytes.to_vec());
+                r.clone()
+            }
+        };
+        warn!("random number: {:?}", random_number);
+
+        let tx = set_current_seed_tx_raw(&random_number);
+
+        //  let mut call = engines::default_system_or_code_call(&self.machine, block);
+        let result = self
+            .machine
+            .execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
+        warn!("execution result: {result:?}");
+        return result.map(|_| ());
+    }
+
+    /// Allow mutating the header during seal generation.
+    fn on_seal_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+        let random_numbers = self.random_numbers.read();
+        match random_numbers.get(&block.header.number()) {
+            None => {
+                warn!("No rng value available for header.");
+                return Ok(());
+            }
+            Some(r) => {
+                let mut bytes: [u8; 32] = [0; 32];
+                r.to_big_endian(&mut bytes);
+
+                block.header.set_extra_data(bytes.to_vec());
+            }
+        };
+
+        Ok(())
     }
 
     fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
