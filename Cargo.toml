@@ -119,7 +119,7 @@ path = "bin/oe/main.rs"
 name = "openethereum"
 
 [profile.dev]
-opt-level = 0
+opt-level = 1
 debug = true
 split-debuginfo = '...'  # Platform-specific.
 debug-assertions = true
@@ -151,8 +151,6 @@ rpath = false
 inherits = 'release'
 opt-level = 3
 debug = true
-debuginfo-level = 1
-jemalloc = false
 split-debuginfo = '...'  # Platform-specific.
 debug-assertions = false
 overflow-checks = false
