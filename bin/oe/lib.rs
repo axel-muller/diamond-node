@@ -105,6 +105,7 @@ mod metrics;
 mod modules;
 mod params;
 mod presale;
+mod reserved_peer_management;
 mod rpc;
 mod rpc_apis;
 mod run;
