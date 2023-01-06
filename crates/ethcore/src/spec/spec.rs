@@ -814,8 +814,9 @@ impl Spec {
                     .expect("Failed to start AuthorityRound consensus engine.")
             }
             ethjson::spec::Engine::Hbbft(hbbft) => {
-                HoneyBadgerBFT::new(hbbft.params.into(), machine)
-                    .expect("Failed to start Honey Badger Byzantine fault tolerant consensus engine.")
+                HoneyBadgerBFT::new(hbbft.params.into(), machine).expect(
+                    "Failed to start Honey Badger Byzantine fault tolerant consensus engine.",
+                )
             }
         };
 
