@@ -364,7 +364,6 @@ impl HbbftMessageDispatcher {
             let arc_clone = self.memorial.clone();
 
             let builder = std::thread::Builder::new().name("MessageMemorial".to_string());
-            
 
             match builder.spawn(move || loop {
                 // one loop cycle is very fast.
@@ -375,7 +374,6 @@ impl HbbftMessageDispatcher {
                     std::thread::sleep(std::time::Duration::from_millis(250));
                 }
             }) {
-
                 Ok(thread) => {
                     self.thread = Some(thread);
                 }
