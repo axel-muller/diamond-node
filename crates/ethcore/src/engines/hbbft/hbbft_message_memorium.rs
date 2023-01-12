@@ -822,6 +822,7 @@ impl HbbftMessageMemorium {
         // good messages
         if let Some(message_good) = self.dispatched_message_event_good.front() {
             if self.on_message_good(&message_good.clone()) {
+                self.dispatched_message_event_good.pop_front();
                 info!(target: "consensus", "work: good message! left: {}", self.dispatched_message_event_good.len());
                 had_worked = true;
             }
