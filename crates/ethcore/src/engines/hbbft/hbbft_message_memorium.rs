@@ -362,7 +362,10 @@ impl HbbftMessageDispatcher {
             // let mut memo = self;
             // let mut arc = std::sync::Arc::new(&self);
             let arc_clone = self.memorial.clone();
-            self.thread = Some(std::thread::spawn(move || loop {
+
+            let builder = std::thread::Builder::new().name("MessageMemorial".to_string());
+
+            match builder.spawn(move || loop {
                 // one loop cycle is very fast.
                 // so report_ function have their chance to aquire a write lock soon.
                 // and don't block the work thread for too long.
@@ -370,7 +373,14 @@ impl HbbftMessageDispatcher {
                 if !work_result {
                     std::thread::sleep(std::time::Duration::from_millis(250));
                 }
-            }));
+            }) {
+                Ok(thread) => {
+                    self.thread = Some(thread);
+                }
+                Err(err) => {
+                    error!("Failed to start message memorial worker thread: {}", err);
+                }
+            }
         }
     }
 
@@ -521,7 +531,7 @@ impl HbbftMessageMemorium {
         if self.config_blocks_to_keep_on_disk > 0 && epoch > self.last_block_deleted_from_disk {
             let mut path_buf = self.get_path_to_write(epoch);
             if let Err(e) = create_dir_all(path_buf.as_path()) {
-                warn!("Error creating key directory: {:?}", e);
+                warn!(target: "consensus", "Error creating key directory: {:?}", e);
                 return;
             };
 
