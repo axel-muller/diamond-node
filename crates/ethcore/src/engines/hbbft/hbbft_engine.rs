@@ -504,6 +504,9 @@ impl HoneyBadgerBFT {
             Ok(Some((step, network_info))) => {
                 if step.fault_log.0.is_empty() {
                     //TODO:  report good message here.
+                    self.hbbft_message_dispatcher.report_message_good(
+                        &sender_id,
+                        message_block);
                 } else {
                     for f in step.fault_log.0.iter() {
                         warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, f.node_id, f.kind);
