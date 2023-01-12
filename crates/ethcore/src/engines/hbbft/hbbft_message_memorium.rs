@@ -56,8 +56,8 @@ pub(crate) struct NodeStakingEpochHistory {
     last_message_good: u64,
 
     num_faulty_messages: u64,
-    // total_contributions_good: u64,
-    // total_contributions_bad: u64,
+    num_good_messages: u64, // total_contributions_good: u64,
+                            // total_contributions_bad: u64,
 }
 
 impl NodeStakingEpochHistory {
@@ -75,6 +75,7 @@ impl NodeStakingEpochHistory {
             last_message_faulty: 0,
             last_message_good: 0,
             num_faulty_messages: 0,
+            num_good_messages: 0,
         }
     }
 
@@ -131,9 +132,22 @@ impl NodeStakingEpochHistory {
         if block_num > last_message_faulty {
             self.last_message_faulty = block_num;
         } else {
-            warn!(target: "consensus", "add_bad_seal_event: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
+            warn!(target: "consensus", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
         }
         self.num_faulty_messages += 1;
+    }
+
+    pub(crate) fn add_message_event_good(&mut self, event: &MessageEventGood) {
+        // todo: add to faulty message history
+        let block_num = event.block_num;
+        let last_message_good = self.last_message_good;
+
+        if block_num > last_message_good {
+            self.last_message_faulty = block_num;
+        } else {
+            warn!(target: "consensus", "add_message_event_good: event.block_num {block_num} <= last_message_faulty {last_message_good}");
+        }
+        self.num_good_messages += 1;
     }
 
     /// GETTERS
@@ -181,7 +195,7 @@ impl NodeStakingEpochHistory {
         let last_late_sealing_message = self.last_error_sealing_message;
         let cumulative_lateness = self.cumulative_lateness;
         // totals messages
-        let total_good_messages = self.get_total_good_sealing_messages();
+        let total_good_messages = self.num_good_messages;
         let total_faulty_messages = self.num_faulty_messages;
         let last_message_good = self.last_message_good;
         // faulty messages
@@ -260,6 +274,12 @@ impl StakingEpochHistory {
         self.exported = false;
     }
 
+    pub fn on_message_good(&mut self, event: &MessageEventGood) {
+        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        node_staking_epoch_history.add_message_event_good(event);
+        self.exported = false;
+    }
+
     pub fn get_epoch_stats_as_csv(&self) -> String {
         let mut result = String::with_capacity(1024);
         result.push_str(NodeStakingEpochHistory::get_epoch_stats_csv_header().as_str());
@@ -310,6 +330,12 @@ pub struct MessageEventFaulty {
     node_id: NodeId,
     block_num: u64,
     fault_kind: Option<honey_badger::FaultKind>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MessageEventGood {
+    node_id: NodeId,
+    block_num: u64,
 }
 
 struct StakingEpochRange {
@@ -442,6 +468,18 @@ impl HbbftMessageDispatcher {
             .push_back(event);
     }
 
+    pub(crate) fn report_message_good(&self, node_id: &NodeId, block_num: u64) {
+        let event = MessageEventGood {
+            node_id: node_id.clone(),
+            block_num,
+        };
+
+        self.memorial
+            .write()
+            .dispatched_message_event_good
+            .push_back(event);
+    }
+
     pub fn free_memory(&self, _current_block: u64) {
         // TODO: make memorium freeing memory of ancient block.
     }
@@ -480,6 +518,7 @@ pub(crate) struct HbbftMessageMemorium {
     dispatched_seal_event_bad: VecDeque<SealEventBad>,
     dispatched_seal_event_late: VecDeque<SealEventLate>,
     dispatched_message_event_faulty: VecDeque<MessageEventFaulty>,
+    dispatched_message_event_good: VecDeque<MessageEventGood>,
     // stores the history for staking epochs.
     // this should be only a hand full of epochs.
     // since old ones are not needed anymore.
@@ -513,6 +552,7 @@ impl HbbftMessageMemorium {
             dispatched_seal_event_bad: VecDeque::new(),
             dispatched_seal_event_late: VecDeque::new(),
             dispatched_message_event_faulty: VecDeque::new(),
+            dispatched_message_event_good: VecDeque::new(),
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
         }
@@ -634,7 +674,7 @@ impl HbbftMessageMemorium {
     }
 
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
-        info!(target: "consensus", "working on faulty event!: {:?}", event);
+        info!(target: "consensus", "working on faulty message event!: {:?}", event);
         let block_num = event.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_message_faulty(event);
@@ -642,6 +682,18 @@ impl HbbftMessageMemorium {
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
             warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+        }
+        return false;
+    }
+
+    fn on_message_good(&mut self, event: &MessageEventGood) -> bool {
+        info!(target: "consensus", "working on good message event!: {:?}", event);
+        if let Some(epoch_history) = self.get_staking_epoch_history(event.block_num) {
+            epoch_history.on_message_good(event);
+            return true;
+        } else {
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", event.block_num);
         }
         return false;
     }
@@ -763,6 +815,14 @@ impl HbbftMessageMemorium {
                 self.dispatched_message_event_faulty.pop_front();
                 info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
 
+                had_worked = true;
+            }
+        }
+
+        // good messages
+        if let Some(message_good) = self.dispatched_message_event_good.front() {
+            if self.on_message_good(&message_good.clone()) {
+                info!(target: "consensus", "work: good message! left: {}", self.dispatched_message_event_good.len());
                 had_worked = true;
             }
         }
