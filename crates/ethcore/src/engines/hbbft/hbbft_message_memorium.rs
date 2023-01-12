@@ -56,9 +56,8 @@ pub(crate) struct NodeStakingEpochHistory {
     last_message_good: u64,
 
     num_faulty_messages: u64,
-    num_good_messages: u64
-    // total_contributions_good: u64,
-    // total_contributions_bad: u64,
+    num_good_messages: u64, // total_contributions_good: u64,
+                            // total_contributions_bad: u64,
 }
 
 impl NodeStakingEpochHistory {
@@ -138,7 +137,7 @@ impl NodeStakingEpochHistory {
         self.num_faulty_messages += 1;
     }
 
-    pub(crate) fn add_message_event_good(&mut self, event: &MessageEventGood) { 
+    pub(crate) fn add_message_event_good(&mut self, event: &MessageEventGood) {
         // todo: add to faulty message history
         let block_num = event.block_num;
         let last_message_good = self.last_message_good;
