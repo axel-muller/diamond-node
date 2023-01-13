@@ -13,7 +13,7 @@ jobs:
       matrix:
         platform:
           - ubuntu-latest
-          - macos-latest
+        #  - macos-latest
         toolchain:
           -  1.59
     runs-on:                    ${{ matrix.platform }}

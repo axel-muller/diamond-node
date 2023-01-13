@@ -15,18 +15,18 @@
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
 use http::{self, hyper};
-use jsonrpc_core::MetaIoHandler;
+use rpc_servers::{HttpServer, MetaIoHandler};
 
 use tests::{helpers::Server, http_client};
 use v1::{extractors, Metadata};
-use HttpServer;
 
+#[cfg(any(test, feature = "test-helpers"))]
 fn serve(handler: Option<MetaIoHandler<Metadata>>) -> Server<HttpServer> {
     let address = "127.0.0.1:0".parse().unwrap();
     let handler = handler.unwrap_or_default();
 
     Server::new(|_remote| {
-        ::start_http_with_middleware(
+        rpc_servers::start_http_with_middleware(
             &address,
             http::DomainsValidation::Disabled,
             http::DomainsValidation::Disabled,
@@ -44,6 +44,7 @@ fn serve(handler: Option<MetaIoHandler<Metadata>>) -> Server<HttpServer> {
     })
 }
 
+#[cfg(any(test, feature = "test-helpers"))]
 /// Test a single request to running server
 fn request(server: Server<HttpServer>, request: &str) -> http_client::Response {
     http_client::request(server.server.address(), request)

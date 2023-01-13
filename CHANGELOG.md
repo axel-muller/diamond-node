@@ -1,3 +1,16 @@
+
+
+
+## Diamond Node Software 3.3.5-hbbft-0.8.5
+
+- [Automatic shutdown on validator candidate unavailability](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+- [Merge final set of changes](https://github.com/DMDcoin/openethereum-3.x/issues/103)
+- [hardware specific optimizations](https://github.com/DMDcoin/openethereum-3.x/issues/117)
+- [Unexpected IO error: Invalid argument (os error 22)](https://github.com/DMDcoin/openethereum-3.x/issues/124)
+- [replace json formatter for HBBFT Messages](https://github.com/DMDcoin/openethereum-3.x/issues/108)
+- [transaction subset contribution](https://github.com/DMDcoin/openethereum-3.x/issues/115)
+- [check_for_epoch_change() called to often (performance)](https://github.com/DMDcoin/openethereum-3.x/issues/101)
+
 ## Diamond Node Software 3.3.4-hbbft-0.8.4
 
 - [Reduced chance of DB corruptions](https://github.com/DMDcoin/openethereum-3.x/issues/87)
@@ -49,6 +62,8 @@ Enhancements:
 * Key Generation Round Counter
 Fixes:
 * Fixed stage 5 syncing error
+* Support for POSDAO contract hardfork (#633)
+* Update rpc server (#619)
 
 ## OpenEthereum v3.3.4
 
@@ -56,8 +71,6 @@ Enhancements:
 * EIP-712: Update logos and rewrite type parser (now builds on Rust 1.58.1) (#463)
 * Handling of incoming transactions with maxFeePerGas lower than current baseFee (#604)
 * Update transaction replacement (#607)
-
-Bug fixes:
 
 ## OpenEthereum v3.3.3
 
@@ -212,6 +225,7 @@ Enhancements:
 devops:
 * Upgrade docker alpine to `v1.13.2`. for rust `v1.47`.
 * Send SIGTERM instead of SIGHUP to OE daemon (#317)
+
 ## OpenEthereum v3.2.4
 
 * Fix for Typed transaction broadcast.

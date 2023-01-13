@@ -334,6 +334,9 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// New transactions were imported to the transaction queue
     fn on_transactions_imported(&self) {}
 
+    /// sealed block got commited to the blockchain  
+    fn on_chain_commit(&self, _hash: &H256) {}
+
     /// Block transformation functions, before the transactions.
     /// `epoch_begin` set to true if this block kicks off an epoch.
     fn on_new_block(
@@ -342,6 +345,12 @@ pub trait Engine<M: Machine>: Sync + Send {
         _epoch_begin: bool,
         _ancestry: &mut dyn Iterator<Item = ExtendedHeader>,
     ) -> Result<(), M::Error> {
+        Ok(())
+    }
+
+    /// Block is prepared to accept transactions.
+    /// good place to call system transactions that need to be the first in the block.
+    fn on_before_transactions(&self, _block: &mut ExecutedBlock) -> Result<(), M::Error> {
         Ok(())
     }
 

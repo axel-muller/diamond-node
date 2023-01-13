@@ -2,7 +2,7 @@
 description = "OpenEthereum"
 name = "openethereum"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "3.3.4-hbbft-0.8.4"
+version = "3.3.5-hbbft-0.8.5"
 license = "GPL-3.0"
 authors = [
 	"OpenEthereum developers",
@@ -60,6 +60,8 @@ parity-daemonize = "0.3"
 parity-local-store = { path = "crates/concensus/miner/local-store" }
 parity-runtime = { path = "crates/runtime/runtime" }
 parity-rpc = { path = "crates/rpc" }
+rpc-servers = { path = "crates/rpc-servers", package = "oe-rpc-servers" }
+rpc-common = { path = "crates/rpc-common", package = "oe-rpc-common" }
 parity-version = { path = "crates/util/version" }
 parity-path = "0.1"
 dir = { path = "crates/util/dir" }
@@ -72,6 +74,7 @@ journaldb = { path = "crates/db/journaldb" }
 stats = { path = "crates/util/stats" }
 prometheus = "0.9.0"
 fs-swap = "0.2.6"
+net2 = "0.2.38"
 
 # ethcore-secretstore = { path = "crates/util/secret-store", optional = true }
 
@@ -115,13 +118,51 @@ path = "bin/oe/lib.rs"
 path = "bin/oe/main.rs"
 name = "openethereum"
 
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+rpath = false
+
+
 [profile.test]
 lto = false
 opt-level = 0
 
 [profile.release]
+opt-level = 3
 debug = false
-lto = true
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 1
+rpath = false
+
+[profile.perf]
+inherits = 'release'
+opt-level = 3
+debug = true
+debuginfo-level = 1
+jemalloc = false
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 1
+rpath = false
+
+
 
 [workspace]
 # This should only list projects that are not

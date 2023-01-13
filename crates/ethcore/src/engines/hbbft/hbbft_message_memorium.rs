@@ -230,25 +230,9 @@ impl HbbftMessageMemorium {
         }
 
         return false;
-
-        // let content = message.content();
-        //match content {
-        //    MessageContent::Subset(subset) => {}
-        //    MessageContent::DecryptionShare { proposer_id, share } => {
-        // debug!("got decryption share from {} {:?}", proposer_id, share);
-        //        if !self.decryption_shares.contains_key(&epoch) {
-        //            match self.decryption_shares.insert(epoch, Vec::new()) {
-        //                None => {}
-        //                Some(vec) => {
-        //                    //Vec<(NodeId, message)
-        //                }
-        //            }
-        //        }
-        //    }
-        //}
     }
 
-    pub fn free_memory(&mut self, _current_block: u64) {
-        // self.signature_shares.remove(&epoch);
-    }
+    // pub fn free_memory(&mut self, _current_block: u64) {
+    //     // self.signature_shares.remove(&epoch);
+    // }
 }

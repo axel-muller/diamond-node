@@ -1,12 +1,17 @@
 use client::traits::EngineClient;
 use engines::signer::EngineSigner;
+use ethcore_miner::pool::{PoolVerifiedTransaction, ScoredTransaction};
 use hbbft::{
     crypto::{PublicKey, Signature},
     honey_badger::{self, HoneyBadgerBuilder},
     Epoched, NetworkInfo,
 };
 use parking_lot::RwLock;
-use std::{collections::BTreeMap, sync::Arc};
+use rand::seq::IteratorRandom;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use types::{header::Header, ids::BlockId};
 
 use super::{
@@ -57,7 +62,15 @@ impl HbbftState {
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
-        let target_posdao_epoch = get_posdao_epoch(&*client, block_id).ok()?.low_u64();
+        let target_posdao_epoch: u64;
+        match get_posdao_epoch(&*client, block_id) {
+            Ok(value) => target_posdao_epoch = value.low_u64(),
+            Err(error) => {
+                error!(target: "engine", "error calling get_posdao_epoch for block {:?}: {:?}", block_id, error);
+                return None;
+            }
+        }
+
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
@@ -85,7 +98,7 @@ impl HbbftState {
         self.current_posdao_epoch = target_posdao_epoch;
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
-            trace!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             return Some(());
         }
 
@@ -93,7 +106,7 @@ impl HbbftState {
         self.network_info = Some(network_info.clone());
         self.honey_badger = Some(self.new_honey_badger(network_info)?);
 
-        trace!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
+        info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
         Some(())
     }
 
@@ -157,19 +170,16 @@ impl HbbftState {
     fn skip_to_current_epoch(
         &mut self,
         client: Arc<dyn EngineClient>,
-        signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
+        _signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     ) -> Option<()> {
         // Ensure we evaluate at the same block # in the entire upward call graph to avoid inconsistent state.
         let latest_block_number = client.block_number(BlockId::Latest)?;
 
         // Update honey_badger *before* trying to use it to make sure we use the data
         // structures matching the current epoch.
-        self.update_honeybadger(
-            client.clone(),
-            signer,
-            BlockId::Number(latest_block_number),
-            false,
-        );
+
+        // we asume that honey badger instance is up to date here.
+        // it has to be updated after closing each block.
 
         // If honey_badger is None we are not a validator, nothing to do.
         let honey_badger = self.honey_badger.as_mut()?;
@@ -253,6 +263,13 @@ impl HbbftState {
             return None;
         }
 
+        if let Some(latest_block) = client.block_number(BlockId::Latest) {
+            if honey_badger.epoch() != latest_block + 1 {
+                info!(target: "consensus", "Detected an attempt to send a hbbft contribution for block {} before the previous block was imported to the chain.", honey_badger.epoch());
+                return None;
+            }
+        }
+
         // If the parent block of the block we would contribute to is not in the hbbft state's
         // epoch we cannot start to contribute, since we would write into a hbbft instance
         // which will be destroyed.
@@ -267,17 +284,75 @@ impl HbbftState {
 
         let network_info = self.network_info.as_ref()?.clone();
 
-        trace!(target: "consensus", "Writing contribution for hbbft epoch(block) {}.", honey_badger.epoch());
+        // Choose a random subset of the maximum transactions, but at least 1.
+        // Since not all nodes may contribute we do not use the full number of nodes
+        // but the minimum number of nodes required to build a block.
+
+        // We cannot be sure that all active validators contribute to the block, in the worst
+        // case only 2/3 of the validators will contribute.
+        // Therefore we need to divide the maximum size of the transactions available for the block
+        // by 2/3 of the validators.
+        // The "num_correct" function of the hbbft network info returns the minimum amount of
+        // validators needed to create a block (which is 2/3 of the total active validators).
+        let min_required_nodes = (network_info.num_correct() / 2) + 1;
+        let max_transactions_for_block = client.queued_transactions();
+        let transactions_subset_size = (max_transactions_for_block.len() / min_required_nodes) + 1;
+
+        // Since every transaction sender can send multiple transactions we need to make sure
+        // not to create nonce gaps. To avoid these gaps we randomly select senders instead of
+        // transaction. For every chosen sender *all* transactions are added to our contribution
+        // until the target contribution size is reached.
+
+        // As a first step we create a map sorting the transactions by sender.
+        let mut transactions_by_sender = HashMap::new();
+        for t in &max_transactions_for_block {
+            transactions_by_sender
+                .entry(t.sender().clone())
+                .or_insert_with(Vec::new)
+                .push(t.clone());
+        }
+
+        // Randomly select a sender and add all their transactions
+        // until we at least reached the target contribution size.
+        let mut transactions_subset = Vec::new();
+        let mut my_rng = rand::thread_rng();
+
+        let full_client = if let Some(full_client) = client.as_full_client() {
+            full_client
+        } else {
+            error!(target: "consensus", "Contribution creation: Full client could not be obtained.");
+            return None;
+        };
+
+        while transactions_subset.len() < transactions_subset_size {
+            let chosen_key = match transactions_by_sender.keys().choose(&mut my_rng) {
+                None => break,
+                Some(key) => key.clone(),
+            };
+            // add all transactions for that sender and delete the sender from the map.
+            if let Some(mut ts) = transactions_by_sender.remove(&chosen_key) {
+                // Even after block import there may still be transactions in the pending set which already
+                // have been included on the chain. We filter out transactions where the nonce is too low.
+                let min_nonce = full_client.latest_nonce(&chosen_key);
+                for tx in ts {
+                    if tx.nonce() >= min_nonce {
+                        transactions_subset.push(tx);
+                    } else {
+                        info!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
+                    }
+                }
+            }
+        }
+
+        info!(target: "consensus", "Block creation: Honeybadger epoch {}, Transactions subset target size: {}, actual size: {}, from available {}.", honey_badger.epoch(), transactions_subset_size, transactions_subset.len(), max_transactions_for_block.len());
+
+        let signed_transactions = transactions_subset
+            .iter()
+            .map(|txn| txn.signed().clone())
+            .collect();
 
         // Now we can select the transactions to include in our contribution.
-        // TODO: Select a random *subset* of transactions to propose
-        let input_contribution = Contribution::new(
-            &client
-                .queued_transactions()
-                .iter()
-                .map(|txn| txn.signed().clone())
-                .collect(),
-        );
+        let input_contribution = Contribution::new(&signed_transactions);
 
         let mut rng = rand_065::thread_rng();
         let step = honey_badger.propose(&input_contribution, &mut rng);

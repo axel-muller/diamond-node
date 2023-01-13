@@ -255,6 +255,12 @@ impl<'x> OpenBlock<'x> {
         Ok(())
     }
 
+    /// let's the engine do work just before transactions get imported.
+    /// e.g. including system transaction as first transaction in the block.
+    pub fn on_before_transactions(&mut self) -> Result<(), Error> {
+        self.engine.on_before_transactions(&mut self.block)
+    }
+
     /// Push a transaction into the block.
     ///
     /// If valid, it will be executed, and archived together with the receipt.
@@ -575,6 +581,9 @@ pub(crate) fn enact(
 
     // t_nb 8.2 transfer all field from current header to OpenBlock header that we created
     b.populate_from(&header);
+
+    // t_nb 8.2.1 give engine the chance to call system transaction that should get included in the block
+    b.on_before_transactions()?;
 
     // t_nb 8.3 execute transactions one by one
     b.push_transactions(transactions)?;
