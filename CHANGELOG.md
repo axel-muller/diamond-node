@@ -1,4 +1,27 @@
-## OpenEthereum v3.3.5
+
+
+
+## Diamond Node Software 3.3.5-hbbft-0.8.5
+
+- [Automatic shutdown on validator candidate unavailability](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+- [Merge final set of changes](https://github.com/DMDcoin/openethereum-3.x/issues/103)
+- [hardware specific optimizations](https://github.com/DMDcoin/openethereum-3.x/issues/117)
+- [Unexpected IO error: Invalid argument (os error 22)](https://github.com/DMDcoin/openethereum-3.x/issues/124)
+- [replace json formatter for HBBFT Messages](https://github.com/DMDcoin/openethereum-3.x/issues/108)
+- [transaction subset contribution](https://github.com/DMDcoin/openethereum-3.x/issues/115)
+- [check_for_epoch_change() called to often (performance)](https://github.com/DMDcoin/openethereum-3.x/issues/101)
+
+## Diamond Node Software 3.3.4-hbbft-0.8.4
+
+- [Reduced chance of DB corruptions](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+
+## Diamond Node Software 3.3.4-hbbft-0.8.3
+
+Increased availability of nodes.
+
+- [Automatic shutdown on validator candidate unavailability ](https://github.com/DMDcoin/openethereum-3.x/issues/87)
+
+
 ## Diamond Node Software 3.3.4-hbbft-0.8.2
 
 Merge with OpenEthereum 3.3.4.
