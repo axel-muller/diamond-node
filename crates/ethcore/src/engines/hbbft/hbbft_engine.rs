@@ -1185,10 +1185,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                     );
                     r
                 } else {
-                    // if there is no header data, 
+                    // if there is no header data,
                     // than it is because the old node software created blocks without random data in the header.
                     // this backward compatibility can be removed once no testnetwork with old behavior is running."
-                    
+
                     return Ok(());
                     // return Err(EngineError::Custom(
                     //     "No value available for calling randomness contract.".into(),
