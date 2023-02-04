@@ -1178,7 +1178,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 // so we only accept data with the correct length.
                 let r_ = if extra_data.len() == 32 {
                     let r = U256::from_big_endian(extra_data);
-                    warn!(
+                    debug!(
                         "restored random number from header for block {} random number: {:?}",
                         block.header.number(),
                         r
