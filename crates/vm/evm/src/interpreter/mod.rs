@@ -125,6 +125,7 @@ enum InstructionResult<Gas> {
 #[derive(Debug)]
 struct InterpreterParams {
     /// Address of currently executed code.
+    #[allow(dead_code)]
     pub code_address: Address,
     /// Hash of currently executed code.
     pub code_hash: Option<H256>,
@@ -144,8 +145,10 @@ struct InterpreterParams {
     /// Input data.
     pub data: Option<Bytes>,
     /// Type of call
+    #[allow(dead_code)]
     pub call_type: CallType,
     /// Param types encoding
+    #[allow(dead_code)]
     pub params_type: ParamsType,
 }
 
