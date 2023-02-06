@@ -330,7 +330,7 @@ impl HbbftState {
                 Some(key) => key.clone(),
             };
             // add all transactions for that sender and delete the sender from the map.
-            if let Some(mut ts) = transactions_by_sender.remove(&chosen_key) {
+            if let Some(ts) = transactions_by_sender.remove(&chosen_key) {
                 // Even after block import there may still be transactions in the pending set which already
                 // have been included on the chain. We filter out transactions where the nonce is too low.
                 let min_nonce = full_client.latest_nonce(&chosen_key);
