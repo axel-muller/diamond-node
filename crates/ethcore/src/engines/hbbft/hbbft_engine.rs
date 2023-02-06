@@ -1,4 +1,4 @@
-use crate::engines::{self, hbbft::contracts::random_hbbft::set_current_seed_tx_raw};
+use crate::engines::{hbbft::contracts::random_hbbft::set_current_seed_tx_raw};
 
 use super::block_reward_hbbft::BlockRewardContract;
 use block::ExecutedBlock;
