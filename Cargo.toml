@@ -120,7 +120,7 @@ path = "bin/oe/main.rs"
 name = "diamond-node"
 
 [profile.dev]
-opt-level = 0
+opt-level = 1
 debug = true
 split-debuginfo = '...'  # Platform-specific.
 debug-assertions = true

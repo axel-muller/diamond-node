@@ -35,6 +35,7 @@ use crate::{
         fatdb_switch_to_bool, mode_switch_to_bool, tracing_switch_to_bool, AccountsConfig,
         GasPricerConfig, MinerExtras, Pruning, SpecType, Switch,
     },
+    reserved_peer_management::ReservedPeersWrapper,
     rpc, rpc_apis, secretstore, signer,
     sync::{self, SyncConfig, SyncProvider},
     user_defaults::UserDefaults,
@@ -43,7 +44,8 @@ use ansi_term::Colour;
 use dir::{DatabaseDirectories, Directories};
 use ethcore::{
     client::{
-        BlockChainClient, BlockInfo, ChainSyncing, Client, DatabaseCompactionProfile, Mode, VMType,
+        BlockChainClient, BlockInfo, ChainSyncing, Client, DatabaseCompactionProfile, Mode,
+        ReservedPeersManagement, VMType,
     },
     miner::{self, stratum, Miner, MinerOptions, MinerService},
     snapshot::{self, SnapshotConfiguration},
@@ -629,6 +631,10 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
         sync_provider: Arc::downgrade(&sync_provider),
         client: Arc::downgrade(&client),
     }));
+
+    client.set_reserved_peers_management(Box::new(ReservedPeersWrapper::new(Arc::downgrade(
+        &manage_network,
+    ))));
 
     Ok(RunningClient {
         inner: RunningClientInner::Full {
