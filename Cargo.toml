@@ -1,10 +1,11 @@
 [package]
-description = "OpenEthereum"
-name = "openethereum"
+description = "Diamond Node"
+name = "diamond-node"
 # NOTE Make sure to update util/version/Cargo.toml as well
 version = "3.3.5-hbbft-0.8.5"
 license = "GPL-3.0"
 authors = [
+	"bit.diamonds developers",
 	"OpenEthereum developers",
 	"Parity Technologies <admin@parity.io>"
 ]
@@ -116,7 +117,7 @@ path = "bin/oe/lib.rs"
 
 [[bin]]
 path = "bin/oe/main.rs"
-name = "openethereum"
+name = "diamond-node"
 
 [profile.dev]
 opt-level = 0
