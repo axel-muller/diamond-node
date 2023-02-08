@@ -138,7 +138,7 @@ pub fn set_validator_internet_address(
         port_array,
     );
 
-    let mut nonce = full_client
+    let nonce = full_client
         .nonce(signer_address, BlockId::Latest)
         .unwrap_or_default();
 
