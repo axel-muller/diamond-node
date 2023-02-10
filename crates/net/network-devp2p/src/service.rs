@@ -115,6 +115,12 @@ impl NetworkService {
         host.as_ref().map(|h| h.local_url())
     }
 
+    /// Returns the devp2p socket endpoint IP and Port information that is used to communicate with other peers.
+    fn get_socket(&self) -> Option<SocketAddrV4> {
+        let host = self.host.read();
+        host.as_ref().map(|h| h.get_socket())
+    }
+    
     /// Start network IO.
     ///
     /// In case of error, also returns the listening address for better error reporting.

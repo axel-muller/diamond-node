@@ -1,6 +1,6 @@
 use super::block_reward_hbbft::BlockRewardContract;
 use crate::engines::hbbft::{
-    contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason,
+    contracts::{random_hbbft::set_current_seed_tx_raw, staking::{staking_contract::functions::get_pool_internet_address, get_validator_internet_address}}, hbbft_message_memorium::BadSealReason,
 };
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
@@ -10,7 +10,7 @@ use engines::{
     SealingState,
 };
 use error::{BlockError, Error};
-use ethereum_types::{H256, H512, U256};
+use ethereum_types::{H256, H512, U256, H160};
 use ethjson::spec::HbbftParams;
 use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
@@ -791,7 +791,7 @@ impl HoneyBadgerBFT {
                 Some(client) => {
                     if !self.is_syncing(&client) {
                         let engine_client = client.deref();
-
+                        let node_staking_address = H160::zero();
                         match staking_by_mining_address(engine_client, &address) {
                             Ok(staking_address) => {
                                 if staking_address.is_zero() {
@@ -801,6 +801,7 @@ impl HoneyBadgerBFT {
                                     //trace!(target: "engine", "availability handling not a validator");
                                     return Ok(());
                                 }
+                                node_staking_address = staking_address;
                             }
                             Err(call_error) => {
                                 error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -844,6 +845,61 @@ impl HoneyBadgerBFT {
                                 ));
                             }
                         }
+
+                        // updates the nodes internet address if the information on the blockchain is outdated.
+                        match get_validator_internet_address(engine_client, &node_staking_address) {
+                            Ok(node_internet_address) => {
+                                // check if the stored internet address differs from our.
+                                // we do not need to do a special handling for 0.0.0.0, because 
+                                // our IP is always different to that.
+
+                                // retrieve our IP address.
+                                match client.as_full_client() {
+                                    Some(c) => {
+                                        c
+                                     }
+                                    None =>  {
+
+                                    },
+                                }
+
+
+                                if node_internet_address.eq(other)
+                                if node_internet_address.is_none() {
+                                    //let c : &dyn BlockChainClient = client.into();
+                                    match client.as_full_client() {
+                                        Some(c) => {
+                                            //debug!(target: "engine", "sending announce availability transaction");
+                                            info!(target: "engine", "sending announce internet address transaction");
+                                            match send_tx_announce_internet_address(c, &address) {
+                                                Ok(()) => {}
+                                                Err(call_error) => {
+                                                    //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
+                                                    return Err(format!("CallError during announce internet address. {:?}", call_error));
+                                                }
+                                            }
+                                        }
+                                        None => {
+                                            return Err(
+                                                "Unable to retrieve client.as_full_client()".into(),
+                                            );
+                                        }
+                                    }
+                                }
+                                // we store "HAS_SENT" if we SEND,
+                                // or if we are already marked as available.
+                                HAS_SENT.store(true, Ordering::SeqCst);
+                            }
+                            Err(e) => {
+                                //return Err(format!("Error trying to send availability check: {:?}", e));
+                                return Err(format!(
+                                    "Error trying to send announce internet address: {:?}",
+                                    e
+                                ));
+                            }
+                        }
+                         
+
                     }
                 }
                 None => {

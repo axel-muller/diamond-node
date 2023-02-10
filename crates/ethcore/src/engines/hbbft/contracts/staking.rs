@@ -49,15 +49,15 @@ pub fn get_validator_internet_address(
 ) -> Result<SocketAddrV4, CallError> {
     let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
     let result = call_const_staking!(c, get_pool_internet_address, staking_address.clone());
-    //staking_contract::functions::get_pool_internet_address::call()
 
     match result {
         Ok((ip, port)) => {
-            //byteorder::new();
+            // Future implementation might support IPv6.
+            // if the first bytes are non zero, we have a IPv6 address.
             return Ok(SocketAddrV4::new(
                 Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
                 port[0] as u16 * 256 + port[1] as u16,
-            ));
+            )); 
         }
         Err(e) => return Err(e),
     }
