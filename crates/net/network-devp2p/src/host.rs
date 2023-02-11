@@ -997,11 +997,10 @@ impl Host {
                 }
             }
         }
+    }
 
-        pub fn get_socket(&self) -> Option<SocketAddrV4> {
-
-            // this.
-        }
+    pub fn get_socket(&self) -> Option<SocketAddrV4> {
+        None
     }
 
     fn discovery_readable(&self, io: &IoContext<NetworkIoMessage>) {
