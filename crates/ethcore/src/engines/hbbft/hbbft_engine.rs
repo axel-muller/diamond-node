@@ -846,59 +846,62 @@ impl HoneyBadgerBFT {
                             }
                         }
 
-                        // updates the nodes internet address if the information on the blockchain is outdated.
-                        match get_validator_internet_address(engine_client, &node_staking_address) {
-                            Ok(node_internet_address) => {
-                                // check if the stored internet address differs from our.
-                                // we do not need to do a special handling for 0.0.0.0, because 
-                                // our IP is always different to that.
+                    // updates the nodes internet address if the information on the blockchain is outdated.
 
-                                // retrieve our IP address.
+                            // check if the stored internet address differs from our.
+                            // we do not need to do a special handling for 0.0.0.0, because 
+                            // our IP is always different to that.
+
+                            // retrieve our IP address.
+                            match client.as_full_client() {
+                                Some(c) => {
+                                    if let Ok(node_internet_address) = match get_validator_internet_address(engine_client, &node_staking_address) {
+                                            if let Some(endpoint) = c.get_devp2p_network_endpoint() {
+                                            }
+                                         }
+                                    
+                                    }
+                                None =>  {
+
+                                },
+                            }
+
+
+                            if node_internet_address.eq(other)
+                            if node_internet_address.is_none() {
+                                //let c : &dyn BlockChainClient = client.into();
                                 match client.as_full_client() {
                                     Some(c) => {
-                                        c
-                                     }
-                                    None =>  {
-
-                                    },
-                                }
-
-
-                                if node_internet_address.eq(other)
-                                if node_internet_address.is_none() {
-                                    //let c : &dyn BlockChainClient = client.into();
-                                    match client.as_full_client() {
-                                        Some(c) => {
-                                            //debug!(target: "engine", "sending announce availability transaction");
-                                            info!(target: "engine", "sending announce internet address transaction");
-                                            match send_tx_announce_internet_address(c, &address) {
-                                                Ok(()) => {}
-                                                Err(call_error) => {
-                                                    //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                                                    return Err(format!("CallError during announce internet address. {:?}", call_error));
-                                                }
+                                        //debug!(target: "engine", "sending announce availability transaction");
+                                        info!(target: "engine", "sending announce internet address transaction");
+                                        match send_tx_announce_internet_address(c, &address) {
+                                            Ok(()) => {}
+                                            Err(call_error) => {
+                                                //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
+                                                return Err(format!("CallError during announce internet address. {:?}", call_error));
                                             }
                                         }
-                                        None => {
-                                            return Err(
-                                                "Unable to retrieve client.as_full_client()".into(),
-                                            );
-                                        }
+                                    }
+                                    None => {
+                                        return Err(
+                                            "Unable to retrieve client.as_full_client()".into(),
+                                        );
                                     }
                                 }
-                                // we store "HAS_SENT" if we SEND,
-                                // or if we are already marked as available.
-                                HAS_SENT.store(true, Ordering::SeqCst);
                             }
-                            Err(e) => {
-                                //return Err(format!("Error trying to send availability check: {:?}", e));
-                                return Err(format!(
-                                    "Error trying to send announce internet address: {:?}",
-                                    e
-                                ));
-                            }
+                            // we store "HAS_SENT" if we SEND,
+                            // or if we are already marked as available.
+                            HAS_SENT.store(true, Ordering::SeqCst);
                         }
-                         
+                        Err(e) => {
+                            //return Err(format!("Error trying to send availability check: {:?}", e));
+                            return Err(format!(
+                                "Error trying to send announce internet address: {:?}",
+                                e
+                            ));
+                        }
+                    }
+                        
 
                     }
                 }

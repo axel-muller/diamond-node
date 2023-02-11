@@ -520,7 +520,7 @@ pub trait BlockChainClient:
     fn is_processing_fork(&self) -> bool;
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> SocketAddrV4;
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4>;
 }
 
 /// The data required for a `Client` to create a transaction.
