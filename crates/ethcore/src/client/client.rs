@@ -2883,7 +2883,7 @@ impl BlockChainClient for Client {
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
         let lock = self.reserved_peers_management.lock();
 
-        if let Some(management) = locked.as_ref() {
+        if let Some(management) = lock.as_ref() {
             return management.get_devp2p_network_endpoint();
         }
 
