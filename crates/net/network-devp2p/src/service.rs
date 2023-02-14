@@ -22,7 +22,11 @@ use network::{
     NetworkProtocolHandler, NonReservedPeerMode, PeerId, ProtocolId,
 };
 use parking_lot::RwLock;
-use std::{net::{SocketAddr, SocketAddrV4}, ops::RangeInclusive, sync::Arc};
+use std::{
+    net::{SocketAddr, SocketAddrV4},
+    ops::RangeInclusive,
+    sync::Arc,
+};
 
 struct HostHandler {
     public_url: RwLock<Option<String>>,
@@ -121,11 +125,12 @@ impl NetworkService {
 
         if let Some(result) = host.as_ref().map(|h| h.get_socket()) {
             return result;
-        } {
+        }
+        {
             return None;
         }
     }
-    
+
     /// Start network IO.
     ///
     /// In case of error, also returns the listening address for better error reporting.

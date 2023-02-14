@@ -19,12 +19,13 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     convert::TryFrom,
     io::{BufRead, BufReader},
+    net::SocketAddrV4,
     str::{from_utf8, FromStr},
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering as AtomicOrdering},
         Arc, Weak,
     },
-    time::{Duration, Instant}, net::{SocketAddrV4},
+    time::{Duration, Instant},
 };
 
 use blockchain::{

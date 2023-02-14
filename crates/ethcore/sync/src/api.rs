@@ -25,9 +25,10 @@ use network::{
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io,
+    net::SocketAddrV4,
     ops::RangeInclusive,
     sync::{atomic, mpsc, Arc},
-    time::Duration, net::SocketAddrV4,
+    time::Duration,
 };
 
 use chain::{

@@ -43,9 +43,9 @@ use std::{
 };
 
 use ansi_term::Colour;
+use diamond_node::{start, ExecutionAction};
 use ethcore_logger::setup_log;
 use fdlimit::raise_fd_limit;
-use diamond_node::{start, ExecutionAction};
 use parity_daemonize::AsHandle;
 use parking_lot::{Condvar, Mutex};
 

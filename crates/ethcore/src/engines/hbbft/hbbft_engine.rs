@@ -861,61 +861,56 @@ impl HoneyBadgerBFT {
                         // retrieve our IP address.
                         match client.as_full_client() {
                             Some(c) => {
-                                
-                                    if let Some(endpoint) = c.get_devp2p_network_endpoint() {
-
-                                        let validator_internet_address_result = get_validator_internet_address(
+                                if let Some(endpoint) = c.get_devp2p_network_endpoint() {
+                                    let validator_internet_address_result =
+                                        get_validator_internet_address(
                                             engine_client,
-                                            &node_staking_address
+                                            &node_staking_address,
                                         );
 
-                                        
-                                        // if !node_internet_address.eq(endpoint) {
-                                            
-                                        // }
+                                    // if !node_internet_address.eq(endpoint) {
 
-                                        return Ok(());
+                                    // }
 
+                                    return Ok(());
 
-                                        // if let Ok(node_internet_address) = validator_internet_address_result {
-                                        //     // if node_internet_address.eq(&endpoint) {
-                                        //     //     return Ok(());
-                                        //     // }
-                                        //     return Ok(());
-                                        // }
-                                        
-                                        //if node_internet_address.eq(other)
-                                        //     {
+                                    // if let Ok(node_internet_address) = validator_internet_address_result {
+                                    //     // if node_internet_address.eq(&endpoint) {
+                                    //     //     return Ok(());
+                                    //     // }
+                                    //     return Ok(());
+                                    // }
 
-                                        //             //debug!(target: "engine", "sending announce availability transaction");
-                                        //             info!(target: "engine", "sending announce internet address transaction");
-                                        //             match send_tx_announce_internet_address(c, &address) {
-                                        //                 Ok(()) => {}
-                                        //                 Err(call_error) => {
-                                        //                     //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                                        //                     return Err(format!("CallError during announce internet address. {:?}", call_error));
-                                        //                 }
-                                        //             }
-                                        //         }
-                                        //         None => {
-                                        //             return Err(
-                                        //                 "Unable to retrieve client.as_full_client()".into(),
-                                        //             );
-                                        //         }
-                                        //     }
-                                        // }
-                                        
-                                    } else {
-                                        // devp2p endpoint not available.
-                                        return Ok(());
-                                    }
+                                    //if node_internet_address.eq(other)
+                                    //     {
+
+                                    //             //debug!(target: "engine", "sending announce availability transaction");
+                                    //             info!(target: "engine", "sending announce internet address transaction");
+                                    //             match send_tx_announce_internet_address(c, &address) {
+                                    //                 Ok(()) => {}
+                                    //                 Err(call_error) => {
+                                    //                     //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
+                                    //                     return Err(format!("CallError during announce internet address. {:?}", call_error));
+                                    //                 }
+                                    //             }
+                                    //         }
+                                    //         None => {
+                                    //             return Err(
+                                    //                 "Unable to retrieve client.as_full_client()".into(),
+                                    //             );
+                                    //         }
+                                    //     }
+                                    // }
+                                } else {
+                                    // devp2p endpoint not available.
+                                    return Ok(());
                                 }
-                            
+                            }
+
                             None => {
                                 return Ok(());
                             }
                         }
-
                     }
                     return Ok(());
                 }
@@ -925,7 +920,7 @@ impl HoneyBadgerBFT {
                 }
             }
         }
-    
+
         return Ok(());
     }
 

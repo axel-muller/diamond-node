@@ -16,7 +16,7 @@
 
 //! Traits implemented by client.
 
-use std::{collections::BTreeMap, sync::Arc, net::SocketAddrV4};
+use std::{collections::BTreeMap, net::SocketAddrV4, sync::Arc};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;

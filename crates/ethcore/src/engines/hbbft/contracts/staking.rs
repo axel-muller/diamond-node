@@ -57,7 +57,7 @@ pub fn get_validator_internet_address(
             return Ok(SocketAddrV4::new(
                 Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
                 port[0] as u16 * 256 + port[1] as u16,
-            )); 
+            ));
         }
         Err(e) => return Err(e),
     }
