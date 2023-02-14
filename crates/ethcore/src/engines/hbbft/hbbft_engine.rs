@@ -5,6 +5,7 @@ use crate::engines::hbbft::{
         staking::{
             get_validator_internet_address, staking_contract::functions::get_pool_internet_address,
         },
+        validator_set::set_validator_internet_address,
     },
     hbbft_message_memorium::BadSealReason,
 };
@@ -861,16 +862,25 @@ impl HoneyBadgerBFT {
                         // retrieve our IP address.
                         match client.as_full_client() {
                             Some(c) => {
-                                if let Some(endpoint) = c.get_devp2p_network_endpoint() {
-                                    let validator_internet_address_result =
+                                if let Some(current_endpoint) = c.get_devp2p_network_endpoint() {
+                                    if let Ok(validator_internet_address) =
                                         get_validator_internet_address(
                                             engine_client,
                                             &node_staking_address,
-                                        );
-
-                                    // if !node_internet_address.eq(endpoint) {
-
-                                    // }
+                                        )
+                                    {
+                                        if !validator_internet_address.eq(&current_endpoint) {
+                                            if let Err(err) = set_validator_internet_address(
+                                                c,
+                                                &node_staking_address,
+                                                current_endpoint.ip(),
+                                                current_endpoint.port(),
+                                            ) {
+                                                error!(target: "engine", "unable to set validator internet address: {:?}", err);
+                                                return Err(format!("unable to set validator internet address: {:?}", err));
+                                            }
+                                        }
+                                    }
 
                                     return Ok(());
 
