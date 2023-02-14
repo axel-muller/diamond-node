@@ -27,7 +27,7 @@ use std::{
     io,
     ops::RangeInclusive,
     sync::{atomic, mpsc, Arc},
-    time::Duration,
+    time::Duration, net::SocketAddrV4,
 };
 
 use chain::{
@@ -800,7 +800,7 @@ impl ManageNetwork for EthSync {
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
-        self.network.get_devp2p_network_endpoint()
+        self.network.get_socket()
     }
 }
 
