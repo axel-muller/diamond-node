@@ -866,29 +866,36 @@ impl HoneyBadgerBFT {
                             Some(c) => {
                                 if let Some(current_endpoint) = c.get_devp2p_network_endpoint() {
                                     warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
-                                    if let Ok(validator_internet_address) =
-                                        get_validator_internet_address(
+                                    // todo: we can improve performance, 
+                                    // by assuming that we are the only one who writes the internet address.
+                                    // so we have to query this data only once, and then we can cache it.
+                                    match get_validator_internet_address(
                                             engine_client,
                                             &node_staking_address,
-                                        )
-                                    {
-                                        warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
-                                        if !validator_internet_address.eq(&current_endpoint) {
-                                            if let Err(err) = set_validator_internet_address(
-                                                c,
-                                                &node_staking_address,
-                                                current_endpoint.ip(),
-                                                current_endpoint.port(),
-                                            ) {
-                                                error!(target: "engine", "unable to set validator internet address: {:?}", err);
-                                                return Err(format!("unable to set validator internet address: {:?}", err));
+                                        ) {
+                                        Ok(validator_internet_address) => {
+                                            warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                                            if !validator_internet_address.eq(&current_endpoint) {
+                                                if let Err(err) = set_validator_internet_address(
+                                                    c,
+                                                    &node_staking_address,
+                                                    current_endpoint.ip(),
+                                                    current_endpoint.port(),
+                                                ) {
+                                                    error!(target: "engine", "unable to set validator internet address: {:?}", err);
+                                                    return Err(format!("unable to set validator internet address: {:?}", err));
+                                                }
                                             }
+                                            return Ok(());
+                                        },
+                                        Err(err) => {
+                                            error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
+                                            return Err(format!("unable to retrieve validator internet address: {:?}", err));
                                         }
                                     }
-
-                                    return Ok(());
                                 } else {
                                     // devp2p endpoint not available.
+                                    warn!(target: "engine", "devp2p endpoint not available.");
                                     return Ok(());
                                 }
                             }
