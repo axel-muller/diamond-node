@@ -859,16 +859,20 @@ impl HoneyBadgerBFT {
                         // we do not need to do a special handling for 0.0.0.0, because
                         // our IP is always different to that.
 
+                        warn!(target: "engine", "checking if internet address needs to be updated.");
+
                         // retrieve our IP address.
                         match client.as_full_client() {
                             Some(c) => {
                                 if let Some(current_endpoint) = c.get_devp2p_network_endpoint() {
+                                    warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
                                     if let Ok(validator_internet_address) =
                                         get_validator_internet_address(
                                             engine_client,
                                             &node_staking_address,
                                         )
                                     {
+                                        warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
                                         if !validator_internet_address.eq(&current_endpoint) {
                                             if let Err(err) = set_validator_internet_address(
                                                 c,
@@ -883,34 +887,6 @@ impl HoneyBadgerBFT {
                                     }
 
                                     return Ok(());
-
-                                    // if let Ok(node_internet_address) = validator_internet_address_result {
-                                    //     // if node_internet_address.eq(&endpoint) {
-                                    //     //     return Ok(());
-                                    //     // }
-                                    //     return Ok(());
-                                    // }
-
-                                    //if node_internet_address.eq(other)
-                                    //     {
-
-                                    //             //debug!(target: "engine", "sending announce availability transaction");
-                                    //             info!(target: "engine", "sending announce internet address transaction");
-                                    //             match send_tx_announce_internet_address(c, &address) {
-                                    //                 Ok(()) => {}
-                                    //                 Err(call_error) => {
-                                    //                     //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                                    //                     return Err(format!("CallError during announce internet address. {:?}", call_error));
-                                    //                 }
-                                    //             }
-                                    //         }
-                                    //         None => {
-                                    //             return Err(
-                                    //                 "Unable to retrieve client.as_full_client()".into(),
-                                    //             );
-                                    //         }
-                                    //     }
-                                    // }
                                 } else {
                                     // devp2p endpoint not available.
                                     return Ok(());
