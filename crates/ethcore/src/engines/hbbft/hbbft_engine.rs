@@ -31,6 +31,7 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
+    net::SocketAddrV4,
     ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Weak},
     time::Duration,
@@ -88,6 +89,7 @@ pub struct HoneyBadgerBFT {
     message_counter: RwLock<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
+    last_written_internet_address: RwLock<Option<SocketAddrV4>>,
 }
 
 struct TransitionHandler {
@@ -778,6 +780,11 @@ impl HoneyBadgerBFT {
         }
 
         Some(())
+    }
+
+    // handles the announcements of the internet address for other peers as blockchain transactions 
+    fn do_internet_address_announcements() {
+
     }
 
     fn do_availability_handling(&self) -> Result<(), String> {
