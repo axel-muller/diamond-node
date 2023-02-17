@@ -2886,6 +2886,8 @@ impl BlockChainClient for Client {
 
         if let Some(management) = lock.as_ref() {
             return management.get_devp2p_network_endpoint();
+        } else {
+            warn!("Reserved peers management lock is not initialized");
         }
 
         return None;

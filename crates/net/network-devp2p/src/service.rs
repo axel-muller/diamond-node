@@ -127,6 +127,7 @@ impl NetworkService {
             return result;
         }
         {
+            warn!(target: "network", "network Socket not available");
             return None;
         }
     }

@@ -24,7 +24,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::{self, Read, Write},
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4, IpAddr},
     ops::*,
     path::{Path, PathBuf},
     str::FromStr,
@@ -293,6 +293,7 @@ pub struct Host {
     pub info: RwLock<HostInfo>,
     udp_socket: Mutex<Option<UdpSocket>>,
     tcp_listener: Mutex<TcpListener>,
+    tcp_listener_addr: Mutex<Option<SocketAddrV4>>,
     sessions: Arc<RwLock<Slab<SharedSession>>>,
     discovery: Mutex<Option<Discovery<'static>>>,
     nodes: RwLock<NodeTable>,
@@ -336,6 +337,19 @@ impl Host {
         let path = config.net_config_path.clone();
         // Setup the server socket
         let tcp_listener = TcpListener::bind(&listen_address)?;
+        let mut tcp_listener_socket = Option::<SocketAddrV4>::None;
+
+        match listen_address.ip() {
+            IpAddr::V4(ip) => {
+                let address = SocketAddrV4::new(ip, listen_address.port());
+                warn!(target: "network", "stored address: {:?}", address);
+                tcp_listener_socket = Some(address);
+            }
+            IpAddr::V6(_ip) => {
+                warn!(target: "network", "IPv6 not supported for all functions");
+            }
+        }
+
         listen_address = SocketAddr::new(listen_address.ip(), tcp_listener.local_addr()?.port());
         debug!(target: "network", "Listening at {:?}", listen_address);
         let udp_port = config.udp_port.unwrap_or_else(|| listen_address.port());
@@ -361,6 +375,7 @@ impl Host {
             discovery: Mutex::new(None),
             udp_socket: Mutex::new(None),
             tcp_listener: Mutex::new(tcp_listener),
+            tcp_listener_addr: Mutex::new(tcp_listener_socket),
             sessions: Arc::new(RwLock::new(Slab::new_starting_at(
                 FIRST_SESSION,
                 MAX_SESSIONS,
@@ -1000,7 +1015,7 @@ impl Host {
     }
 
     pub fn get_socket(&self) -> Option<SocketAddrV4> {
-        None
+        self.tcp_listener_addr.lock().clone()
     }
 
     fn discovery_readable(&self, io: &IoContext<NetworkIoMessage>) {

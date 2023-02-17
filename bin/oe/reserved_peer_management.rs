@@ -24,7 +24,10 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
         match self.manage_network.upgrade() {
             Some(sync_arc) => sync_arc.get_devp2p_network_endpoint(),
-            None => None,
+            None => {
+                warn!("ManageNetwork instance not available.");
+                None
+            },
         }
     }
 }
