@@ -25,7 +25,6 @@ use network::{
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io,
-    net::SocketAddrV4,
     ops::RangeInclusive,
     sync::{atomic, mpsc, Arc},
     time::Duration,
@@ -747,7 +746,7 @@ pub trait ManageNetwork: Send + Sync {
     /// Get network context for protocol.
     fn with_proto_context(&self, proto: ProtocolId, f: &mut dyn FnMut(&dyn NetworkContext));
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4>;
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
 }
 
 impl ManageNetwork for EthSync {
@@ -800,7 +799,7 @@ impl ManageNetwork for EthSync {
     }
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
         self.network.get_socket()
     }
 }

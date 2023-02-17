@@ -2,7 +2,7 @@ use client::EngineClient;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
 use std::{
-    net::{Ipv4Addr, SocketAddrV4},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     str::FromStr,
 };
 use types::ids::BlockId;
@@ -46,7 +46,7 @@ pub fn candidate_min_stake(client: &dyn EngineClient) -> Result<U256, CallError>
 pub fn get_validator_internet_address(
     client: &dyn EngineClient,
     staking_address: &Address,
-) -> Result<SocketAddrV4, CallError> {
+) -> Result<SocketAddr, CallError> {
     let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
     let result = call_const_staking!(c, get_pool_internet_address, staking_address.clone());
 
@@ -54,10 +54,11 @@ pub fn get_validator_internet_address(
         Ok((ip, port)) => {
             // Future implementation might support IPv6.
             // if the first bytes are non zero, we have a IPv6 address.
-            return Ok(SocketAddrV4::new(
+
+            return Ok(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
                 port[0] as u16 * 256 + port[1] as u16,
-            ));
+            )));
         }
         Err(e) => return Err(e),
     }

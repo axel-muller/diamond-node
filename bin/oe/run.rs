@@ -44,8 +44,7 @@ use ansi_term::Colour;
 use dir::{DatabaseDirectories, Directories};
 use ethcore::{
     client::{
-        BlockChainClient, BlockInfo, ChainSyncing, Client, DatabaseCompactionProfile, Mode,
-        ReservedPeersManagement, VMType,
+        BlockChainClient, BlockInfo, ChainSyncing, Client, DatabaseCompactionProfile, Mode, VMType,
     },
     miner::{self, stratum, Miner, MinerOptions, MinerService},
     snapshot::{self, SnapshotConfiguration},

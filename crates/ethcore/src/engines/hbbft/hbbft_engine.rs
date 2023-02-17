@@ -35,7 +35,7 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
-    net::SocketAddrV4,
+    net::SocketAddr,
     ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Mutex, Weak},
     time::Duration,
@@ -93,7 +93,7 @@ pub struct HoneyBadgerBFT {
     message_counter: RwLock<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
-    last_written_internet_address: Mutex<Option<SocketAddrV4>>,
+    last_written_internet_address: Mutex<Option<SocketAddr>>,
     has_sent_availability_tx: AtomicBool,
 }
 
@@ -357,7 +357,7 @@ impl IoHandler<()> for TransitionHandler {
             }
         } else if timer == ENGINE_VALIDATOR_CANDIDATE_ACTIONS {
             warn!(target: "consensus", "do_validator_engine_actions");
-            if let Err(err) =self.engine.do_validator_engine_actions() {
+            if let Err(err) = self.engine.do_validator_engine_actions() {
                 error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
             }
         }
@@ -878,7 +878,7 @@ impl HoneyBadgerBFT {
                         // we don't need to do anything.
                         // but we cache the current endpoint, so we don't have to query the db again.
                         if let Ok(mut lock) = self.last_written_internet_address.lock() {
-                            lock.insert(current_endpoint.clone());
+                            *lock = Some(current_endpoint.clone());
                         }
 
                         return Ok(());
@@ -887,12 +887,11 @@ impl HoneyBadgerBFT {
                     match set_validator_internet_address(
                         block_chain_client,
                         &node_address,
-                        current_endpoint.ip(),
-                        current_endpoint.port(),
+                        &current_endpoint,
                     ) {
                         Ok(()) => {
                             if let Ok(mut lock) = self.last_written_internet_address.lock() {
-                                lock.insert(current_endpoint);
+                                *lock = Some(current_endpoint);
                             };
                             return Ok(());
                         }

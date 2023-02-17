@@ -16,7 +16,7 @@
 
 //! Traits implemented by client.
 
-use std::{collections::BTreeMap, net::SocketAddrV4, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;
@@ -220,7 +220,7 @@ pub trait ReservedPeersManagement: Send + Sync {
     fn add_reserved_peer(&self, peer: String) -> Result<(), String>;
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4>;
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
 }
 
 /// IO operations that should off-load heavy work to another thread.
@@ -520,7 +520,7 @@ pub trait BlockChainClient:
     fn is_processing_fork(&self) -> bool;
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4>;
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
 }
 
 /// The data required for a `Client` to create a transaction.

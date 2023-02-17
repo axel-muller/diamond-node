@@ -5,7 +5,7 @@ use client::{
 use crypto::publickey::Public;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
-use std::{collections::BTreeMap, net::Ipv4Addr, str::FromStr};
+use std::{collections::BTreeMap, net::SocketAddr, str::FromStr};
 use types::{ids::BlockId, transaction::Error};
 
 use_contract!(
@@ -121,15 +121,27 @@ pub fn get_pending_validators(client: &dyn EngineClient) -> Result<Vec<Address>,
 pub fn set_validator_internet_address(
     full_client: &dyn BlockChainClient,
     signer_address: &Address,
-    ip_address: &Ipv4Addr,
-    port: u16,
+    socket_addr: &SocketAddr,
 ) -> Result<(), Error> {
     //let c = BoundContract::bind(client, BlockId::Latest, *VALIDATOR_SET_ADDRESS);
 
-    let octects = ip_address.octets();
-    let ip_address_array: [u8; 16] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, octects[0], octects[1], octects[2], octects[3],
-    ];
+    let mut ip_address_array: [u8; 16] = [0; 16];
+
+    match socket_addr.ip() {
+        std::net::IpAddr::V4(ipv4) => {
+            let o = ipv4.octets();
+            ip_address_array[12] = o[0];
+            ip_address_array[13] = o[0];
+            ip_address_array[14] = o[0];
+            ip_address_array[15] = o[0];
+        }
+        std::net::IpAddr::V6(ipv6) => {
+            let o = ipv6.octets();
+            ip_address_array.copy_from_slice(&o);
+        }
+    }
+
+    let port = socket_addr.port();
 
     let port_array: [u8; 2] = [(port / 256) as u8, (port - (port / 256)) as u8];
 
@@ -146,7 +158,7 @@ pub fn set_validator_internet_address(
         .gas(U256::from(100_000))
         .nonce(nonce);
 
-    info!(target:"consensus", "set_validator_internet_address: ip: {} port: {} none: {}", ip_address, port, nonce);
+    info!(target:"consensus", "set_validator_internet_address: ip: {} nonce: {}", socket_addr, nonce);
     full_client.transact_silently(transaction)?;
     Ok(())
 }

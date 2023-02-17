@@ -1,4 +1,4 @@
-use std::{net::SocketAddrV4, sync::Weak};
+use std::{net::SocketAddr, sync::Weak};
 
 use ethcore::client::ReservedPeersManagement;
 
@@ -21,13 +21,13 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
     }
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
         match self.manage_network.upgrade() {
             Some(sync_arc) => sync_arc.get_devp2p_network_endpoint(),
             None => {
                 warn!("ManageNetwork instance not available.");
                 None
-            },
+            }
         }
     }
 }

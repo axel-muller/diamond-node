@@ -19,7 +19,7 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     convert::TryFrom,
     io::{BufRead, BufReader},
-    net::SocketAddrV4,
+    net::SocketAddr,
     str::{from_utf8, FromStr},
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering as AtomicOrdering},
@@ -2881,7 +2881,7 @@ impl BlockChainClient for Client {
             .is_processing_fork(&chain.best_block_hash(), &chain)
     }
 
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddrV4> {
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
         let lock = self.reserved_peers_management.lock();
 
         if let Some(management) = lock.as_ref() {
