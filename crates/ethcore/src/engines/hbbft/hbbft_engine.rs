@@ -1,14 +1,18 @@
 use super::block_reward_hbbft::BlockRewardContract;
-use crate::{engines::hbbft::{
-    contracts::{
-        random_hbbft::set_current_seed_tx_raw,
-        staking::{
-            get_validator_internet_address, staking_contract::functions::get_pool_internet_address,
+use crate::{
+    client::BlockChainClient,
+    engines::hbbft::{
+        contracts::{
+            random_hbbft::set_current_seed_tx_raw,
+            staking::{
+                get_validator_internet_address,
+                staking_contract::functions::get_pool_internet_address,
+            },
+            validator_set::set_validator_internet_address,
         },
-        validator_set::set_validator_internet_address,
+        hbbft_message_memorium::BadSealReason,
     },
-    hbbft_message_memorium::BadSealReason,
-}, client::BlockChainClient};
+};
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
 use crypto::publickey::Signature;
@@ -31,10 +35,11 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
+    fmt::format,
     net::SocketAddrV4,
     ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Weak},
-    time::Duration, fmt::format,
+    time::Duration,
 };
 use types::{
     header::{ExtendedHeader, Header},
@@ -375,7 +380,7 @@ impl HoneyBadgerBFT {
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
             last_written_internet_address: RwLock::new(None),
-            has_sent_availability_tx: AtomicBool::new(false)
+            has_sent_availability_tx: AtomicBool::new(false),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -785,14 +790,17 @@ impl HoneyBadgerBFT {
         Some(())
     }
 
-
     fn should_handle_availability_announcements(&self) -> bool {
         self.has_sent_availability_tx.load(Ordering::SeqCst)
     }
 
-    fn handle_availability_announcements(&self,  engine_client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, validator_address: &H160) {
+    fn handle_availability_announcements(
+        &self,
+        engine_client: &dyn EngineClient,
+        block_chain_client: &dyn BlockChainClient,
+        validator_address: &H160,
+    ) {
         // handles the announcements of the availability of other peers as blockchain transactions
-
 
         // let engine_client = client.deref();
 
@@ -809,7 +817,7 @@ impl HoneyBadgerBFT {
                         }
                     }
                 }
-                
+
                 // we store "HAS_SENT" if we SEND,
                 // or if we are already marked as available.
                 self.has_sent_availability_tx.store(true, Ordering::SeqCst);
@@ -824,10 +832,7 @@ impl HoneyBadgerBFT {
                 // ));
             }
         }
-
     }
-       
-    
 
     fn should_handle_internet_address_announcements(&self) -> bool {
         // todo
@@ -835,9 +840,12 @@ impl HoneyBadgerBFT {
     }
 
     // handles the announcements of the internet address for other peers as blockchain transactions
-    fn handle_internet_address_announcements(&self, block_chain_client: &dyn BlockChainClient, engine_client: &dyn EngineClient, node_address: &H160) -> Result<(), String>{
-
-
+    fn handle_internet_address_announcements(
+        &self,
+        block_chain_client: &dyn BlockChainClient,
+        engine_client: &dyn EngineClient,
+        node_address: &H160,
+    ) -> Result<(), String> {
         // updates the nodes internet address if the information on the blockchain is outdated.
 
         // check if the stored internet address differs from our.
@@ -851,10 +859,7 @@ impl HoneyBadgerBFT {
             // todo: we can improve performance,
             // by assuming that we are the only one who writes the internet address.
             // so we have to query this data only once, and then we can cache it.
-            match get_validator_internet_address(
-                engine_client,
-                &node_address,
-            ) {
+            match get_validator_internet_address(engine_client, &node_address) {
                 Ok(validator_internet_address) => {
                     warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
                     if !validator_internet_address.eq(&current_endpoint) {
@@ -865,14 +870,20 @@ impl HoneyBadgerBFT {
                             current_endpoint.port(),
                         ) {
                             error!(target: "engine", "unable to set validator internet address: {:?}", err);
-                            return Err(format!("unable to set validator internet address: {:?}", err));
+                            return Err(format!(
+                                "unable to set validator internet address: {:?}",
+                                err
+                            ));
                         }
                     }
                     return Ok(());
                 }
                 Err(err) => {
                     error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
-                    return Err(format!("unable to retrieve validator internet address: {:?}", err));
+                    return Err(format!(
+                        "unable to retrieve validator internet address: {:?}",
+                        err
+                    ));
                 }
             }
         } else {
@@ -882,17 +893,19 @@ impl HoneyBadgerBFT {
         }
     }
 
-
     // some actions are required for hbbft validator nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
     fn do_validator_engine_actions(&self) -> Result<(), String> {
-
-        let should_handle_availability_announcements = self.should_handle_availability_announcements();
-        let should_handle_internet_address_announcements = self.should_handle_internet_address_announcements();
+        let should_handle_availability_announcements =
+            self.should_handle_availability_announcements();
+        let should_handle_internet_address_announcements =
+            self.should_handle_internet_address_announcements();
 
         // if we do not have to do anything, we can return early.
-        if !(should_handle_availability_announcements || should_handle_internet_address_announcements) { 
+        if !(should_handle_availability_announcements
+            || should_handle_internet_address_announcements)
+        {
             return Ok(());
         }
 
@@ -906,13 +919,12 @@ impl HoneyBadgerBFT {
                     return Ok(());
                 }
 
-                
                 // If we have no signer there is nothing for us to send.
                 let mining_address = match self.signer.read().as_ref() {
                     Some(signer) => signer.address(),
                     None => {
                         // we do not have a signer on Full and RPC nodes.
-                        // here is a possible performance improvement: 
+                        // here is a possible performance improvement:
                         // this won't change during the lifetime of the application ?!
                         return Ok(());
                     }
@@ -923,7 +935,10 @@ impl HoneyBadgerBFT {
                 // TODO:
                 // staking by mining address could be cached.
                 // but it COULD also get changed in the contracts, during the time the node is running.
-                let node_staking_address = match staking_by_mining_address(engine_client, &mining_address) {
+                let node_staking_address = match staking_by_mining_address(
+                    engine_client,
+                    &mining_address,
+                ) {
                     Ok(staking_address) => {
                         if staking_address.is_zero() {
                             //TODO: here some fine handling can improve performance.
@@ -940,43 +955,45 @@ impl HoneyBadgerBFT {
                         return Err(message.into());
                     }
                 };
-                
-        
 
                 // client.as_full_client()
 
                 match engine_client.as_full_client() {
                     Some(block_chain_client) => {
-
                         // if we are not a potential validator, we already have already returned here.
                         if should_handle_availability_announcements {
-                            self.handle_availability_announcements(engine_client, block_chain_client, &mining_address);
+                            self.handle_availability_announcements(
+                                engine_client,
+                                block_chain_client,
+                                &mining_address,
+                            );
                         }
 
                         // since get latest nonce respects the pending transactions,
                         // we don't have to take care of sending 2 transactions at once.
-                
+
                         if should_handle_internet_address_announcements {
-                            self.handle_internet_address_announcements(block_chain_client, engine_client, &mining_address);
+                            self.handle_internet_address_announcements(
+                                block_chain_client,
+                                engine_client,
+                                &mining_address,
+                            );
                         }
-                        
+
                         return Ok(());
                     }
                     None => {
-                        return Err(
-                            "Unable to retrieve client.as_full_client()".into(),
-                        );
+                        return Err("Unable to retrieve client.as_full_client()".into());
                     }
                 }
             }
             None => {
                 // client arc not ready yet,
                 // can happen during initialization and shutdown.
-                return Ok(())
+                return Ok(());
             }
         }
     }
-    
 
     /// Returns true if we are in the keygen phase and a new key has been generated.
     fn do_keygen(&self, block_timestamp: u64) -> bool {
