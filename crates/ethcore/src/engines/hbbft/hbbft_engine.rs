@@ -1,5 +1,5 @@
 use super::block_reward_hbbft::BlockRewardContract;
-use crate::engines::hbbft::{
+use crate::{engines::hbbft::{
     contracts::{
         random_hbbft::set_current_seed_tx_raw,
         staking::{
@@ -8,7 +8,7 @@ use crate::engines::hbbft::{
         validator_set::set_validator_internet_address,
     },
     hbbft_message_memorium::BadSealReason,
-};
+}, client::BlockChainClient};
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
 use crypto::publickey::Signature;
@@ -34,7 +34,7 @@ use std::{
     net::SocketAddrV4,
     ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Weak},
-    time::Duration,
+    time::Duration, fmt::format,
 };
 use types::{
     header::{ExtendedHeader, Header},
@@ -90,6 +90,7 @@ pub struct HoneyBadgerBFT {
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
     last_written_internet_address: RwLock<Option<SocketAddrV4>>,
+    has_sent_availability_tx: AtomicBool,
 }
 
 struct TransitionHandler {
@@ -186,8 +187,8 @@ impl IoHandler<()> for TransitionHandler {
             // Periodically allow messages received for future epochs to be processed.
             self.engine.replay_cached_messages();
 
-            if let Err(e) = self.engine.do_availability_handling() {
-                error!(target: "engine", "Error during do_availability_handling: {}", e)
+            if let Err(e) = self.engine.do_validator_engine_actions() {
+                error!(target: "engine", "Error during do_validator_engine_actions: {}", e)
             }
 
             // The client may not be registered yet on startup, we set the default duration.
@@ -373,6 +374,8 @@ impl HoneyBadgerBFT {
             message_counter: RwLock::new(0),
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
+            last_written_internet_address: RwLock::new(None),
+            has_sent_availability_tx: AtomicBool::new(false)
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -782,147 +785,198 @@ impl HoneyBadgerBFT {
         Some(())
     }
 
-    // handles the announcements of the internet address for other peers as blockchain transactions 
-    fn do_internet_address_announcements() {
 
+    fn should_handle_availability_announcements(&self) -> bool {
+        self.has_sent_availability_tx.load(Ordering::SeqCst)
     }
 
-    fn do_availability_handling(&self) -> Result<(), String> {
-        // only try once on startup-
-        static HAS_SENT: AtomicBool = AtomicBool::new(false);
+    fn handle_availability_announcements(&self,  engine_client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, validator_address: &H160) {
+        // handles the announcements of the availability of other peers as blockchain transactions
 
-        if !HAS_SENT.load(Ordering::SeqCst) {
-            // If we have no signer there is nothing for us to send.
-            let address = match self.signer.read().as_ref() {
-                Some(signer) => signer.address(),
-                None => {
-                    // warn!("Could not retrieve address for writing availability transaction.");
-                    return Ok(());
+
+        // let engine_client = client.deref();
+
+        match get_validator_available_since(engine_client, &validator_address) {
+            Ok(s) => {
+                if s.is_zero() {
+                    //debug!(target: "engine", "sending announce availability transaction");
+                    info!(target: "engine", "sending announce availability transaction");
+                    match send_tx_announce_availability(block_chain_client, &validator_address) {
+                        Ok(()) => {}
+                        Err(call_error) => {
+                            //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
+                            // return Err(format!("CallError during announce availability. {:?}", call_error));
+                        }
+                    }
                 }
-            };
+                
+                // we store "HAS_SENT" if we SEND,
+                // or if we are already marked as available.
+                self.has_sent_availability_tx.store(true, Ordering::SeqCst);
+                //return Ok(());
+            }
+            Err(e) => {
+                //return Err(format!("Error trying to send availability check: {:?}", e));
+                warn!(target: "engine", "Error trying to send availability check: {:?}", e);
+                // return Err(format!(
+                //     "Error retrieving get_validator_available_since: {:?}",
+                //     e
+                // ));
+            }
+        }
 
-            match self.client_arc() {
-                Some(client) => {
-                    if !self.is_syncing(&client) {
-                        let engine_client = client.deref();
-                        let mut node_staking_address = H160::zero();
-                        match staking_by_mining_address(engine_client, &address) {
-                            Ok(staking_address) => {
-                                if staking_address.is_zero() {
-                                    //TODO: here some fine handling can improve performance.
-                                    //with this implementation every node (validator or not)
-                                    //needs to query this state every block.
-                                    //trace!(target: "engine", "availability handling not a validator");
-                                    return Ok(());
-                                }
-                                node_staking_address = staking_address;
-                            }
-                            Err(call_error) => {
-                                error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                                let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                                return Err(message.into());
-                            }
-                        }
+    }
+       
+    
 
-                        match get_validator_available_since(engine_client, &address) {
-                            Ok(s) => {
-                                if s.is_zero() {
-                                    //let c : &dyn BlockChainClient = client.into();
-                                    match client.as_full_client() {
-                                        Some(c) => {
-                                            //debug!(target: "engine", "sending announce availability transaction");
-                                            info!(target: "engine", "sending announce availability transaction");
-                                            match send_tx_announce_availability(c, &address) {
-                                                Ok(()) => {}
-                                                Err(call_error) => {
-                                                    //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                                                    return Err(format!("CallError during announce availability. {:?}", call_error));
-                                                }
-                                            }
-                                        }
-                                        None => {
-                                            return Err(
-                                                "Unable to retrieve client.as_full_client()".into(),
-                                            );
-                                        }
-                                    }
-                                }
-                                // we store "HAS_SENT" if we SEND,
-                                // or if we are already marked as available.
-                                HAS_SENT.store(true, Ordering::SeqCst);
-                            }
-                            Err(e) => {
-                                //return Err(format!("Error trying to send availability check: {:?}", e));
-                                return Err(format!(
-                                    "Error trying to send availability check: {:?}",
-                                    e
-                                ));
-                            }
-                        }
+    fn should_handle_internet_address_announcements(&self) -> bool {
+        // todo
+        true
+    }
 
-                        // updates the nodes internet address if the information on the blockchain is outdated.
+    // handles the announcements of the internet address for other peers as blockchain transactions
+    fn handle_internet_address_announcements(&self, block_chain_client: &dyn BlockChainClient, engine_client: &dyn EngineClient, node_address: &H160) -> Result<(), String>{
 
-                        // check if the stored internet address differs from our.
-                        // we do not need to do a special handling for 0.0.0.0, because
-                        // our IP is always different to that.
 
-                        warn!(target: "engine", "checking if internet address needs to be updated.");
+        // updates the nodes internet address if the information on the blockchain is outdated.
 
-                        // retrieve our IP address.
-                        match client.as_full_client() {
-                            Some(c) => {
-                                if let Some(current_endpoint) = c.get_devp2p_network_endpoint() {
-                                    warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
-                                    // todo: we can improve performance, 
-                                    // by assuming that we are the only one who writes the internet address.
-                                    // so we have to query this data only once, and then we can cache it.
-                                    match get_validator_internet_address(
-                                            engine_client,
-                                            &node_staking_address,
-                                        ) {
-                                        Ok(validator_internet_address) => {
-                                            warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
-                                            if !validator_internet_address.eq(&current_endpoint) {
-                                                if let Err(err) = set_validator_internet_address(
-                                                    c,
-                                                    &node_staking_address,
-                                                    current_endpoint.ip(),
-                                                    current_endpoint.port(),
-                                                ) {
-                                                    error!(target: "engine", "unable to set validator internet address: {:?}", err);
-                                                    return Err(format!("unable to set validator internet address: {:?}", err));
-                                                }
-                                            }
-                                            return Ok(());
-                                        },
-                                        Err(err) => {
-                                            error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
-                                            return Err(format!("unable to retrieve validator internet address: {:?}", err));
-                                        }
-                                    }
-                                } else {
-                                    // devp2p endpoint not available.
-                                    warn!(target: "engine", "devp2p endpoint not available.");
-                                    return Ok(());
-                                }
-                            }
+        // check if the stored internet address differs from our.
+        // we do not need to do a special handling for 0.0.0.0, because
+        // our IP is always different to that.
 
-                            None => {
-                                return Ok(());
-                            }
+        warn!(target: "engine", "checking if internet address needs to be updated.");
+
+        if let Some(current_endpoint) = block_chain_client.get_devp2p_network_endpoint() {
+            warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+            // todo: we can improve performance,
+            // by assuming that we are the only one who writes the internet address.
+            // so we have to query this data only once, and then we can cache it.
+            match get_validator_internet_address(
+                engine_client,
+                &node_address,
+            ) {
+                Ok(validator_internet_address) => {
+                    warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                    if !validator_internet_address.eq(&current_endpoint) {
+                        if let Err(err) = set_validator_internet_address(
+                            block_chain_client,
+                            &node_address,
+                            current_endpoint.ip(),
+                            current_endpoint.port(),
+                        ) {
+                            error!(target: "engine", "unable to set validator internet address: {:?}", err);
+                            return Err(format!("unable to set validator internet address: {:?}", err));
                         }
                     }
                     return Ok(());
                 }
-                None => {
-                    //during bootup and shutdown, the ARC is not available. - it's fine, will send later
-                    return Ok(());
+                Err(err) => {
+                    error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
+                    return Err(format!("unable to retrieve validator internet address: {:?}", err));
                 }
             }
+        } else {
+            // devp2p endpoint not available.
+            warn!(target: "engine", "devp2p endpoint not available.");
+            return Ok(());
+        }
+    }
+
+
+    // some actions are required for hbbft validator nodes.
+    // this functions figures out what kind of actions are required and executes them.
+    // this will lock the client and some deeper layers.
+    fn do_validator_engine_actions(&self) -> Result<(), String> {
+
+        let should_handle_availability_announcements = self.should_handle_availability_announcements();
+        let should_handle_internet_address_announcements = self.should_handle_internet_address_announcements();
+
+        // if we do not have to do anything, we can return early.
+        if !(should_handle_availability_announcements || should_handle_internet_address_announcements) { 
+            return Ok(());
         }
 
-        return Ok(());
+        // here we need to differentiate the different engine functions,
+        // that requre different levels of access to the client.
+
+        match self.client_arc() {
+            Some(client_arc) => {
+                if self.is_syncing(&client_arc) {
+                    // we are syncing - do not do anything.
+                    return Ok(());
+                }
+
+                
+                // If we have no signer there is nothing for us to send.
+                let mining_address = match self.signer.read().as_ref() {
+                    Some(signer) => signer.address(),
+                    None => {
+                        // we do not have a signer on Full and RPC nodes.
+                        // here is a possible performance improvement: 
+                        // this won't change during the lifetime of the application ?!
+                        return Ok(());
+                    }
+                };
+
+                let engine_client = client_arc.deref();
+
+                // TODO:
+                // staking by mining address could be cached.
+                // but it COULD also get changed in the contracts, during the time the node is running.
+                let node_staking_address = match staking_by_mining_address(engine_client, &mining_address) {
+                    Ok(staking_address) => {
+                        if staking_address.is_zero() {
+                            //TODO: here some fine handling can improve performance.
+                            //with this implementation every node (validator or not)
+                            //needs to query this state every block.
+                            //trace!(target: "engine", "availability handling not a validator");
+                            return Ok(());
+                        }
+                        staking_address
+                    }
+                    Err(call_error) => {
+                        error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                        let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                        return Err(message.into());
+                    }
+                };
+                
+        
+
+                // client.as_full_client()
+
+                match engine_client.as_full_client() {
+                    Some(block_chain_client) => {
+
+                        // if we are not a potential validator, we already have already returned here.
+                        if should_handle_availability_announcements {
+                            self.handle_availability_announcements(engine_client, block_chain_client, &mining_address);
+                        }
+
+                        // since get latest nonce respects the pending transactions,
+                        // we don't have to take care of sending 2 transactions at once.
+                
+                        if should_handle_internet_address_announcements {
+                            self.handle_internet_address_announcements(block_chain_client, engine_client, &mining_address);
+                        }
+                        
+                        return Ok(());
+                    }
+                    None => {
+                        return Err(
+                            "Unable to retrieve client.as_full_client()".into(),
+                        );
+                    }
+                }
+            }
+            None => {
+                // client arc not ready yet,
+                // can happen during initialization and shutdown.
+                return Ok(())
+            }
+        }
     }
+    
 
     /// Returns true if we are in the keygen phase and a new key has been generated.
     fn do_keygen(&self, block_timestamp: u64) -> bool {
