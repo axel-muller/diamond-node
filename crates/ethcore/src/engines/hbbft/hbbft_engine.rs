@@ -862,13 +862,29 @@ impl HoneyBadgerBFT {
             match get_validator_internet_address(engine_client, &node_address) {
                 Ok(validator_internet_address) => {
                     warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
-                    if !validator_internet_address.eq(&current_endpoint) {
-                        if let Err(err) = set_validator_internet_address(
-                            block_chain_client,
-                            &node_address,
-                            current_endpoint.ip(),
-                            current_endpoint.port(),
-                        ) {
+                    if validator_internet_address.eq(&current_endpoint) {
+                        // if the current stored endpoint is the same as the current endpoint,
+                        // we don't need to do anything.
+                        // but we cache the current endpoint, so we don't have to query the db again.
+                        self.last_written_internet_address
+                            .write()
+                            .insert(current_endpoint.clone());
+                        return Ok(());
+                    }
+
+                    match set_validator_internet_address(
+                        block_chain_client,
+                        &node_address,
+                        current_endpoint.ip(),
+                        current_endpoint.port(),
+                    ) {
+                        Ok(()) => {
+                            self.last_written_internet_address
+                                .write()
+                                .insert(current_endpoint.clone());
+                            return Ok(());
+                        }
+                        Err(err) => {
                             error!(target: "engine", "unable to set validator internet address: {:?}", err);
                             return Err(format!(
                                 "unable to set validator internet address: {:?}",
@@ -876,7 +892,6 @@ impl HoneyBadgerBFT {
                             ));
                         }
                     }
-                    return Ok(());
                 }
                 Err(err) => {
                     error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
