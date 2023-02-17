@@ -55,9 +55,8 @@ pub fn get_validator_internet_address(
             
             // if we have a prefix in the first 8 bytes, we have an IPv6 address
             if ip[0] > 0 || ip[1] > 0 || ip[2] > 0 || ip[3] > 0 || ip[4] > 0 || ip[5] > 0 || ip[6] > 0 || ip[7] > 0  {
-                let ipV6 = Ipv6Addr::from(ip);
                 return Ok(SocketAddr::V6(SocketAddrV6::new(
-                    ipV6,
+                    Ipv6Addr::from(ip),
                     port[0] as u16 * 256 + port[1] as u16,
                     0,
                     0

@@ -62,7 +62,6 @@ pub(crate) struct NodeStakingEpochHistory {
 
 impl NodeStakingEpochHistory {
     pub fn new(node_id: NodeId) -> Self {
-        let x = u32::MAX;
         NodeStakingEpochHistory {
             node_id,
             last_good_sealing_message: 0,
