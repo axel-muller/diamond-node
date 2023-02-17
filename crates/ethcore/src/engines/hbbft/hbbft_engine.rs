@@ -35,10 +35,9 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
-    fmt::format,
     net::SocketAddrV4,
     ops::BitXor,
-    sync::{atomic::AtomicBool, Arc, Weak},
+    sync::{atomic::AtomicBool, Arc, Mutex, Weak},
     time::Duration,
 };
 use types::{
@@ -94,7 +93,7 @@ pub struct HoneyBadgerBFT {
     message_counter: RwLock<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
-    last_written_internet_address: RwLock<Option<SocketAddrV4>>,
+    last_written_internet_address: Mutex<Option<SocketAddrV4>>,
     has_sent_availability_tx: AtomicBool,
 }
 
@@ -379,7 +378,7 @@ impl HoneyBadgerBFT {
             message_counter: RwLock::new(0),
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
-            last_written_internet_address: RwLock::new(None),
+            last_written_internet_address: Mutex::new(None),
             has_sent_availability_tx: AtomicBool::new(false),
         });
 
@@ -835,8 +834,12 @@ impl HoneyBadgerBFT {
     }
 
     fn should_handle_internet_address_announcements(&self) -> bool {
-        // todo
-        true
+        if let Ok(internet_address) = self.last_written_internet_address.lock() {
+            return internet_address.is_none();
+        }
+        // we do not send the internet address again, if the lock was poisoned (thread panicked)
+        // this should never happen
+        false
     }
 
     // handles the announcements of the internet address for other peers as blockchain transactions
@@ -856,6 +859,7 @@ impl HoneyBadgerBFT {
 
         if let Some(current_endpoint) = block_chain_client.get_devp2p_network_endpoint() {
             warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+
             // todo: we can improve performance,
             // by assuming that we are the only one who writes the internet address.
             // so we have to query this data only once, and then we can cache it.
@@ -866,9 +870,10 @@ impl HoneyBadgerBFT {
                         // if the current stored endpoint is the same as the current endpoint,
                         // we don't need to do anything.
                         // but we cache the current endpoint, so we don't have to query the db again.
-                        self.last_written_internet_address
-                            .write()
-                            .insert(current_endpoint.clone());
+                        if let Ok(mut lock) = self.last_written_internet_address.lock() {
+                            lock.insert(current_endpoint.clone());
+                        }
+
                         return Ok(());
                     }
 
@@ -879,9 +884,9 @@ impl HoneyBadgerBFT {
                         current_endpoint.port(),
                     ) {
                         Ok(()) => {
-                            self.last_written_internet_address
-                                .write()
-                                .insert(current_endpoint.clone());
+                            if let Ok(mut lock) = self.last_written_internet_address.lock() {
+                                lock.insert(current_endpoint);
+                            };
                             return Ok(());
                         }
                         Err(err) => {
@@ -950,6 +955,8 @@ impl HoneyBadgerBFT {
                 // TODO:
                 // staking by mining address could be cached.
                 // but it COULD also get changed in the contracts, during the time the node is running.
+                // most likely since a Node can get staked, and than it becomes a mining address.
+                // a good solution for this is not to do this that fequently.
                 let node_staking_address = match staking_by_mining_address(
                     engine_client,
                     &mining_address,
