@@ -120,16 +120,16 @@ impl NetworkService {
     }
 
     /// Returns the devp2p socket endpoint IP and Port information that is used to communicate with other peers.
-    pub fn get_socket(&self) -> Option<SocketAddr> {
+    pub fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
         let host = self.host.read();
-
-        if let Some(result) = host.as_ref().map(|h| h.info.read().local_endpoint.address) {
-            return Some(result);
+        
+        if let Some(result) = host.as_ref() {
+            if let Some(endpoint) = result.info.read().public_endpoint.as_ref() {
+                return Some(endpoint.address);
+            }
         }
-        {
-            warn!(target: "network", "network Socket not available");
-            return None;
-        }
+        
+        return None;
     }
 
     /// Start network IO.

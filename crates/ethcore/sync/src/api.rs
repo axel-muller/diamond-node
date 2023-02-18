@@ -800,7 +800,7 @@ impl ManageNetwork for EthSync {
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
-        self.network.get_socket()
+        self.network.get_devp2p_network_endpoint()
     }
 }
 
