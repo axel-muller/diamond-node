@@ -350,12 +350,13 @@ pub enum BadSealReason {
 }
 
 impl HbbftMessageDispatcher {
-    pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String) -> Self {
+    pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String, validator_stats_directory: String) -> Self {
         let mut result = HbbftMessageDispatcher {
             num_blocks_to_keep_on_disk,
             thread: None,
             memorial: std::sync::Arc::new(RwLock::new(HbbftMessageMemorium::new(
                 num_blocks_to_keep_on_disk,
+                validator_stats_directory,
                 block_to_keep_directory,
             ))),
         };
@@ -532,6 +533,7 @@ pub(crate) struct HbbftMessageMemorium {
 impl HbbftMessageMemorium {
     pub fn new(
         config_blocks_to_keep_on_disk: u64,
+        config_validator_stats_directory: String,
         block_to_keep_directory: String, /* seal_event_good_receiver: Receiver<SealEventGood>, seal_event_bad_receiver: Receiver<SealEventBad>,  */
     ) -> Self {
         HbbftMessageMemorium {
@@ -543,7 +545,7 @@ impl HbbftMessageMemorium {
             config_blocks_to_keep_on_disk: config_blocks_to_keep_on_disk,
             config_block_to_keep_directory: block_to_keep_directory,
             config_validator_stats_write_interval: 5,
-            config_validator_stats_directory: "data".to_string(),
+            config_validator_stats_directory,
             last_block_deleted_from_disk: 0,
             dispatched_messages: VecDeque::new(),
             dispatched_seals: VecDeque::new(),
@@ -827,6 +829,25 @@ impl HbbftMessageMemorium {
             }
         }
 
+        // this does a disc write - probably we should do this on a separate thread.
+        had_worked = had_worked | self.do_validator_stats_work();
+
+
+        return had_worked;
+    }
+
+    pub fn free_memory(&mut self, _current_block: u64) {
+        // self.signature_shares.remove(&epoch);
+    }
+
+    fn do_validator_stats_work(&mut self) -> bool {
+        
+        // this function does only the write out to hdd,
+        // so we can safely return here, if no directory is configured.
+        if self.config_validator_stats_directory.len() == 0 {
+            return false;
+        }
+
         // write the validator stats output report to disk if data is available and enough time has passed.
         //  self.timestamp_last_validator_stats_written
         // get current time.
@@ -853,7 +874,7 @@ impl HbbftMessageMemorium {
                 if let Ok(path_) = std::env::current_dir() {
                     path = path_;
                 } else {
-                    return had_worked;
+                    return false;
                 }
                 path.push(PathBuf::from(filename));
 
@@ -867,6 +888,7 @@ impl HbbftMessageMemorium {
                         } else {
                             epoch_history.exported = true;
                             self.timestamp_last_validator_stats_written = current_time;
+                            return true;
                         }
                     }
                     Err(error) => {
@@ -875,12 +897,7 @@ impl HbbftMessageMemorium {
                 }
             }
         }
-
-        return had_worked;
-    }
-
-    pub fn free_memory(&mut self, _current_block: u64) {
-        // self.signature_shares.remove(&epoch);
+        return false;
     }
 }
 

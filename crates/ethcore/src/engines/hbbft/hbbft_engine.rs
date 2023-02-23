@@ -367,6 +367,7 @@ impl IoHandler<()> for TransitionHandler {
 impl HoneyBadgerBFT {
     /// Creates an instance of the Honey Badger BFT Engine.
     pub fn new(params: HbbftParams, machine: EthereumMachine) -> Result<Arc<Self>, Error> {
+        let is_unit_test = params.is_unit_test.unwrap_or(false);
         let engine = Arc::new(HoneyBadgerBFT {
             transition_service: IoService::<()>::start("Hbbft")?,
             client: Arc::new(RwLock::new(None)),
@@ -375,6 +376,7 @@ impl HoneyBadgerBFT {
             hbbft_state: RwLock::new(HbbftState::new()),
             hbbft_message_dispatcher: HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
+                if is_unit_test { "".to_string() } else { "data".to_string() },
                 params
                     .blocks_to_keep_directory
                     .clone()
