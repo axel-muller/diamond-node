@@ -376,11 +376,11 @@ impl HoneyBadgerBFT {
             hbbft_state: RwLock::new(HbbftState::new()),
             hbbft_message_dispatcher: HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
-                if is_unit_test { "".to_string() } else { "data".to_string() },
                 params
                     .blocks_to_keep_directory
                     .clone()
                     .unwrap_or("data/messages/".to_string()),
+                if is_unit_test { "".to_string() } else { "data".to_string() }
             ),
             sealing: RwLock::new(BTreeMap::new()),
             params,
@@ -711,6 +711,8 @@ impl HoneyBadgerBFT {
             .contribute_if_contribution_threshold_reached(client.clone(), &self.signer);
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
+        } else {
+            trace!(target: "consensus", "tried to join HBBFT Epoch, but contribution threshold not reached.");
         }
         Ok(())
     }
