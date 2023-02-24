@@ -1003,13 +1003,12 @@ impl HoneyBadgerBFT {
                         // we don't have to take care of sending 2 transactions at once.
 
                         if should_handle_internet_address_announcements {
-                            self.handle_internet_address_announcements(
+                            return self.handle_internet_address_announcements(
                                 block_chain_client,
                                 engine_client,
                                 &mining_address,
                             );
                         }
-
                         return Ok(());
                     }
                     None => {
