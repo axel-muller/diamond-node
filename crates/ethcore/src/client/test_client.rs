@@ -18,11 +18,12 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrder},
         Arc,
-    }, net::{SocketAddr, IpAddr, Ipv4Addr},
+    },
 };
 
 use blockchain::{BlockReceipts, TreeRoute};
@@ -1140,9 +1141,11 @@ impl BlockChainClient for TestBlockChainClient {
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
-        return Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 30303));
+        return Some(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            30303,
+        ));
     }
-    
 }
 
 impl IoClient for TestBlockChainClient {

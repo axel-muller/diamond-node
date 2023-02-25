@@ -22,11 +22,7 @@ use network::{
     NetworkProtocolHandler, NonReservedPeerMode, PeerId, ProtocolId,
 };
 use parking_lot::RwLock;
-use std::{
-    net::{SocketAddr},
-    ops::RangeInclusive,
-    sync::Arc,
-};
+use std::{net::SocketAddr, ops::RangeInclusive, sync::Arc};
 
 struct HostHandler {
     public_url: RwLock<Option<String>>,
@@ -122,13 +118,13 @@ impl NetworkService {
     /// Returns the devp2p socket endpoint IP and Port information that is used to communicate with other peers.
     pub fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
         let host = self.host.read();
-        
+
         if let Some(result) = host.as_ref() {
             if let Some(endpoint) = result.info.read().public_endpoint.as_ref() {
                 return Some(endpoint.address);
             }
         }
-        
+
         return None;
     }
 

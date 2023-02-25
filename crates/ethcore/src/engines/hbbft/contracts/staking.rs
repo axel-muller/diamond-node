@@ -2,7 +2,7 @@ use client::EngineClient;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
 use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     str::FromStr,
 };
 use types::ids::BlockId;
@@ -52,14 +52,21 @@ pub fn get_validator_internet_address(
 
     match result {
         Ok((ip, port)) => {
-            
             // if we have a prefix in the first 8 bytes, we have an IPv6 address
-            if ip[0] > 0 || ip[1] > 0 || ip[2] > 0 || ip[3] > 0 || ip[4] > 0 || ip[5] > 0 || ip[6] > 0 || ip[7] > 0  {
+            if ip[0] > 0
+                || ip[1] > 0
+                || ip[2] > 0
+                || ip[3] > 0
+                || ip[4] > 0
+                || ip[5] > 0
+                || ip[6] > 0
+                || ip[7] > 0
+            {
                 return Ok(SocketAddr::V6(SocketAddrV6::new(
                     Ipv6Addr::from(ip),
                     port[0] as u16 * 256 + port[1] as u16,
                     0,
-                    0
+                    0,
                 )));
             } else {
                 // we also return an V4 address if we have only 0.0.0.0 as well.

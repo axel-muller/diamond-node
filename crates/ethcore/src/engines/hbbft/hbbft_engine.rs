@@ -380,7 +380,11 @@ impl HoneyBadgerBFT {
                     .blocks_to_keep_directory
                     .clone()
                     .unwrap_or("data/messages/".to_string()),
-                if is_unit_test { "".to_string() } else { "data".to_string() }
+                if is_unit_test {
+                    "".to_string()
+                } else {
+                    "data".to_string()
+                },
             ),
             sealing: RwLock::new(BTreeMap::new()),
             params,

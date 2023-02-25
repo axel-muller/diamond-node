@@ -350,7 +350,11 @@ pub enum BadSealReason {
 }
 
 impl HbbftMessageDispatcher {
-    pub fn new(num_blocks_to_keep_on_disk: u64, block_to_keep_directory: String, validator_stats_directory: String) -> Self {
+    pub fn new(
+        num_blocks_to_keep_on_disk: u64,
+        block_to_keep_directory: String,
+        validator_stats_directory: String,
+    ) -> Self {
         let mut result = HbbftMessageDispatcher {
             num_blocks_to_keep_on_disk,
             thread: None,
@@ -832,7 +836,6 @@ impl HbbftMessageMemorium {
         // this does a disc write - probably we should do this on a separate thread.
         had_worked = had_worked | self.do_validator_stats_work();
 
-
         return had_worked;
     }
 
@@ -841,7 +844,6 @@ impl HbbftMessageMemorium {
     }
 
     fn do_validator_stats_work(&mut self) -> bool {
-        
         // this function does only the write out to hdd,
         // so we can safely return here, if no directory is configured.
         if self.config_validator_stats_directory.len() == 0 {
