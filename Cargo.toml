@@ -122,7 +122,6 @@ name = "diamond-node"
 [profile.dev]
 opt-level = 1
 debug = true
-split-debuginfo = '...'  # Platform-specific.
 debug-assertions = true
 overflow-checks = true
 lto = false
@@ -139,7 +138,6 @@ opt-level = 0
 [profile.release]
 opt-level = 3
 debug = false
-split-debuginfo = '...'  # Platform-specific.
 debug-assertions = false
 overflow-checks = false
 lto = false
@@ -152,7 +150,6 @@ rpath = false
 inherits = 'release'
 opt-level = 3
 debug = true
-split-debuginfo = '...'  # Platform-specific.
 debug-assertions = false
 overflow-checks = false
 lto = false
