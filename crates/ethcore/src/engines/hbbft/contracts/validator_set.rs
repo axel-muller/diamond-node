@@ -123,7 +123,6 @@ pub fn set_validator_internet_address(
     signer_address: &Address,
     socket_addr: &SocketAddr,
 ) -> Result<(), Error> {
-    //let c = BoundContract::bind(client, BlockId::Latest, *VALIDATOR_SET_ADDRESS);
 
     let mut ip_address_array: [u8; 16] = [0; 16];
 
@@ -131,9 +130,9 @@ pub fn set_validator_internet_address(
         std::net::IpAddr::V4(ipv4) => {
             let o = ipv4.octets();
             ip_address_array[12] = o[0];
-            ip_address_array[13] = o[0];
-            ip_address_array[14] = o[0];
-            ip_address_array[15] = o[0];
+            ip_address_array[13] = o[1];
+            ip_address_array[14] = o[2];
+            ip_address_array[15] = o[3];
         }
         std::net::IpAddr::V6(ipv6) => {
             let o = ipv6.octets();
@@ -142,7 +141,6 @@ pub fn set_validator_internet_address(
     }
 
     let port = socket_addr.port();
-
     let port_array: [u8; 2] = [(port / 256) as u8, (port - (port / 256)) as u8];
 
     let send_data = validator_set_hbbft::functions::set_validator_internet_address::call(
