@@ -24,7 +24,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::{self, Read, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     ops::*,
     path::{Path, PathBuf},
     str::FromStr,
