@@ -826,8 +826,7 @@ impl HoneyBadgerBFT {
                     match send_tx_announce_availability(block_chain_client, &validator_address) {
                         Ok(()) => {}
                         Err(call_error) => {
-                            //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                            // return Err(format!("CallError during announce availability. {:?}", call_error));
+                            error!(target: "engine", "CallError during announce availability. {:?}", call_error);
                         }
                     }
                 }
@@ -838,12 +837,7 @@ impl HoneyBadgerBFT {
                 //return Ok(());
             }
             Err(e) => {
-                //return Err(format!("Error trying to send availability check: {:?}", e));
-                warn!(target: "engine", "Error trying to send availability check: {:?}", e);
-                // return Err(format!(
-                //     "Error retrieving get_validator_available_since: {:?}",
-                //     e
-                // ));
+                error!(target: "engine", "Error trying to send availability check: {:?}", e);
             }
         }
     }
