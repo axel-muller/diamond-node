@@ -962,7 +962,7 @@ impl HoneyBadgerBFT {
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                let node_staking_address = match staking_by_mining_address(
+                match staking_by_mining_address(
                     engine_client,
                     &mining_address,
                 ) {
@@ -974,7 +974,6 @@ impl HoneyBadgerBFT {
                             //trace!(target: "engine", "availability handling not a validator");
                             return Ok(());
                         }
-                        staking_address
                     }
                     Err(call_error) => {
                         error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -982,8 +981,6 @@ impl HoneyBadgerBFT {
                         return Err(message.into());
                     }
                 };
-
-                // client.as_full_client()
 
                 match engine_client.as_full_client() {
                     Some(block_chain_client) => {
@@ -998,7 +995,6 @@ impl HoneyBadgerBFT {
 
                         // since get latest nonce respects the pending transactions,
                         // we don't have to take care of sending 2 transactions at once.
-
                         if should_handle_internet_address_announcements {
                             return self.handle_internet_address_announcements(
                                 block_chain_client,
