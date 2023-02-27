@@ -4,10 +4,7 @@ use crate::{
     engines::hbbft::{
         contracts::{
             random_hbbft::set_current_seed_tx_raw,
-            staking::{
-                get_validator_internet_address,
-                staking_contract::functions::get_pool_internet_address,
-            },
+            staking::get_validator_internet_address,
             validator_set::set_validator_internet_address,
         },
         hbbft_message_memorium::BadSealReason,
