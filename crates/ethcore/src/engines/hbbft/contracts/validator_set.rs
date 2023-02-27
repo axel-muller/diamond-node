@@ -123,7 +123,6 @@ pub fn set_validator_internet_address(
     signer_address: &Address,
     socket_addr: &SocketAddr,
 ) -> Result<(), Error> {
-
     let mut ip_address_array: [u8; 16] = [0; 16];
 
     match socket_addr.ip() {

@@ -3,8 +3,7 @@ use crate::{
     client::BlockChainClient,
     engines::hbbft::{
         contracts::{
-            random_hbbft::set_current_seed_tx_raw,
-            staking::get_validator_internet_address,
+            random_hbbft::set_current_seed_tx_raw, staking::get_validator_internet_address,
             validator_set::set_validator_internet_address,
         },
         hbbft_message_memorium::BadSealReason,
@@ -962,10 +961,7 @@ impl HoneyBadgerBFT {
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                match staking_by_mining_address(
-                    engine_client,
-                    &mining_address,
-                ) {
+                match staking_by_mining_address(engine_client, &mining_address) {
                     Ok(staking_address) => {
                         if staking_address.is_zero() {
                             //TODO: here some fine handling can improve performance.
