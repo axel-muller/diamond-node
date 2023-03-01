@@ -1022,22 +1022,23 @@ impl HoneyBadgerBFT {
             None => false,
             Some(client) => {
                 // If we are not in key generation phase, return false.
-                let num_validators = match get_pending_validators(&*client) {
+                let validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
+                        // peers management: set new peers to connect.
+                        if let Ok(mut peers_management) = self.peers_management.lock() {
+                            if validators.len() == 0 {
+                                peers_management.disconnect_pending_validators();
+                            }
+                        } else {
+                            error!(target: "engine", "Could not do peers management, peers management poisoned.");
+                        }
+                        
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
                         }
-
-                        // peers management: set new peers to connect.
-                        if let Ok(mut peers_management) = self.peers_management.lock() {
-                            peers_management.connect_to_pending_validators(&validators);
-                        } else {
-                            error!(target: "engine", "Could not do peers management, peers management poisoned.");
-                        }
-
-                        validators.len()
+                        validators
                     }
                 };
 
@@ -1045,7 +1046,7 @@ impl HoneyBadgerBFT {
                 // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
                 // when attempting to initialize the synckeygen.
                 if let Ok(all_available) =
-                    all_parts_acks_available(&*client, block_timestamp, num_validators)
+                    all_parts_acks_available(&*client, block_timestamp, validators.len())
                 {
                     if all_available {
                         let null_signer = Arc::new(RwLock::new(None));
@@ -1070,6 +1071,9 @@ impl HoneyBadgerBFT {
                     if let Ok(is_pending) = is_pending_validator(&*client, &signer.address()) {
                         trace!(target: "engine", "is_pending_validator: {}", is_pending);
                         if is_pending {
+                            if let Ok(mut peers_management) = self.peers_management.lock() {
+                                peers_management.connect_to_pending_validators(&validators);
+                            }
                             let _err = self
                                 .keygen_transaction_sender
                                 .write()
@@ -1297,7 +1301,15 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
+       
+        if let Some(engineSigner) = signer.as_ref() {
+            if let Ok(mut peers_management) = self.peers_management.lock() {
+                peers_management.set_own_address(engineSigner.address());
+            }    
+        }
+
         *self.signer.write() = signer;
+
         if let Some(client) = self.client_arc() {
             warn!(target: "engine", "set_signer - update_honeybadger...");
             if let None = self.hbbft_state.write().update_honeybadger(

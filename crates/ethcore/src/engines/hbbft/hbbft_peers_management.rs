@@ -3,13 +3,14 @@ use ethereum_types::Address;
 
 
 pub struct HbbftPeersManagement {
-
+    is_syncing: bool,
+    own_address: Address
 }
 
 impl HbbftPeersManagement {
 
     pub fn new() -> Self {
-        HbbftPeersManagement {}
+        HbbftPeersManagement { is_syncing: false, own_address: Address::zero() }
     }
 
     /// if we become a pending validator, 
@@ -37,11 +38,27 @@ impl HbbftPeersManagement {
         error!("TODO: disconnect all validators");
     }
 
+    pub fn disconnect_pending_validators(&mut self) {
+
+        // disconnect's can be done in any case, 
+        // reguardless if we are syncing or not.
+
+        error!("TODO: disconnect_pending_validators");
+    }
+
     // if a key gen round fails,
     // we can disconnect from the failing validators, 
     // and only keep the connection to the current ones.
     fn disconnect_old_pending_validators(&mut self) {
 
+    }
+
+    pub fn set_is_syncing(&mut self, value: bool) {
+        self.is_syncing = value;
+    }
+
+    pub fn set_own_address(&mut self, value: Address) {
+        self.own_address = value;
     }
 
 }
