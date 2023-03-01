@@ -7,6 +7,7 @@ use crate::{
             validator_set::set_validator_internet_address,
         },
         hbbft_message_memorium::BadSealReason,
+        hbbft_peers_management::HbbftPeersManagement
     },
 };
 use block::ExecutedBlock;
@@ -91,6 +92,7 @@ pub struct HoneyBadgerBFT {
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
     last_written_internet_address: Mutex<Option<SocketAddr>>,
     has_sent_availability_tx: AtomicBool,
+    peers_management: Mutex<HbbftPeersManagement>
 }
 
 struct TransitionHandler {
@@ -389,6 +391,7 @@ impl HoneyBadgerBFT {
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
             last_written_internet_address: Mutex::new(None),
             has_sent_availability_tx: AtomicBool::new(false),
+            peers_management: Mutex::new(HbbftPeersManagement::new())
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -1026,6 +1029,14 @@ impl HoneyBadgerBFT {
                         if validators.is_empty() {
                             return false;
                         }
+
+                        // peers management: set new peers to connect.
+                        if let Ok(mut peers_management) = self.peers_management.lock() {
+                            peers_management.connect_to_pending_validators(&validators);
+                        } else {
+                            error!(target: "engine", "Could not do peers management, peers management poisoned.");
+                        }
+
                         validators.len()
                     }
                 };

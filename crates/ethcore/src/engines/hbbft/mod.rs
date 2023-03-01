@@ -3,6 +3,7 @@ mod contracts;
 mod contribution;
 mod hbbft_engine;
 mod hbbft_message_memorium;
+mod hbbft_peers_management;
 mod hbbft_state;
 mod keygen_transactions;
 mod sealing;
