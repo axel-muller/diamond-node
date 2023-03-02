@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, net::SocketAddr};
 
-use crate::{ethereum::public_key_to_address::public_key_to_address, client::EngineClient, engines::hbbft::contracts::{validator_set::staking_by_mining_address, staking::get_validator_internet_address}};
+use crate::{ethereum::public_key_to_address::public_key_to_address, client::{EngineClient, BlockChainClient}, engines::hbbft::contracts::{validator_set::{staking_by_mining_address, set_validator_internet_address}, staking::get_validator_internet_address}};
 
 use super::NodeId;
 use ethereum_types::Address;
@@ -9,6 +9,7 @@ use hbbft::NetworkInfo;
 pub struct HbbftPeersManagement {
     is_syncing: bool,
     own_address: Address,
+    last_written_internet_address: Option<SocketAddr>,
 }
 
 impl HbbftPeersManagement {
@@ -16,6 +17,7 @@ impl HbbftPeersManagement {
         HbbftPeersManagement {
             is_syncing: false,
             own_address: Address::zero(),
+            last_written_internet_address: None
         }
     }
 
@@ -116,7 +118,80 @@ impl HbbftPeersManagement {
     // if a key gen round fails,
     // we can disconnect from the failing validators,
     // and only keep the connection to the current ones.
-    fn disconnect_old_pending_validators(&mut self) {}
+    fn disconnect_old_pending_validators(&mut self) {
+
+    }
+
+    pub fn should_announce_own_internet_address(&self) -> bool {
+
+        return !self.is_syncing && self.last_written_internet_address.is_none();
+    }
+
+       // handles the announcements of the internet address for other peers as blockchain transactions
+    pub fn announce_own_internet_address(
+        &mut self,
+        block_chain_client: &dyn BlockChainClient,
+        engine_client: &dyn EngineClient,
+        node_address: &Address,
+    ) -> Result<(), String> {
+        // updates the nodes internet address if the information on the blockchain is outdated.
+
+        // check if the stored internet address differs from our.
+        // we do not need to do a special handling for 0.0.0.0, because
+        // our IP is always different to that.
+
+        warn!(target: "engine", "checking if internet address needs to be updated.");
+
+        if let Some(current_endpoint) = block_chain_client.get_devp2p_network_endpoint() {
+            warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+
+            // todo: we can improve performance,
+            // by assuming that we are the only one who writes the internet address.
+            // so we have to query this data only once, and then we can cache it.
+            match get_validator_internet_address(engine_client, &node_address) {
+                Ok(validator_internet_address) => {
+                    warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                    if validator_internet_address.eq(&current_endpoint) {
+                        // if the current stored endpoint is the same as the current endpoint,
+                        // we don't need to do anything.
+                        // but we cache the current endpoint, so we don't have to query the db again.
+                        self.last_written_internet_address = Some(current_endpoint);
+                        return Ok(());
+                    }
+
+                    match set_validator_internet_address(
+                        block_chain_client,
+                        &node_address,
+                        &current_endpoint,
+                    ) {
+                        Ok(()) => {
+                            self.last_written_internet_address = Some(current_endpoint);
+                            return Ok(());
+                        }
+                        Err(err) => {
+                            error!(target: "engine", "unable to set validator internet address: {:?}", err);
+                            return Err(format!(
+                                "unable to set validator internet address: {:?}",
+                                err
+                            ));
+                        }
+                    }
+                }
+                Err(err) => {
+                    error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
+                    return Err(format!(
+                        "unable to retrieve validator internet address: {:?}",
+                        err
+                    ));
+                }
+            }
+        } else {
+            // devp2p endpoint not available.
+            warn!(target: "engine", "devp2p endpoint not available.");
+            return Ok(());
+        }
+    }
+
 
     pub fn set_is_syncing(&mut self, value: bool) {
         self.is_syncing = value;

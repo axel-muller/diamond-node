@@ -90,7 +90,6 @@ pub struct HoneyBadgerBFT {
     message_counter: RwLock<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
-    last_written_internet_address: Mutex<Option<SocketAddr>>,
     has_sent_availability_tx: AtomicBool,
     peers_management: Mutex<HbbftPeersManagement>,
 }
@@ -389,7 +388,6 @@ impl HoneyBadgerBFT {
             message_counter: RwLock::new(0),
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
-            last_written_internet_address: Mutex::new(None),
             has_sent_availability_tx: AtomicBool::new(false),
             peers_management: Mutex::new(HbbftPeersManagement::new()),
         });
@@ -842,84 +840,15 @@ impl HoneyBadgerBFT {
     }
 
     fn should_handle_internet_address_announcements(&self) -> bool {
-        if let Ok(internet_address) = self.last_written_internet_address.lock() {
-            return internet_address.is_none();
+
+        if let Ok(peers) = self.peers_management.lock() {
+            return peers.should_announce_own_internet_address();
         }
-        // we do not send the internet address again, if the lock was poisoned (thread panicked)
-        // this should never happen
+
         false
     }
 
-    // handles the announcements of the internet address for other peers as blockchain transactions
-    fn handle_internet_address_announcements(
-        &self,
-        block_chain_client: &dyn BlockChainClient,
-        engine_client: &dyn EngineClient,
-        node_address: &H160,
-    ) -> Result<(), String> {
-        // updates the nodes internet address if the information on the blockchain is outdated.
-
-        // check if the stored internet address differs from our.
-        // we do not need to do a special handling for 0.0.0.0, because
-        // our IP is always different to that.
-
-        warn!(target: "engine", "checking if internet address needs to be updated.");
-
-        if let Some(current_endpoint) = block_chain_client.get_devp2p_network_endpoint() {
-            warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
-
-            // todo: we can improve performance,
-            // by assuming that we are the only one who writes the internet address.
-            // so we have to query this data only once, and then we can cache it.
-            match get_validator_internet_address(engine_client, &node_address) {
-                Ok(validator_internet_address) => {
-                    warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
-                    if validator_internet_address.eq(&current_endpoint) {
-                        // if the current stored endpoint is the same as the current endpoint,
-                        // we don't need to do anything.
-                        // but we cache the current endpoint, so we don't have to query the db again.
-                        if let Ok(mut lock) = self.last_written_internet_address.lock() {
-                            *lock = Some(current_endpoint.clone());
-                        }
-
-                        return Ok(());
-                    }
-
-                    match set_validator_internet_address(
-                        block_chain_client,
-                        &node_address,
-                        &current_endpoint,
-                    ) {
-                        Ok(()) => {
-                            if let Ok(mut lock) = self.last_written_internet_address.lock() {
-                                *lock = Some(current_endpoint);
-                            };
-                            return Ok(());
-                        }
-                        Err(err) => {
-                            error!(target: "engine", "unable to set validator internet address: {:?}", err);
-                            return Err(format!(
-                                "unable to set validator internet address: {:?}",
-                                err
-                            ));
-                        }
-                    }
-                }
-                Err(err) => {
-                    error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
-                    return Err(format!(
-                        "unable to retrieve validator internet address: {:?}",
-                        err
-                    ));
-                }
-            }
-        } else {
-            // devp2p endpoint not available.
-            warn!(target: "engine", "devp2p endpoint not available.");
-            return Ok(());
-        }
-    }
-
+ 
     // some actions are required for hbbft validator nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
@@ -995,11 +924,9 @@ impl HoneyBadgerBFT {
                         // since get latest nonce respects the pending transactions,
                         // we don't have to take care of sending 2 transactions at once.
                         if should_handle_internet_address_announcements {
-                            return self.handle_internet_address_announcements(
-                                block_chain_client,
-                                engine_client,
-                                &mining_address,
-                            );
+                            if let Ok(mut peers_management) = self.peers_management.lock() {
+                                peers_management.announce_own_internet_address(block_chain_client, engine_client, &mining_address);
+                            }
                         }
                         return Ok(());
                     }
