@@ -23,6 +23,8 @@
 pub mod denominations;
 /// Export the ethash module.
 pub mod ethash;
+/// public key to address function
+pub mod public_key_to_address;
 
 pub use self::{denominations::*, ethash::Ethash};
 

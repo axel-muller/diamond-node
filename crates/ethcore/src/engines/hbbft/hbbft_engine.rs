@@ -1287,7 +1287,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();
-            match state.update_honeybadger(client, &self.signer, BlockId::Latest, true) {
+            match state.update_honeybadger(client, &self.signer, &self.peers_management, BlockId::Latest, true) {
                 Some(_) => {
                     let posdao_epoch = state.get_current_posdao_epoch();
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
@@ -1315,6 +1315,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,
                 &self.signer,
+                &self.peers_management,
                 BlockId::Latest,
                 true,
             ) {
@@ -1531,6 +1532,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             match state.update_honeybadger(
                 client.clone(),
                 &self.signer,
+                &self.peers_management,
                 BlockId::Hash(block_hash.clone()),
                 false,
             ) {

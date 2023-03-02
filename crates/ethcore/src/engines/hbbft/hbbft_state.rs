@@ -10,7 +10,7 @@ use parking_lot::RwLock;
 use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 use types::{header::Header, ids::BlockId};
 
@@ -21,7 +21,7 @@ use super::{
         validator_set::ValidatorType,
     },
     contribution::Contribution,
-    NodeId,
+    NodeId, hbbft_peers_management::HbbftPeersManagement,
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -66,6 +66,7 @@ impl HbbftState {
         &mut self,
         client: Arc<dyn EngineClient>,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
+        peers_management_mutex: &Mutex<HbbftPeersManagement>,
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
@@ -108,14 +109,24 @@ impl HbbftState {
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            // we can disconnect the peers here.
+            if let Ok(mut peers_management) = peers_management_mutex.lock() {
+                peers_management.disconnect_all_validators();
+            }
             return Some(());
         }
 
         let network_info = synckeygen_to_network_info(&synckeygen, pks, sks)?;
         self.network_info = Some(network_info.clone());
-        self.honey_badger = Some(self.new_honey_badger(network_info)?);
+        self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
 
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
+
+        if let Ok(mut peers_management) = peers_management_mutex.lock() {
+            
+            peers_management.connect_to_current_validators(&network_info);
+        }
+
         Some(())
     }
 
