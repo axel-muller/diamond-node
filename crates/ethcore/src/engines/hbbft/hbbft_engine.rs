@@ -7,7 +7,7 @@ use crate::{
             validator_set::set_validator_internet_address,
         },
         hbbft_message_memorium::BadSealReason,
-        hbbft_peers_management::HbbftPeersManagement
+        hbbft_peers_management::HbbftPeersManagement,
     },
 };
 use block::ExecutedBlock;
@@ -92,7 +92,7 @@ pub struct HoneyBadgerBFT {
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
     last_written_internet_address: Mutex<Option<SocketAddr>>,
     has_sent_availability_tx: AtomicBool,
-    peers_management: Mutex<HbbftPeersManagement>
+    peers_management: Mutex<HbbftPeersManagement>,
 }
 
 struct TransitionHandler {
@@ -391,7 +391,7 @@ impl HoneyBadgerBFT {
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
             last_written_internet_address: Mutex::new(None),
             has_sent_availability_tx: AtomicBool::new(false),
-            peers_management: Mutex::new(HbbftPeersManagement::new())
+            peers_management: Mutex::new(HbbftPeersManagement::new()),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -1033,7 +1033,7 @@ impl HoneyBadgerBFT {
                         } else {
                             error!(target: "engine", "Could not do peers management, peers management poisoned.");
                         }
-                        
+
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
@@ -1287,7 +1287,13 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();
-            match state.update_honeybadger(client, &self.signer, &self.peers_management, BlockId::Latest, true) {
+            match state.update_honeybadger(
+                client,
+                &self.signer,
+                &self.peers_management,
+                BlockId::Latest,
+                true,
+            ) {
                 Some(_) => {
                     let posdao_epoch = state.get_current_posdao_epoch();
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
@@ -1301,11 +1307,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
-       
         if let Some(engineSigner) = signer.as_ref() {
             if let Ok(mut peers_management) = self.peers_management.lock() {
                 peers_management.set_own_address(engineSigner.address());
-            }    
+            }
         }
 
         *self.signer.write() = signer;

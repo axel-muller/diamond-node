@@ -21,7 +21,8 @@ use super::{
         validator_set::ValidatorType,
     },
     contribution::Contribution,
-    NodeId, hbbft_peers_management::HbbftPeersManagement,
+    hbbft_peers_management::HbbftPeersManagement,
+    NodeId,
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -123,7 +124,6 @@ impl HbbftState {
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
 
         if let Ok(mut peers_management) = peers_management_mutex.lock() {
-            
             peers_management.connect_to_current_validators(&network_info);
         }
 
