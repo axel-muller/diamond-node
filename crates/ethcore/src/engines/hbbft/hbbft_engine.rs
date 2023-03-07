@@ -840,7 +840,6 @@ impl HoneyBadgerBFT {
     }
 
     fn should_handle_internet_address_announcements(&self) -> bool {
-
         if let Ok(peers) = self.peers_management.lock() {
             return peers.should_announce_own_internet_address();
         }
@@ -848,7 +847,6 @@ impl HoneyBadgerBFT {
         false
     }
 
- 
     // some actions are required for hbbft validator nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
@@ -925,7 +923,11 @@ impl HoneyBadgerBFT {
                         // we don't have to take care of sending 2 transactions at once.
                         if should_handle_internet_address_announcements {
                             if let Ok(mut peers_management) = self.peers_management.lock() {
-                                peers_management.announce_own_internet_address(block_chain_client, engine_client, &mining_address);
+                                peers_management.announce_own_internet_address(
+                                    block_chain_client,
+                                    engine_client,
+                                    &mining_address,
+                                );
                             }
                         }
                         return Ok(());

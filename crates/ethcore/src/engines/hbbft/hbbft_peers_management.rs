@@ -1,6 +1,13 @@
-use std::{sync::Arc, net::SocketAddr};
+use std::{net::SocketAddr, sync::Arc};
 
-use crate::{ethereum::public_key_to_address::public_key_to_address, client::{EngineClient, BlockChainClient}, engines::hbbft::contracts::{validator_set::{staking_by_mining_address, set_validator_internet_address}, staking::get_validator_internet_address}};
+use crate::{
+    client::{BlockChainClient, EngineClient},
+    engines::hbbft::contracts::{
+        staking::get_validator_internet_address,
+        validator_set::{set_validator_internet_address, staking_by_mining_address},
+    },
+    ethereum::public_key_to_address::public_key_to_address,
+};
 
 use super::NodeId;
 use ethereum_types::Address;
@@ -17,7 +24,7 @@ impl HbbftPeersManagement {
         HbbftPeersManagement {
             is_syncing: false,
             own_address: Address::zero(),
-            last_written_internet_address: None
+            last_written_internet_address: None,
         }
     }
 
@@ -49,7 +56,11 @@ impl HbbftPeersManagement {
     // that we are a current valudator,
     // then we have to figure out the current devP2P endpoints
     // from the smart contract and connect to them.
-    pub fn connect_to_current_validators(&mut self, network_info: &NetworkInfo<NodeId>, client_arc: &Arc<dyn EngineClient>) {
+    pub fn connect_to_current_validators(
+        &mut self,
+        network_info: &NetworkInfo<NodeId>,
+        client_arc: &Arc<dyn EngineClient>,
+    ) {
         if self.should_not_connect() {
             return;
         }
@@ -63,14 +74,13 @@ impl HbbftPeersManagement {
 
         let client = client_arc.as_ref();
 
-        let block_chain_client = 
-            match client.as_full_client() {
-                Some(full_client) => full_client,
-                None => {
-                    error!(target: "Engine", "could not retrieve BlockChainClient for adding Internet Addresses.");
-                    return;
-                }
-            };
+        let block_chain_client = match client.as_full_client() {
+            Some(full_client) => full_client,
+            None => {
+                error!(target: "Engine", "could not retrieve BlockChainClient for adding Internet Addresses.");
+                return;
+            }
+        };
 
         for node in ids.iter() {
             //let h512 = &node.0;
@@ -91,7 +101,8 @@ impl HbbftPeersManagement {
                         continue;
                     }
 
-                    let socket_addr = match get_validator_internet_address(client, &staking_address) {
+                    let socket_addr = match get_validator_internet_address(client, &staking_address)
+                    {
                         Ok(socket_addr) => socket_addr,
                         Err(error) => {
                             error!(target: "engine", "unable to retrieve internet address for Node ( Public: {}, Validator Address: {}, pool address: {}. call Error: {:?}",node.0, address, staking_address, error);
@@ -105,12 +116,11 @@ impl HbbftPeersManagement {
             };
         }
 
-        // after we have retrieved all the peer information, 
+        // after we have retrieved all the peer information,
         // we now can lock the reserved_peers_management and add our new peers.
 
         let lock = block_chain_client.reserved_peers_management().lock();
 
-        
         // if let Some(mut reserved_peers_management) = block_chain_client.reserved_peers_management().lock() {
         //     reserved_peers_management.
         // }
@@ -137,16 +147,13 @@ impl HbbftPeersManagement {
     // if a key gen round fails,
     // we can disconnect from the failing validators,
     // and only keep the connection to the current ones.
-    fn disconnect_old_pending_validators(&mut self) {
-
-    }
+    fn disconnect_old_pending_validators(&mut self) {}
 
     pub fn should_announce_own_internet_address(&self) -> bool {
-
         return !self.is_syncing && self.last_written_internet_address.is_none();
     }
 
-       // handles the announcements of the internet address for other peers as blockchain transactions
+    // handles the announcements of the internet address for other peers as blockchain transactions
     pub fn announce_own_internet_address(
         &mut self,
         block_chain_client: &dyn BlockChainClient,
@@ -161,7 +168,11 @@ impl HbbftPeersManagement {
 
         warn!(target: "engine", "checking if internet address needs to be updated.");
 
-        let current_endpoint = if let Some(peers_management) =  block_chain_client.reserved_peers_management().lock().as_ref() {
+        let current_endpoint = if let Some(peers_management) = block_chain_client
+            .reserved_peers_management()
+            .lock()
+            .as_ref()
+        {
             if let Some(endpoint) = peers_management.get_devp2p_network_endpoint() {
                 endpoint
             } else {
@@ -207,7 +218,7 @@ impl HbbftPeersManagement {
                         ));
                     }
                 }
-            } 
+            }
             Err(err) => {
                 error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
                 return Err(format!(
@@ -216,7 +227,6 @@ impl HbbftPeersManagement {
                 ));
             }
         }
-
     }
 
     pub fn set_is_syncing(&mut self, value: bool) {

@@ -36,7 +36,7 @@ use ethtrie;
 use hash::keccak;
 use itertools::Itertools;
 use kvdb::DBValue;
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{Mutex, RwLock};
 use rlp::RlpStream;
 use rustc_hex::FromHex;
 use types::{
@@ -80,7 +80,7 @@ use stats::{PrometheusMetrics, PrometheusRegistry};
 use trace::LocalizedTrace;
 use verification::queue::{kind::blocks::Unverified, QueueInfo};
 
-use super::{ReservedPeersManagement, registry::logs::Reserved};
+use super::{registry::logs::Reserved, ReservedPeersManagement};
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -204,7 +204,7 @@ impl TestBlockChainClient {
             disabled: AtomicBool::new(false),
             error_on_logs: RwLock::new(None),
             new_transaction_hashes: RwLock::new(None),
-            reserved_peers_management: Mutex::new(None)
+            reserved_peers_management: Mutex::new(None),
         };
 
         // insert genesis hash.
