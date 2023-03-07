@@ -541,10 +541,9 @@ impl HoneyBadgerBFT {
                             Some(f.kind.clone()),
                         );
                     }
-
-                    self.process_step(client, step, &network_info);
-                    self.join_hbbft_epoch()?;
                 }
+                self.process_step(client, step, &network_info);
+                self.join_hbbft_epoch()?;
             }
             Ok(None) => {}
             Err(err) => {
