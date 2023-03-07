@@ -3,6 +3,7 @@ use std::str::FromStr;
 use ethereum_types::{Address, H512};
 use tiny_keccak::Hasher;
 
+/// Returns the Ethereum Address for the given ECDSA public key.
 pub fn public_key_to_address(public_key: &H512) -> Address {
     let mut keccak = tiny_keccak::Keccak::v256();
 
