@@ -16,7 +16,7 @@
 
 //! Traits implemented by client.
 
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr, sync::{Arc}};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;
@@ -26,6 +26,7 @@ use ethereum_types::{Address, H256, H512, U256};
 use evm::Schedule;
 use itertools::Itertools;
 use kvdb::DBValue;
+use parking_lot::Mutex;
 use types::{
     basic_account::BasicAccount,
     block_status::BlockStatus,
@@ -519,8 +520,8 @@ pub trait BlockChainClient:
     /// Returns true, if underlying import queue is processing possible fork at the moment
     fn is_processing_fork(&self) -> bool;
 
-    /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
+    // returns the reserved peer management that allow to read and manipulate the devp2p peer communication. 
+    fn reserved_peers_management(&self) ->  &Mutex<Option<Box<dyn ReservedPeersManagement>>>;
 }
 
 /// The data required for a `Client` to create a transaction.

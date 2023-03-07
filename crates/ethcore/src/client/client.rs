@@ -2881,16 +2881,8 @@ impl BlockChainClient for Client {
             .is_processing_fork(&chain.best_block_hash(), &chain)
     }
 
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
-        let lock = self.reserved_peers_management.lock();
-
-        if let Some(management) = lock.as_ref() {
-            return management.get_devp2p_network_endpoint();
-        } else {
-            warn!("Reserved peers management lock is not initialized");
-        }
-
-        return None;
+    fn reserved_peers_management(&self) -> &Mutex<Option<Box<dyn ReservedPeersManagement>>> {
+        &self.reserved_peers_management
     }
 }
 

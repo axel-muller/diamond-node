@@ -63,6 +63,15 @@ impl HbbftPeersManagement {
 
         let client = client_arc.as_ref();
 
+        let block_chain_client = 
+            match client.as_full_client() {
+                Some(full_client) => full_client,
+                None => {
+                    error!(target: "Engine", "could not retrieve BlockChainClient for adding Internet Addresses.");
+                    return;
+                }
+            };
+
         for node in ids.iter() {
             //let h512 = &node.0;
 
@@ -95,6 +104,16 @@ impl HbbftPeersManagement {
                 }
             };
         }
+
+        // after we have retrieved all the peer information, 
+        // we now can lock the reserved_peers_management and add our new peers.
+
+        let lock = block_chain_client.reserved_peers_management().lock();
+
+        
+        // if let Some(mut reserved_peers_management) = block_chain_client.reserved_peers_management().lock() {
+        //     reserved_peers_management.
+        // }
 
         warn!(target: "engine", "gathering Endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
 
@@ -142,56 +161,63 @@ impl HbbftPeersManagement {
 
         warn!(target: "engine", "checking if internet address needs to be updated.");
 
-        if let Some(current_endpoint) = block_chain_client.get_devp2p_network_endpoint() {
-            warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+        let current_endpoint = if let Some(peers_management) =  block_chain_client.reserved_peers_management().lock().as_ref() {
+            if let Some(endpoint) = peers_management.get_devp2p_network_endpoint() {
+                endpoint
+            } else {
+                warn!(target: "engine", "devp2p endpoint not available.");
+                return Ok(());
+            }
+        } else {
+            error!(target: "engine", "Unable to lock reserved_peers_management");
+            return Err("Unable to lock reserved_peers_management".to_string());
+        };
+        //let peers_management =
 
-            // todo: we can improve performance,
-            // by assuming that we are the only one who writes the internet address.
-            // so we have to query this data only once, and then we can cache it.
-            match get_validator_internet_address(engine_client, &node_address) {
-                Ok(validator_internet_address) => {
-                    warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
-                    if validator_internet_address.eq(&current_endpoint) {
-                        // if the current stored endpoint is the same as the current endpoint,
-                        // we don't need to do anything.
-                        // but we cache the current endpoint, so we don't have to query the db again.
+        warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+
+        // todo: we can improve performance,
+        // by assuming that we are the only one who writes the internet address.
+        // so we have to query this data only once, and then we can cache it.
+        match get_validator_internet_address(engine_client, &node_address) {
+            Ok(validator_internet_address) => {
+                warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                if validator_internet_address.eq(&current_endpoint) {
+                    // if the current stored endpoint is the same as the current endpoint,
+                    // we don't need to do anything.
+                    // but we cache the current endpoint, so we don't have to query the db again.
+                    self.last_written_internet_address = Some(current_endpoint);
+                    return Ok(());
+                }
+
+                match set_validator_internet_address(
+                    block_chain_client,
+                    &node_address,
+                    &current_endpoint,
+                ) {
+                    Ok(()) => {
                         self.last_written_internet_address = Some(current_endpoint);
                         return Ok(());
                     }
-
-                    match set_validator_internet_address(
-                        block_chain_client,
-                        &node_address,
-                        &current_endpoint,
-                    ) {
-                        Ok(()) => {
-                            self.last_written_internet_address = Some(current_endpoint);
-                            return Ok(());
-                        }
-                        Err(err) => {
-                            error!(target: "engine", "unable to set validator internet address: {:?}", err);
-                            return Err(format!(
-                                "unable to set validator internet address: {:?}",
-                                err
-                            ));
-                        }
+                    Err(err) => {
+                        error!(target: "engine", "unable to set validator internet address: {:?}", err);
+                        return Err(format!(
+                            "unable to set validator internet address: {:?}",
+                            err
+                        ));
                     }
                 }
-                Err(err) => {
-                    error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
-                    return Err(format!(
-                        "unable to retrieve validator internet address: {:?}",
-                        err
-                    ));
-                }
+            } 
+            Err(err) => {
+                error!(target: "engine", "unable to retrieve validator internet address: {:?}", err);
+                return Err(format!(
+                    "unable to retrieve validator internet address: {:?}",
+                    err
+                ));
             }
-        } else {
-            // devp2p endpoint not available.
-            warn!(target: "engine", "devp2p endpoint not available.");
-            return Ok(());
         }
-    }
 
+    }
 
     pub fn set_is_syncing(&mut self, value: bool) {
         self.is_syncing = value;
