@@ -36,7 +36,7 @@ use ethtrie;
 use hash::keccak;
 use itertools::Itertools;
 use kvdb::DBValue;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use rlp::RlpStream;
 use rustc_hex::FromHex;
 use types::{
@@ -79,6 +79,8 @@ use state_db::StateDB;
 use stats::{PrometheusMetrics, PrometheusRegistry};
 use trace::LocalizedTrace;
 use verification::queue::{kind::blocks::Unverified, QueueInfo};
+
+use super::{ReservedPeersManagement, registry::logs::Reserved};
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -130,6 +132,8 @@ pub struct TestBlockChainClient {
     pub disabled: AtomicBool,
     /// Transaction hashes producer
     pub new_transaction_hashes: RwLock<Option<crossbeam_channel::Sender<H256>>>,
+
+    reserved_peers_management: Mutex<Option<Box<dyn ReservedPeersManagement>>>,
 }
 
 /// Used for generating test client blocks.
@@ -200,6 +204,7 @@ impl TestBlockChainClient {
             disabled: AtomicBool::new(false),
             error_on_logs: RwLock::new(None),
             new_transaction_hashes: RwLock::new(None),
+            reserved_peers_management: Mutex::new(None)
         };
 
         // insert genesis hash.
@@ -1140,11 +1145,9 @@ impl BlockChainClient for TestBlockChainClient {
     }
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
-    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
-        return Some(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            30303,
-        ));
+
+    fn reserved_peers_management(&self) -> &Mutex<Option<Box<dyn ReservedPeersManagement>>> {
+        &self.reserved_peers_management
     }
 }
 
