@@ -32,7 +32,6 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
-    net::SocketAddr,
     ops::{BitXor, DerefMut},
     sync::{atomic::AtomicBool, Arc, Mutex, Weak},
     time::Duration,
@@ -920,11 +919,13 @@ impl HoneyBadgerBFT {
                         // we don't have to take care of sending 2 transactions at once.
                         if should_handle_internet_address_announcements {
                             if let Ok(mut peers_management) = self.peers_management.lock() {
-                                peers_management.announce_own_internet_address(
+                                if let Err(error) = peers_management.announce_own_internet_address(
                                     block_chain_client,
                                     engine_client,
                                     &mining_address,
-                                );
+                                ) {
+                                    error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
+                                }
                             }
                         }
                         return Ok(());
@@ -1233,9 +1234,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
-        if let Some(engineSigner) = signer.as_ref() {
+        if let Some(engine_signer) = signer.as_ref() {
             if let Ok(mut peers_management) = self.peers_management.lock() {
-                peers_management.set_own_address(engineSigner.address());
+                peers_management.set_own_address(engine_signer.address());
             }
         }
 

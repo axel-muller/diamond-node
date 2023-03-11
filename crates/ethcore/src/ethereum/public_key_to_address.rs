@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use ethereum_types::{Address, H512};
 use tiny_keccak::Hasher;
 

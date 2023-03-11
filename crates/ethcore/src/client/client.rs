@@ -19,7 +19,6 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     convert::TryFrom,
     io::{BufRead, BufReader},
-    net::SocketAddr,
     str::{from_utf8, FromStr},
     sync::{
         atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering as AtomicOrdering},
