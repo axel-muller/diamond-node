@@ -181,7 +181,7 @@ impl IoHandler<()> for TransitionHandler {
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
         if timer == ENGINE_TIMEOUT_TOKEN {
-            //trace!(target: "consensus", "Honey Badger IoHandler timeout called");
+            trace!(target: "consensus", "Honey Badger IoHandler timeout called");
             // The block may be complete, but not have been ready to seal - trigger a new seal attempt.
             // TODO: In theory, that should not happen. The seal is ready exactly when the sealing entry is `Complete`.
             if let Some(ref weak) = *self.client.read() {
@@ -519,8 +519,8 @@ impl HoneyBadgerBFT {
         self.hbbft_message_dispatcher.on_message_received(&message);
 
         let message_block = message.epoch();
-        let mut hbbft_state_lock = self.hbbft_state.write();
-        match hbbft_state_lock.process_message(
+
+        match self.hbbft_state.write().process_message(
             client.clone(),
             &self.signer,
             sender_id,
@@ -542,7 +542,7 @@ impl HoneyBadgerBFT {
                     }
                 }
                 self.process_step(client, step, &network_info);
-                self.join_hbbft_epoch(hbbft_state_lock.deref_mut())?;
+                self.join_hbbft_epoch()?;
             }
             Ok(None) => {}
             Err(err) => {
@@ -698,7 +698,7 @@ impl HoneyBadgerBFT {
 
     /// Conditionally joins the current hbbft epoch if the number of received
     /// contributions exceeds the maximum number of tolerated faulty nodes.
-    fn join_hbbft_epoch(&self, hbbft_state: &mut HbbftState) -> Result<(), EngineError> {
+    fn join_hbbft_epoch(&self) -> Result<(), EngineError> {
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
         if self.is_syncing(&client) {
             trace!(target: "consensus", "tried to join HBBFT Epoch, but still syncing.");
@@ -706,7 +706,7 @@ impl HoneyBadgerBFT {
         }
 
         
-        let step = hbbft_state
+        let step = self.hbbft_state.write()
             .contribute_if_contribution_threshold_reached(client.clone(), &self.signer);
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
@@ -772,8 +772,8 @@ impl HoneyBadgerBFT {
 
     fn replay_cached_messages(&self) -> Option<()> {
         let client = self.client_arc()?;
-        let mut hbbft_state_write_lock = self.hbbft_state.write();
-        let steps = hbbft_state_write_lock.replay_cached_messages(client.clone());
+        
+        let steps = self.hbbft_state.write().replay_cached_messages(client.clone());
         let mut processed_step = false;
         if let Some((steps, network_info)) = steps {
             for step in steps {
@@ -789,7 +789,7 @@ impl HoneyBadgerBFT {
         }
 
         if processed_step {
-            if let Err(e) = self.join_hbbft_epoch(hbbft_state_write_lock.deref_mut()) {
+            if let Err(e) = self.join_hbbft_epoch() {
                 error!(target: "engine", "Error trying to join epoch: {}", e);
             }
         }
