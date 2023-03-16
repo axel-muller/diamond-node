@@ -772,8 +772,24 @@ impl HoneyBadgerBFT {
 
     fn replay_cached_messages(&self) -> Option<()> {
         let client = self.client_arc()?;
+
+        // replaying cached messages is not so important that it cause deadlocks
+        // instead we gently try to get a lock for 10 ms, and if we do not get a lock, 
+        // we will just try again in the next tick.
+        // we could try to do some optimizations here to improve performance.
+
+        let steps = 
+            match self.hbbft_state.try_write_for(Duration::from_millis(10)) {
+                Some(mut hbbft_state_lock) => {
+                    hbbft_state_lock.replay_cached_messages(client.clone())
+                },
+                None => {
+                    trace!(target: "engine", "could not acquire write lock for replaying cached messages, stepping back..",);
+                    return None;
+                },
+            };
+
         
-        let steps = self.hbbft_state.write().replay_cached_messages(client.clone());
         let mut processed_step = false;
         if let Some((steps, network_info)) = steps {
             for step in steps {
