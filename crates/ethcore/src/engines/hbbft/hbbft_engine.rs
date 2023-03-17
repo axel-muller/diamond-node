@@ -200,7 +200,7 @@ impl IoHandler<()> for TransitionHandler {
                     timer_duration = self.min_block_time_remaining(c.clone());
 
                     // If the minimum block time has passed we are ready to trigger new blocks.
-                    if timer_duration == Duration::from_secs(0) {
+                    if timer_duration == Duration::from_secs(0) {                    
                         // Always create blocks if we are in the keygen phase.
                         self.engine.start_hbbft_epoch_if_next_phase();
 
@@ -1240,6 +1240,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 Some(_) => {
                     let posdao_epoch = state.get_current_posdao_epoch();
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
+                    // we got all infos from the state, we can drop the lock.
+                    std::mem::drop(state);
                     warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
                     self.hbbft_message_dispatcher
                         .report_new_epoch(posdao_epoch, epoch_start_block);
