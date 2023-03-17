@@ -520,13 +520,15 @@ impl HoneyBadgerBFT {
 
         let message_block = message.epoch();
 
-        match self.hbbft_state.write().process_message(
+        let mut lock = self.hbbft_state.write(); 
+        match lock.process_message(
             client.clone(),
             &self.signer,
             sender_id,
             message,
         ) {
             Ok(Some((step, network_info))) => {
+                std::mem::drop(lock);
                 if step.fault_log.0.is_empty() {
                     //TODO:  report good message here.
                     self.hbbft_message_dispatcher
@@ -546,6 +548,7 @@ impl HoneyBadgerBFT {
             }
             Ok(None) => {}
             Err(err) => {
+                std::mem::drop(lock);
                 // this error is thrown on a step error.
                 warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, &sender_id, err);
                 self.hbbft_message_dispatcher.report_message_faulty(
