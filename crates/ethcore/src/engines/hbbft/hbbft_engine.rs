@@ -86,7 +86,7 @@ pub struct HoneyBadgerBFT {
     hbbft_message_dispatcher: HbbftMessageDispatcher,
     sealing: RwLock<BTreeMap<BlockNumber, Sealing>>,
     params: HbbftParams,
-    message_counter: RwLock<usize>,
+    message_counter: Mutex<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
     has_sent_availability_tx: AtomicBool,
@@ -384,7 +384,7 @@ impl HoneyBadgerBFT {
             ),
             sealing: RwLock::new(BTreeMap::new()),
             params,
-            message_counter: RwLock::new(0),
+            message_counter: Mutex::new(0),
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
             has_sent_availability_tx: AtomicBool::new(false),
@@ -684,7 +684,14 @@ impl HoneyBadgerBFT {
         step: HoneyBadgerStep,
         network_info: &NetworkInfo<NodeId>,
     ) {
-        let mut message_counter = self.message_counter.write();
+        let mut message_counter = match  self.message_counter.lock() {
+            Ok(val) => val,
+            Err(_) =>  {
+                warn!(target: "engine", "process step message_counter is poisoned.");
+                return;
+            },
+        };
+
         let messages = step.messages.into_iter().map(|msg| {
             *message_counter += 1;
             TargetedMessage {
@@ -693,6 +700,7 @@ impl HoneyBadgerBFT {
             }
         });
         self.dispatch_messages(&client, messages, network_info);
+        std::mem::drop(message_counter);
         self.process_output(client, step.output, network_info);
     }
 
