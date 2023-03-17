@@ -206,7 +206,7 @@ impl IoHandler<()> for TransitionHandler {
 
                         // If the maximum block time has been reached we trigger a new block in any case.
                         if self.max_block_time_remaining(c.clone()) == Duration::from_secs(0) {
-                            self.engine.start_hbbft_epoch(c);
+                            self.engine.start_hbbft_epoch(c, false);
                         }
 
                         // Transactions may have been submitted during creation of the last block, trigger the
@@ -724,14 +724,23 @@ impl HoneyBadgerBFT {
         Ok(())
     }
 
-    fn start_hbbft_epoch(&self, client: Arc<dyn EngineClient>) {
+    fn start_hbbft_epoch(&self, client: Arc<dyn EngineClient>, urgent: bool) {
         if self.is_syncing(&client) {
             return;
         }
-        let step = self
-            .hbbft_state
-            .write()
-            .try_send_contribution(client.clone(), &self.signer);
+
+        let mut lock = 
+        if urgent {self.hbbft_state.write() } else {
+            if let Some(try_lock) = self.hbbft_state.try_write_for(std::time::Duration::from_millis(10)) {
+                try_lock
+            } else {
+                return;
+            }
+        };
+        
+        let step = lock.try_send_contribution(client.clone(), &self.signer);
+        std::mem::drop(lock);
+
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
         }
@@ -772,7 +781,7 @@ impl HoneyBadgerBFT {
 
                 // If current time larger than phase start time, start a new block.
                 if genesis_transition_time.as_u64() < unix_now_secs() {
-                    self.start_hbbft_epoch(client);
+                    self.start_hbbft_epoch(client, false);
                 }
             }
         }
@@ -1165,7 +1174,7 @@ impl HoneyBadgerBFT {
     fn start_hbbft_epoch_if_ready(&self) {
         if let Some(client) = self.client_arc() {
             if self.transaction_queue_and_time_thresholds_reached(&client) {
-                self.start_hbbft_epoch(client);
+                self.start_hbbft_epoch(client, false);
             }
         }
     }
