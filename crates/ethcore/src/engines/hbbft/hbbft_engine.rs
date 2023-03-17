@@ -1488,6 +1488,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             ) {
                 Some(_) => {
                     let new_posdao_epoch = state.get_current_posdao_epoch();
+                    std::mem::drop(state);
                     if new_posdao_epoch != old_posdao_epoch {
                         info!(target: "consensus", "POSDAO epoch changed from {old_posdao_epoch} to {new_posdao_epoch}.");
                         if let Some(block_number) = client.block_number(BlockId::Hash(*block_hash))
