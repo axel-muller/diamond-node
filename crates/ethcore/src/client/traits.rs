@@ -16,7 +16,7 @@
 
 //! Traits implemented by client.
 
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+use std::{collections::{BTreeMap, BTreeSet}, net::SocketAddr, sync::Arc};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;
@@ -218,7 +218,15 @@ pub trait ChainSyncing: Send + Sync {
 /// Access to management of reserved peers in the network module.
 pub trait ReservedPeersManagement: Send + Sync {
     /// Add a reserved peer
-    fn add_reserved_peer(&self, peer: String) -> Result<(), String>;
+    fn add_reserved_peer(&mut self, peer: String) -> Result<(), String>;
+
+    /// remove reserved peer
+    fn remove_reserved_peer(&mut self, peer: String) -> Result<(), ()> ;
+
+    /// get the infos what peers have been added currently.
+    fn get_reserved_peers(&self) -> &BTreeSet<String>;
+
+    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>);
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;

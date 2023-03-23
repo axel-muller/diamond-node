@@ -1023,6 +1023,8 @@ impl Client {
             .and_then(|s| Address::from_str(s).ok());
         if let Some(ref addr) = registrar_address {
             trace!(target: "client", "Found registrar at {}", addr);
+
+
         }
 
         let client = Arc::new(Client {
@@ -1177,6 +1179,7 @@ impl Client {
         &self,
         reserved_peers_management: Box<dyn ReservedPeersManagement>,
     ) {
+        info!("set_reserved_peers_management");
         *self.reserved_peers_management.lock() = Some(reserved_peers_management);
     }
 

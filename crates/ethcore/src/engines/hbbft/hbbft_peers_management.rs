@@ -113,6 +113,10 @@ impl HbbftPeersManagement {
                         }
                     };
 
+                    if socket_addr.port() == 0 {
+                        // we interprate port 0 as NULL.
+                        continue;
+                    }
                     let ip = socket_addr.to_string();
                     //let port = socket_addr.port();
                     
@@ -134,9 +138,9 @@ impl HbbftPeersManagement {
 
                     warn!(target: "engine", "adding reserved peer: {:?}", ip);
 
-                    let guard = block_chain_client.reserved_peers_management().lock();
+                    let mut guard = block_chain_client.reserved_peers_management().lock();
                     
-                    if let Some(peers_management) =  guard.as_deref() {
+                    if let Some(mut peers_management) =  guard.as_deref_mut() {
 
                         let public_key = &node.0.to_hex();
                         let peer_string = format!("enode://{}@{}", public_key, ip);
