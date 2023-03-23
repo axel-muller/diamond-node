@@ -109,6 +109,35 @@ impl HbbftPeersManagement {
                             continue;
                         }
                     };
+
+                    let ip = socket_addr.to_string();
+                    let port = socket_addr.port();
+                    
+                    // match socket_addr {
+                    //     SocketAddr::V4(ipv4) => {
+                    //         ip = ipv4.to_string();
+                            
+                    //     },
+                    //     SocketAddr::V6(_) => {
+                            
+                    //     },
+                    // }
+
+                    let guard = block_chain_client.reserved_peers_management().lock();
+                    
+                    if let Some(peers_management) =  guard.as_deref() {
+
+                        let public_key = "x".to_string();
+                        let peer_string = format!("enode://{}@{}:{}", public_key, ip, port);
+                        warn!(target: "engine", "adding reserved peer: {}", peer_string);
+                        if let Err(err) = peers_management.add_reserved_peer(peer_string.clone()) {
+                            warn!(target: "engine", "failed to adding reserved: {}", peer_string);
+                        }
+                    }
+                    // if deref.is_some() {
+                    //     let took = deref.take();
+                    // }
+                    //self
                 }
                 Err(call_error) => {
                     error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -140,7 +169,6 @@ impl HbbftPeersManagement {
     pub fn disconnect_pending_validators(&mut self) {
         // disconnect's can be done in any case,
         // reguardless if we are syncing or not.
-
         error!("TODO: disconnect_pending_validators");
     }
 
