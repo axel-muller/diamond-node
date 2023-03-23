@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::NodeId;
+use bytes::ToPretty;
 use ethereum_types::Address;
 use hbbft::NetworkInfo;
 
@@ -33,7 +34,7 @@ impl HbbftPeersManagement {
         // don't do any connections while the network is syncing.
         // the connection is not required yet, and might be outdated.
         // if we don't have a signing key, then we also do not need connections.
-        return !self.is_syncing && !self.own_address.is_zero();
+        return self.is_syncing || self.own_address.is_zero();
     }
 
     /// if we become a pending validator,
@@ -43,6 +44,7 @@ impl HbbftPeersManagement {
     /// gives us enough time, so the switch from
     pub fn connect_to_pending_validators(&mut self, pending_validators: &Vec<Address>) {
         if self.should_not_connect() {
+            warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
             return;
         }
 
@@ -62,6 +64,7 @@ impl HbbftPeersManagement {
         client_arc: &Arc<dyn EngineClient>,
     ) {
         if self.should_not_connect() {
+            warn!("connect_to_current_validators should_not_connect" );
             return;
         }
 
@@ -111,7 +114,7 @@ impl HbbftPeersManagement {
                     };
 
                     let ip = socket_addr.to_string();
-                    let port = socket_addr.port();
+                    //let port = socket_addr.port();
                     
                     // match socket_addr {
                     //     SocketAddr::V4(ipv4) => {
@@ -122,22 +125,28 @@ impl HbbftPeersManagement {
                             
                     //     },
                     // }
+  
+                    // if deref.is_some() {
+                    //     let took = deref.take();
+                    // }
+                    //self
+
+
+                    warn!(target: "engine", "adding reserved peer: {:?}", ip);
 
                     let guard = block_chain_client.reserved_peers_management().lock();
                     
                     if let Some(peers_management) =  guard.as_deref() {
 
-                        let public_key = "x".to_string();
-                        let peer_string = format!("enode://{}@{}:{}", public_key, ip, port);
+                        let public_key = &node.0.to_hex();
+                        let peer_string = format!("enode://{}@{}", public_key, ip);
                         warn!(target: "engine", "adding reserved peer: {}", peer_string);
                         if let Err(err) = peers_management.add_reserved_peer(peer_string.clone()) {
-                            warn!(target: "engine", "failed to adding reserved: {}", peer_string);
+                            warn!(target: "engine", "failed to adding reserved: {} : {}", peer_string, err);
                         }
+                    } else {
+                        warn!(target: "engine", "no peers management");
                     }
-                    // if deref.is_some() {
-                    //     let took = deref.take();
-                    // }
-                    //self
                 }
                 Err(call_error) => {
                     error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -145,18 +154,17 @@ impl HbbftPeersManagement {
             };
         }
 
-        // after we have retrieved all the peer information,
-        // we now can lock the reserved_peers_management and add our new peers.
+                                  // after we have retrieved all the peer information,
+                     // we now can lock the reserved_peers_management and add our new peers.
 
-        let lock = block_chain_client.reserved_peers_management().lock();
+
+
 
         // if let Some(mut reserved_peers_management) = block_chain_client.reserved_peers_management().lock() {
         //     reserved_peers_management.
         // }
 
         warn!(target: "engine", "gathering Endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
-
-        error!("TODO: connect to current validators:");
     }
 
     // if we drop out as a current validator,
