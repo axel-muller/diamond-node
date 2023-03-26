@@ -33,7 +33,7 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
             match self.manage_network.upgrade() {
                 Some(sync_arc) => {
                     let remove_result = sync_arc.remove_reserved_peer(peer);
-                    return remove_result.map_err(|e| ());
+                    return remove_result.map_err(|_e| ());
                 },
                 None => {
                     warn!("ManageNetwork instance not available.");
@@ -51,16 +51,18 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
         &self.current_reserved_peers
     }
 
-    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>) {
+    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>) -> usize {
 
         let reserved_peers_to_disconnect : Vec<String> = self.current_reserved_peers.iter().filter_map(|p| if keep_list.contains(p) {None} else {Some(p.clone())}).collect();
 
-        
+        let mut disconnected = 0;
         for reserved_peer in reserved_peers_to_disconnect {
-
-            self.remove_reserved_peer(reserved_peer);
-            
+            if self.remove_reserved_peer(reserved_peer).is_ok() {
+                disconnected += 1;
+            }
         }
+
+        return disconnected;
     }
 
 

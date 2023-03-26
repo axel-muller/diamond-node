@@ -226,7 +226,8 @@ pub trait ReservedPeersManagement: Send + Sync {
     /// get the infos what peers have been added currently.
     fn get_reserved_peers(&self) -> &BTreeSet<String>;
 
-    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>);
+    /// disconnect peers, but keeps those in keep_list, returns number of removed.
+    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>) -> usize;
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
     fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;

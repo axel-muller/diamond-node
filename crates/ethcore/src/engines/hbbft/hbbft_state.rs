@@ -498,6 +498,10 @@ impl HbbftState {
         self.network_info.clone()
     }
 
+    pub fn  get_current_network_info(&self ) -> Option<NetworkInfo<NodeId>> {
+        return self.network_info.clone();
+    }
+
     pub fn get_current_posdao_epoch(&self) -> u64 {
         self.current_posdao_epoch
     }

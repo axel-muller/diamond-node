@@ -477,6 +477,10 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
         )
         .map_err(|e| format!("Sync error: {}", e))?;
 
+    client.set_reserved_peers_management(Box::new(ReservedPeersWrapper::new(Arc::downgrade(
+        &manage_network,
+    ))));
+    
     service.add_notify(chain_notify.clone());
 
     // Propagate transactions as soon as they are imported.
@@ -630,11 +634,6 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
         sync_provider: Arc::downgrade(&sync_provider),
         client: Arc::downgrade(&client),
     }));
-
-    
-    client.set_reserved_peers_management(Box::new(ReservedPeersWrapper::new(Arc::downgrade(
-        &manage_network,
-    ))));
 
     Ok(RunningClient {
         inner: RunningClientInner::Full {

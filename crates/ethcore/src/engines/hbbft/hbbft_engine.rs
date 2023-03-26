@@ -90,6 +90,7 @@ pub struct HoneyBadgerBFT {
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
     has_sent_availability_tx: AtomicBool,
+    has_connected_to_validator_set: AtomicBool,
     peers_management: Mutex<HbbftPeersManagement>,
 }
 
@@ -388,6 +389,7 @@ impl HoneyBadgerBFT {
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
             has_sent_availability_tx: AtomicBool::new(false),
+            has_connected_to_validator_set: AtomicBool::new(false),
             peers_management: Mutex::new(HbbftPeersManagement::new()),
         });
 
@@ -722,7 +724,7 @@ impl HoneyBadgerBFT {
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
         } else {
-            trace!(target: "consensus", "tried to join HBBFT Epoch, but contribution threshold not reached.");
+            // trace!(target: "consensus", "tried to join HBBFT Epoch, but contribution threshold not reached.");
         }
         Ok(())
     }
@@ -832,7 +834,11 @@ impl HoneyBadgerBFT {
     }
 
     fn should_handle_availability_announcements(&self) -> bool {
-        self.has_sent_availability_tx.load(Ordering::SeqCst)
+        !self.has_sent_availability_tx.load(Ordering::SeqCst)
+    }
+
+    fn should_connect_to_validator_set(&self) -> bool {
+        !self.has_connected_to_validator_set.load(Ordering::SeqCst)
     }
 
     fn handle_availability_announcements(
@@ -886,9 +892,12 @@ impl HoneyBadgerBFT {
         let should_handle_internet_address_announcements =
             self.should_handle_internet_address_announcements();
 
+        let should_connect_to_validator_set = self.should_connect_to_validator_set();
+
         // if we do not have to do anything, we can return early.
         if !(should_handle_availability_announcements
-            || should_handle_internet_address_announcements)
+            || should_handle_internet_address_announcements
+            || should_connect_to_validator_set)
         {
             return Ok(());
         }
@@ -959,8 +968,28 @@ impl HoneyBadgerBFT {
                                     &mining_address,
                                 ) {
                                     error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
+                                } else {
+                                    
                                 }
                             }
+                        }
+
+                        if should_connect_to_validator_set {
+
+                            let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() { 
+                                hbbft_state.get_current_network_info()
+                            } else {
+                                None
+                            };
+
+                            if let Some(network_info) = network_info_o {
+                                if let Ok(mut peers_management) = self.peers_management.lock() {
+                                    // connecting to current validators.
+                                    peers_management.connect_to_current_validators(&network_info, &client_arc);
+                                    self.has_connected_to_validator_set.store(true, Ordering::SeqCst);
+                                }
+                            }
+
                         }
                         return Ok(());
                     }

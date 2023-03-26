@@ -52,7 +52,11 @@ impl HbbftPeersManagement {
             "TODO: connect to pending validators: {:?}",
             pending_validators
         );
+
+        
     }
+
+    
 
     // if we boot up and figure out,
     // that we are a current valudator,
@@ -61,7 +65,7 @@ impl HbbftPeersManagement {
     pub fn connect_to_current_validators(
         &mut self,
         network_info: &NetworkInfo<NodeId>,
-        client_arc: &Arc<dyn EngineClient>,
+        client_arc: &Arc<dyn EngineClient>
     ) {
         if self.should_not_connect() {
             warn!("connect_to_current_validators should_not_connect" );

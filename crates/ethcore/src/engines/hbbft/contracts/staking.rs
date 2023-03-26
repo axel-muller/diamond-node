@@ -62,6 +62,8 @@ pub fn get_validator_internet_address(
                 || ip[6] > 0
                 || ip[7] > 0
             {
+
+                warn!("Port: {} - {}", port[0], port[1]);
                 return Ok(SocketAddr::V6(SocketAddrV6::new(
                     Ipv6Addr::from(ip),
                     port[0] as u16 * 256 + port[1] as u16,
@@ -69,10 +71,11 @@ pub fn get_validator_internet_address(
                     0,
                 )));
             } else {
+                warn!("port: {} - {}", port[0], port[1]);
                 // we also return an V4 address if we have only 0.0.0.0 as well.
                 return Ok(SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
-                    port[0] as u16 * 256 + port[1] as u16,
+                    port[1] as u16 + port[0] as u16 * 256
                 )));
             }
         }
