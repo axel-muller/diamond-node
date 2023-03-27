@@ -140,7 +140,7 @@ pub fn set_validator_internet_address(
     }
 
     let port = socket_addr.port();
-    let port_array: [u8; 2] = [(port / 256) as u8, (port - (port / 256)) as u8];
+    let port_array: [u8; 2] = u16::to_be_bytes(port); //  [(port / 256) as u8, (port - (port / 256)) as u8];
 
     let send_data = validator_set_hbbft::functions::set_validator_internet_address::call(
         ip_address_array,
