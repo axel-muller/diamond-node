@@ -1,11 +1,13 @@
 use client::EngineClient;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
-use ethereum_types::{Address, U256};
+use ethereum_types::{Address, U256, H512, Public};
 use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     str::FromStr,
 };
 use types::ids::BlockId;
+
+use crate::engines::hbbft::NodeId;
 
 use_contract!(staking_contract, "res/contracts/staking_contract.json");
 
@@ -100,6 +102,23 @@ pub fn stake_amount(
         staking_address.clone(),
         owner_address.clone()
     )
+}
+
+pub fn get_pool_public_key(
+    client: &dyn EngineClient,
+    staking_address: &Address,
+) -> Result<Public, CallError> {
+    let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
+    let result = call_const_staking!(c, get_pool_public_key, staking_address.clone());
+
+    match result {
+        Ok( pk ) => {
+
+            // let nodeID: H512 =  H512::from_slice();
+            return Ok(Public::from_slice(&pk));
+        }
+        Err(e) => return Err(e),
+    }
 }
 
 #[cfg(test)]

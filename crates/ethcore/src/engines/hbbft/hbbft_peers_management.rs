@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
-    client::{BlockChainClient, EngineClient},
+    client::{BlockChainClient, EngineClient, ReservedPeersManagement},
     engines::hbbft::contracts::{
         staking::get_validator_internet_address,
         validator_set::{set_validator_internet_address, staking_by_mining_address},
@@ -9,15 +9,27 @@ use crate::{
     ethereum::public_key_to_address::public_key_to_address,
 };
 
-use super::NodeId;
 use bytes::ToPretty;
 use ethereum_types::Address;
 use hbbft::NetworkInfo;
+
+use super::{contracts::staking::get_pool_public_key, NodeId};
+
+
+struct ValidatorConnectionData {
+    // mining_address: Address,
+    staking_address: Address,
+    socket_addr: SocketAddr,
+    public_key: NodeId,
+    peer_string: String,
+}
 
 pub struct HbbftPeersManagement {
     is_syncing: bool,
     own_address: Address,
     last_written_internet_address: Option<SocketAddr>,
+    connected_current_pending_validators: Vec<ValidatorConnectionData>,
+    connected_current_validators: Vec<ValidatorConnectionData>,
 }
 
 impl HbbftPeersManagement {
@@ -26,6 +38,8 @@ impl HbbftPeersManagement {
             is_syncing: false,
             own_address: Address::zero(),
             last_written_internet_address: None,
+            connected_current_pending_validators: Vec::new(),
+            connected_current_validators: Vec::new()
         }
     }
 
@@ -42,16 +56,46 @@ impl HbbftPeersManagement {
     /// potential future validators.
     /// The transition phase for changing the validator
     /// gives us enough time, so the switch from
-    pub fn connect_to_pending_validators(&mut self, pending_validators: &Vec<Address>) {
+    pub fn connect_to_pending_validators(&mut self,  client_arc: &Arc<dyn EngineClient>, pending_validators: &Vec<Address>) -> Result<usize, String> {
         if self.should_not_connect() {
             warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
-            return;
+            return Ok(0);
         }
 
-        error!(
-            "TODO: connect to pending validators: {:?}",
-            pending_validators
-        );
+
+        let block_chain_client = client_arc.as_full_client().ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
+        
+
+        //self.
+        // self.
+
+        let reserved_peers_management_lock = block_chain_client.reserved_peers_management().lock();
+        let mut connected_current_pending_validators: Vec<ValidatorConnectionData> = Vec::new();
+
+        // we need go get the nodeID from the smart contract
+        
+        
+        
+         
+        if let Some(peers_management) =  reserved_peers_management_lock.as_deref() {
+            //peers_management.
+
+            for address in pending_validators.iter() {
+
+                if let Some(connected_validator) = self.connect_to_validator(client_arc.as_ref(), peers_management, block_chain_client, address) {
+                    connected_current_pending_validators.push(connected_validator);
+                }
+
+            }
+            
+        }
+        
+        // we overwrite here the data.
+        // mahybe we should make sure that there are no connected_current_pending_validators
+        debug_assert!(self.connected_current_pending_validators.len() == 0);
+        self.connected_current_pending_validators = connected_current_pending_validators;
+
+        return Ok(self.connected_current_pending_validators.len());
 
         
     }
@@ -89,77 +133,22 @@ impl HbbftPeersManagement {
             }
         };
 
+        // deadlock danger here.
+        let peers_management_lock = block_chain_client.reserved_peers_management().lock();
+        let peers = if let Some(peers) = peers_management_lock.as_deref() {
+            peers
+        } else {
+            error!("no peers management for connect_to_current_validators");
+            return;
+        };
+
         for node in ids.iter() {
             //let h512 = &node.0;
 
             let address = public_key_to_address(&node.0);
-
-            if self.own_address.eq(&address) {
-                // we do not have to connect to ourself.
-                continue;
+            if let Some(connected) = self.connect_to_validator(client, peers, block_chain_client, &address) {
+                self.connected_current_validators.push(connected);
             }
-
-            warn!(target: "engine", "retrieving Internet address for {}", address);
-
-            match staking_by_mining_address(client, &address) {
-                Ok(staking_address) => {
-                    if staking_address.is_zero() {
-                        error!(target: "engine", "no IP Address found unable to ask for corresponding staking address for given mining address: {:?}", address);
-                        continue;
-                    }
-
-                    let socket_addr = match get_validator_internet_address(client, &staking_address)
-                    {
-                        Ok(socket_addr) => socket_addr,
-                        Err(error) => {
-                            error!(target: "engine", "unable to retrieve internet address for Node ( Public: {}, Validator Address: {}, pool address: {}. call Error: {:?}",node.0, address, staking_address, error);
-                            continue;
-                        }
-                    };
-
-                    if socket_addr.port() == 0 {
-                        // we interprate port 0 as NULL.
-                        continue;
-                    }
-                    let ip = socket_addr.to_string();
-                    //let port = socket_addr.port();
-                    
-                    // match socket_addr {
-                    //     SocketAddr::V4(ipv4) => {
-                    //         ip = ipv4.to_string();
-                            
-                    //     },
-                    //     SocketAddr::V6(_) => {
-                            
-                    //     },
-                    // }
-  
-                    // if deref.is_some() {
-                    //     let took = deref.take();
-                    // }
-                    //self
-
-
-                    warn!(target: "engine", "adding reserved peer: {:?}", ip);
-
-                    let mut guard = block_chain_client.reserved_peers_management().lock();
-                    
-                    if let Some(mut peers_management) =  guard.as_deref_mut() {
-
-                        let public_key = &node.0.to_hex();
-                        let peer_string = format!("enode://{}@{}", public_key, ip);
-                        warn!(target: "engine", "adding reserved peer: {}", peer_string);
-                        if let Err(err) = peers_management.add_reserved_peer(peer_string.clone()) {
-                            warn!(target: "engine", "failed to adding reserved: {} : {}", peer_string, err);
-                        }
-                    } else {
-                        warn!(target: "engine", "no peers management");
-                    }
-                }
-                Err(call_error) => {
-                    error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                }
-            };
         }
 
                                   // after we have retrieved all the peer information,
@@ -280,4 +269,78 @@ impl HbbftPeersManagement {
     pub fn set_own_address(&mut self, value: Address) {
         self.own_address = value;
     }
+
+    fn connect_to_validator(&self, client: &dyn EngineClient, peers_management: &dyn ReservedPeersManagement, block_chain_client: &dyn BlockChainClient, address: &Address) -> Option<ValidatorConnectionData> {
+
+        match staking_by_mining_address(client, &address) {
+            Ok(staking_address) => {
+
+                let node_id =match get_pool_public_key(client, &staking_address) {
+                    Ok(pk) => { NodeId(pk) },
+                    Err(e) => { 
+                        error!("error calling get_pool_public_key: {:?}", e);
+                        return None;
+                    },
+                };
+
+                return connect_to_validator_core(client, peers_management, block_chain_client, staking_address, &node_id);
+            }
+            Err(call_error) => {
+                error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+            }
+        };
+
+        return None;        
+    }
 }
+
+fn connect_to_validator_core(client: &dyn EngineClient, peers_management: &dyn ReservedPeersManagement, block_chain_client: &dyn BlockChainClient, staking_address: Address, node_id: &NodeId ) -> Option<ValidatorConnectionData> {
+
+    if staking_address.is_zero() {
+        // error!(target: "engine", "no IP Address found unable to ask for corresponding staking address for given mining address: {:?}", address);
+        return None;
+    }
+
+
+
+
+    let socket_addr = match get_validator_internet_address(client, &staking_address)
+    {
+        Ok(socket_addr) => socket_addr,
+        Err(error) => {
+            error!(target: "engine", "unable to retrieve internet address for Node ( Public (NodeId): {:?} , staking address: {}, call Error: {:?}", node_id, staking_address, error);
+            return None;
+        }
+    };
+
+    if socket_addr.port() == 0 {
+        // we interprate port 0 as NULL.
+        return None;
+    }
+    let ip = socket_addr.to_string();
+
+    warn!(target: "engine", "adding reserved peer: {:?}", ip);
+
+    let mut guard = block_chain_client.reserved_peers_management().lock();
+
+    if let Some(mut peers_management) =  guard.as_deref_mut() {
+
+        let public_key = node_id.0.to_hex();
+        let peer_string = format!("enode://{}@{}", public_key, ip);
+        warn!(target: "engine", "adding reserved peer: {}", peer_string);
+        if let Err(err) = peers_management.add_reserved_peer(peer_string.clone()) {
+            warn!(target: "engine", "failed to adding reserved: {} : {}", peer_string, err);
+        }
+
+        return Some(ValidatorConnectionData {
+            staking_address: staking_address,
+            //mining_address: *address,
+            socket_addr: socket_addr,
+            peer_string,
+            public_key: node_id.clone(),
+        });
+    } else {
+        warn!(target: "engine", "no peers management");
+        None
+    }
+    }

@@ -1062,7 +1062,9 @@ impl HoneyBadgerBFT {
                         trace!(target: "engine", "is_pending_validator: {}", is_pending);
                         if is_pending {
                             if let Ok(mut peers_management) = self.peers_management.lock() {
-                                peers_management.connect_to_pending_validators(&validators);
+                                
+
+                                peers_management.connect_to_pending_validators(&client, &validators);
                             }
                             let _err = self
                                 .keygen_transaction_sender
