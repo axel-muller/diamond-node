@@ -16,13 +16,18 @@ use hbbft::NetworkInfo;
 use super::{contracts::staking::get_pool_public_key, NodeId};
 
 
+#[derive(Clone, Debug)]
 struct ValidatorConnectionData {
     // mining_address: Address,
     staking_address: Address,
     socket_addr: SocketAddr,
     public_key: NodeId,
     peer_string: String,
+    mining_address: Address
 }
+
+// impl ValidatorConnectionData {
+// }
 
 pub struct HbbftPeersManagement {
     is_syncing: bool,
@@ -70,10 +75,16 @@ impl HbbftPeersManagement {
         // we need go get the nodeID from the smart contract
         
 
-        for address in pending_validators.iter() {
-            if let Some(connected_validator) = self.connect_to_validator(client_arc.as_ref(), block_chain_client, address) {
-                connected_current_pending_validators.push(connected_validator);
+        for pending_validator_address in pending_validators.iter() {
+
+            if let Some(connection) = self.is_address_connected(pending_validator_address) {
+                connected_current_pending_validators.push(connection.clone());
+            } else {
+                if let Some(connected_validator) = self.connect_to_validator(client_arc.as_ref(), block_chain_client, pending_validator_address) {
+                    connected_current_pending_validators.push(connected_validator);
+                }
             }
+            
         }
     
         // we overwrite here the data.
@@ -146,7 +157,9 @@ impl HbbftPeersManagement {
     // if a key gen round fails,
     // we can disconnect from the failing validators,
     // and only keep the connection to the current ones.
-    fn disconnect_old_pending_validators(&mut self) {}
+    fn disconnect_old_pending_validators(&mut self) {
+        error!("TODO: disconnect_old_pending_validators");
+    }
 
     pub fn should_announce_own_internet_address(&self) -> bool {
         return !self.is_syncing && self.last_written_internet_address.is_none();
@@ -236,9 +249,9 @@ impl HbbftPeersManagement {
         self.own_address = value;
     }
 
-    fn connect_to_validator(&self, client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, address: &Address) -> Option<ValidatorConnectionData> {
+    fn connect_to_validator(&self, client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, mining_address: &Address) -> Option<ValidatorConnectionData> {
 
-        match staking_by_mining_address(client, &address) {
+        match staking_by_mining_address(client, &mining_address) {
             Ok(staking_address) => {
 
                 let node_id =match get_pool_public_key(client, &staking_address) {
@@ -249,7 +262,10 @@ impl HbbftPeersManagement {
                     },
                 };
 
-                return connect_to_validator_core(client, block_chain_client, staking_address, &node_id);
+                let mut result =  connect_to_validator_core(client, block_chain_client, staking_address, &node_id);
+                if let Some(mut data) = result {
+                    data.mining_address = *mining_address;
+                }
             }
             Err(call_error) => {
                 error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -257,6 +273,12 @@ impl HbbftPeersManagement {
         };
 
         return None;        
+    }
+
+    fn is_address_connected(&self, mining_address: &Address) -> Option<&ValidatorConnectionData> {
+        
+
+        return self.connected_current_validators.iter().find(|x| x.mining_address == *mining_address);
     }
 }
 
@@ -266,9 +288,6 @@ fn connect_to_validator_core(client: &dyn EngineClient, block_chain_client: &dyn
         // error!(target: "engine", "no IP Address found unable to ask for corresponding staking address for given mining address: {:?}", address);
         return None;
     }
-
-
-
 
     let socket_addr = match get_validator_internet_address(client, &staking_address)
     {
@@ -304,6 +323,7 @@ fn connect_to_validator_core(client: &dyn EngineClient, block_chain_client: &dyn
             socket_addr: socket_addr,
             peer_string,
             public_key: node_id.clone(),
+            mining_address: Address::zero(), // all caller of this function will set this value.
         });
     } else {
         warn!(target: "engine", "no peers management");
