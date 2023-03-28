@@ -62,34 +62,20 @@ impl HbbftPeersManagement {
             return Ok(0);
         }
 
-
         let block_chain_client = client_arc.as_full_client().ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
         
-
-        //self.
-        // self.
-
         let reserved_peers_management_lock = block_chain_client.reserved_peers_management().lock();
         let mut connected_current_pending_validators: Vec<ValidatorConnectionData> = Vec::new();
 
         // we need go get the nodeID from the smart contract
         
-        
-        
-         
-        if let Some(peers_management) =  reserved_peers_management_lock.as_deref() {
-            //peers_management.
 
-            for address in pending_validators.iter() {
-
-                if let Some(connected_validator) = self.connect_to_validator(client_arc.as_ref(), peers_management, block_chain_client, address) {
-                    connected_current_pending_validators.push(connected_validator);
-                }
-
+        for address in pending_validators.iter() {
+            if let Some(connected_validator) = self.connect_to_validator(client_arc.as_ref(), block_chain_client, address) {
+                connected_current_pending_validators.push(connected_validator);
             }
-            
         }
-        
+    
         // we overwrite here the data.
         // mahybe we should make sure that there are no connected_current_pending_validators
         debug_assert!(self.connected_current_pending_validators.len() == 0);
@@ -133,33 +119,13 @@ impl HbbftPeersManagement {
             }
         };
 
-        // deadlock danger here.
-        let peers_management_lock = block_chain_client.reserved_peers_management().lock();
-        let peers = if let Some(peers) = peers_management_lock.as_deref() {
-            peers
-        } else {
-            error!("no peers management for connect_to_current_validators");
-            return;
-        };
-
         for node in ids.iter() {
-            //let h512 = &node.0;
-
+ 
             let address = public_key_to_address(&node.0);
-            if let Some(connected) = self.connect_to_validator(client, peers, block_chain_client, &address) {
+            if let Some(connected) = self.connect_to_validator(client, block_chain_client, &address) {
                 self.connected_current_validators.push(connected);
             }
         }
-
-                                  // after we have retrieved all the peer information,
-                     // we now can lock the reserved_peers_management and add our new peers.
-
-
-
-
-        // if let Some(mut reserved_peers_management) = block_chain_client.reserved_peers_management().lock() {
-        //     reserved_peers_management.
-        // }
 
         warn!(target: "engine", "gathering Endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
     }
@@ -270,7 +236,7 @@ impl HbbftPeersManagement {
         self.own_address = value;
     }
 
-    fn connect_to_validator(&self, client: &dyn EngineClient, peers_management: &dyn ReservedPeersManagement, block_chain_client: &dyn BlockChainClient, address: &Address) -> Option<ValidatorConnectionData> {
+    fn connect_to_validator(&self, client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, address: &Address) -> Option<ValidatorConnectionData> {
 
         match staking_by_mining_address(client, &address) {
             Ok(staking_address) => {
@@ -283,7 +249,7 @@ impl HbbftPeersManagement {
                     },
                 };
 
-                return connect_to_validator_core(client, peers_management, block_chain_client, staking_address, &node_id);
+                return connect_to_validator_core(client, block_chain_client, staking_address, &node_id);
             }
             Err(call_error) => {
                 error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -294,7 +260,7 @@ impl HbbftPeersManagement {
     }
 }
 
-fn connect_to_validator_core(client: &dyn EngineClient, peers_management: &dyn ReservedPeersManagement, block_chain_client: &dyn BlockChainClient, staking_address: Address, node_id: &NodeId ) -> Option<ValidatorConnectionData> {
+fn connect_to_validator_core(client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, staking_address: Address, node_id: &NodeId ) -> Option<ValidatorConnectionData> {
 
     if staking_address.is_zero() {
         // error!(target: "engine", "no IP Address found unable to ask for corresponding staking address for given mining address: {:?}", address);
