@@ -1,13 +1,11 @@
 use client::EngineClient;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
-use ethereum_types::{Address, U256, H512, Public};
+use ethereum_types::{Address, U256, Public};
 use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     str::FromStr,
 };
 use types::ids::BlockId;
-
-use crate::engines::hbbft::NodeId;
 
 use_contract!(staking_contract, "res/contracts/staking_contract.json");
 
