@@ -31,7 +31,7 @@ struct ValidatorConnectionData {
 
 pub struct HbbftPeersManagement {
     is_syncing: bool,
-    own_address: Address,
+    own_validator_address: Address,
     last_written_internet_address: Option<SocketAddr>,
     connected_current_pending_validators: Vec<ValidatorConnectionData>,
     connected_current_validators: Vec<ValidatorConnectionData>,
@@ -41,7 +41,7 @@ impl HbbftPeersManagement {
     pub fn new() -> Self {
         HbbftPeersManagement {
             is_syncing: false,
-            own_address: Address::zero(),
+            own_validator_address: Address::zero(),
             last_written_internet_address: None,
             connected_current_pending_validators: Vec::new(),
             connected_current_validators: Vec::new()
@@ -53,7 +53,7 @@ impl HbbftPeersManagement {
         // don't do any connections while the network is syncing.
         // the connection is not required yet, and might be outdated.
         // if we don't have a signing key, then we also do not need connections.
-        return self.is_syncing || self.own_address.is_zero();
+        return self.is_syncing || self.own_validator_address.is_zero();
     }
 
     /// if we become a pending validator,
@@ -243,12 +243,17 @@ impl HbbftPeersManagement {
         self.is_syncing = value;
     }
 
-    pub fn set_own_address(&mut self, value: Address) {
-        self.own_address = value;
+    pub fn set_validator_address(&mut self, value: Address) {
+        self.own_validator_address = value;
     }
 
     fn connect_to_validator(&self, client: &dyn EngineClient, block_chain_client: &dyn BlockChainClient, mining_address: &Address) -> Option<ValidatorConnectionData> {
 
+        // we do not connect to ourself.
+        if mining_address == &self.own_validator_address {
+            return None;
+        }
+        // self.own_validator_address
         match staking_by_mining_address(client, &mining_address) {
             Ok(staking_address) => {
 

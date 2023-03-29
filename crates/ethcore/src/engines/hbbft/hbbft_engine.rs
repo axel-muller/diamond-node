@@ -1304,7 +1304,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
         if let Some(engine_signer) = signer.as_ref() {
             // this is importamt, we really have to get that lock here.
-            self.peers_management.lock().set_own_address(engine_signer.address());
+            self.peers_management.lock().set_validator_address(engine_signer.address());
         }
 
         *self.signer.write() = signer;
