@@ -89,7 +89,7 @@ impl NodeStakingEpochHistory {
         if block_num > last_good_sealing_message {
             self.last_good_sealing_message = event.block_num;
         } else {
-            warn!(target: "consensus", "add_good_seal_event: event.block_num {block_num} <= self.last_good_sealing_message {last_good_sealing_message}");
+            warn!(target: "hbbft_message_memorium", "add_good_seal_event: event.block_num {block_num} <= self.last_good_sealing_message {last_good_sealing_message}");
         }
         self.sealing_blocks_good.push(event.block_num);
     }
@@ -103,7 +103,7 @@ impl NodeStakingEpochHistory {
         if block_num > last_late_sealing_message {
             self.last_late_sealing_message = event.block_num;
         } else {
-            warn!(target: "consensus", "add_late_seal_event: event.block_num {block_num} <= self.last_late_sealing_message {last_late_sealing_message}");
+            warn!(target: "hbbft_message_memorium", "add_late_seal_event: event.block_num {block_num} <= self.last_late_sealing_message {last_late_sealing_message}");
         }
         self.cumulative_lateness += event.get_lateness();
         self.sealing_blocks_late.push(event.block_num);
@@ -118,7 +118,7 @@ impl NodeStakingEpochHistory {
         if block_num > last_bad_sealing_message {
             self.last_good_sealing_message = event.block_num;
         } else {
-            warn!(target: "consensus", "add_bad_seal_event: event.block_num {block_num} <= self.last_bad_sealing_message {last_bad_sealing_message}");
+            warn!(target: "hbbft_message_memorium", "add_bad_seal_event: event.block_num {block_num} <= self.last_bad_sealing_message {last_bad_sealing_message}");
         }
         self.sealing_blocks_good.push(event.block_num);
     }
@@ -131,7 +131,7 @@ impl NodeStakingEpochHistory {
         if block_num > last_message_faulty {
             self.last_message_faulty = block_num;
         } else {
-            warn!(target: "consensus", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
+            warn!(target: "hbbft_message_memorium", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
         }
         self.num_faulty_messages += 1;
     }
@@ -144,7 +144,7 @@ impl NodeStakingEpochHistory {
         if block_num > last_message_good {
             self.last_message_faulty = block_num;
         } else {
-            warn!(target: "consensus", "add_message_event_good: event.block_num {block_num} <= last_message_faulty {last_message_good}");
+            warn!(target: "hbbft_message_memorium", "add_message_event_good: event.block_num {block_num} <= last_message_faulty {last_message_good}");
         }
         self.num_good_messages += 1;
     }
@@ -576,7 +576,7 @@ impl HbbftMessageMemorium {
         if self.config_blocks_to_keep_on_disk > 0 && epoch > self.last_block_deleted_from_disk {
             let mut path_buf = self.get_path_to_write(epoch);
             if let Err(e) = create_dir_all(path_buf.as_path()) {
-                warn!(target: "consensus", "Error creating key directory: {:?}", e);
+                warn!(target: "hbbft_message_memorium", "Error creating key directory: {:?}", e);
                 return;
             };
 
@@ -585,13 +585,13 @@ impl HbbftMessageMemorium {
             let mut file = match File::create(&path) {
                 Ok(file) => file,
                 Err(e) => {
-                    warn!(target: "consensus", "Error creating hbbft memorial file: {:?}", e);
+                    warn!(target: "hbbft_message_memorium", "Error creating hbbft memorial file: {:?}", e);
                     return;
                 }
             };
 
             if let Err(e) = file.write(message_json.as_bytes()) {
-                warn!(target: "consensus", "Error writing hbbft memorial file: {:?}", e);
+                warn!(target: "hbbft_message_memorium", "Error writing hbbft memorial file: {:?}", e);
             }
 
             //figure out if we have to delete a old block
@@ -617,10 +617,10 @@ impl HbbftMessageMemorium {
                                         if dir_epoch <= epoch - self.config_blocks_to_keep_on_disk {
                                             match fs::remove_dir_all(path_buf.clone()) {
                                                 Ok(_) => {
-                                                    info!(target: "consensus", "deleted old message directory: {:?}", path_buf);
+                                                    debug!(target: "hbbft_message_memorium", "deleted old message directory: {:?}", path_buf);
                                                 }
                                                 Err(e) => {
-                                                    warn!(target: "consensus", "could not delete old directories reason: {:?}", e);
+                                                    warn!(target: "hbbft_message_memorium", "could not delete old directories reason: {:?}", e);
                                                 }
                                             }
                                         }
@@ -639,80 +639,80 @@ impl HbbftMessageMemorium {
 
     // process a good seal message in to the history.
     fn on_seal_good(&mut self, seal: &SealEventGood) -> bool {
-        info!(target: "consensus", "working on  good seal!: {:?}", seal);
+        debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_seal_good(seal);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
         }
         return false;
     }
 
     // process a late seal message in to the history.
     fn on_seal_late(&mut self, seal: &SealEventLate) -> bool {
-        info!(target: "consensus", "working on  good seal!: {:?}", seal);
+        debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_seal_late(seal);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
         }
         return false;
     }
 
     fn on_seal_bad(&mut self, seal: &SealEventBad) -> bool {
-        info!(target: "consensus", "working on  good seal!: {:?}", seal);
+        debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_seal_bad(seal);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
         }
         return false;
     }
 
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
-        info!(target: "consensus", "working on faulty message event!: {:?}", event);
+        debug!(target: "hbbft_message_memorium", "working on faulty message event!: {:?}", event);
         let block_num = event.block_num;
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
             epoch_history.on_message_faulty(event);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", block_num);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
         }
         return false;
     }
 
     fn on_message_good(&mut self, event: &MessageEventGood) -> bool {
-        info!(target: "consensus", "working on good message event!: {:?}", event);
+        debug!(target: "hbbft_message_memorium", "working on good message event!: {:?}", event);
         if let Some(epoch_history) = self.get_staking_epoch_history(event.block_num) {
             epoch_history.on_message_good(event);
             return true;
         } else {
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "consensus", "Staking Epoch History not set up for block: {}", event.block_num);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", event.block_num);
         }
         return false;
     }
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
-        warn!(target: "consensus", "report new epoch: {}", staking_epoch);
+        warn!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
         if let Ok(_) = self
             .staking_epoch_history
             .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
         {
-            warn!(target: "consensus", "New staking epoch reported twice: {}", staking_epoch);
+            warn!(target: "hbbft_message_memorium", "New staking epoch reported twice: {}", staking_epoch);
         } else {
-            info!(target: "consensus", "New staking epoch reported : {staking_epoch}");
+            debug!(target: "hbbft_message_memorium", "New staking epoch reported : {staking_epoch}");
             // if we have already a staking epoch stored, we can write the end block of the previous staking epoch.
             if let Some(previous) = self.staking_epoch_history.back_mut() {
                 previous.staking_epoch_end_block = staking_epoch_start_block - 1;
@@ -756,7 +756,7 @@ impl HbbftMessageMemorium {
                     // being unable to interprete a message, could result in consequences
                     // not being able to report missbehavior,
                     // or reporting missbehavior, where there was not a missbehavior.
-                    error!(target: "consensus", "could not store hbbft message: {:?}", e);
+                    error!(target: "hbbft_message_memorium", "could not store hbbft message: {:?}", e);
                 }
             }
             had_worked = true;
@@ -771,7 +771,7 @@ impl HbbftMessageMemorium {
                     // being unable to interprete a message, could result in consequences
                     // not being able to report missbehavior,
                     // or reporting missbehavior, where there was not a missbehavior.
-                    error!(target: "consensus", "could not store seal message: {:?}", e);
+                    error!(target: "hbbft_message_memorium", "could not store seal message: {:?}", e);
                 }
             }
             had_worked = true;
@@ -781,10 +781,10 @@ impl HbbftMessageMemorium {
 
         if let Some(good_seal) = self.dispatched_seal_event_good.front() {
             // rust borrow system forced me into this useless clone...
-            info!(target: "consensus", "work: good Seal!");
+            debug!(target: "hbbft_message_memorium", "work: good Seal!");
             if self.on_seal_good(&good_seal.clone()) {
                 self.dispatched_seal_event_good.pop_front();
-                info!(target: "consensus", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
+                debug!(target: "hbbft_message_memorium", "work: good Seal success! left: {}", self.dispatched_seal_event_good.len());
 
                 had_worked = true;
             }
@@ -796,7 +796,7 @@ impl HbbftMessageMemorium {
             // rust borrow system forced me into this useless clone...
             if self.on_seal_late(&late_seal.clone()) {
                 self.dispatched_seal_event_late.pop_front();
-                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+                debug!(target: "hbbft_message_memorium", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
 
                 had_worked = true;
             }
@@ -807,7 +807,7 @@ impl HbbftMessageMemorium {
             // rust borrow system forced me into this useless clone...
             if self.on_seal_bad(&late_seal.clone()) {
                 self.dispatched_seal_event_bad.pop_front();
-                info!(target: "consensus", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
+                debug!(target: "hbbft_message_memorium", "work: late Seal success! left: {}", self.dispatched_seal_event_late.len());
 
                 had_worked = true;
             }
@@ -818,7 +818,7 @@ impl HbbftMessageMemorium {
             // rust borrow system forced me into this useless clone...
             if self.on_message_faulty(&message_faulty.clone()) {
                 self.dispatched_message_event_faulty.pop_front();
-                info!(target: "consensus", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
+                debug!(target: "hbbft_message_memorium", "work: faulty message! left: {}", self.dispatched_message_event_faulty.len());
 
                 had_worked = true;
             }
@@ -828,7 +828,7 @@ impl HbbftMessageMemorium {
         if let Some(message_good) = self.dispatched_message_event_good.front() {
             if self.on_message_good(&message_good.clone()) {
                 self.dispatched_message_event_good.pop_front();
-                info!(target: "consensus", "work: good message! left: {}", self.dispatched_message_event_good.len());
+                debug!(target: "hbbft_message_memorium", "work: good message! left: {}", self.dispatched_message_event_good.len());
                 had_worked = true;
             }
         }
@@ -886,7 +886,7 @@ impl HbbftMessageMemorium {
                     Ok(mut file) => {
                         let csv = epoch_history.get_epoch_stats_as_csv();
                         if let Err(err) = file.write_all(csv.as_bytes()) {
-                            error!(target: "consensus", "could not write validator stats to disk:{:?} {:?}",output_path, err);
+                            error!(target: "hbbft_message_memorium", "could not write validator stats to disk:{:?} {:?}",output_path, err);
                         } else {
                             epoch_history.exported = true;
                             self.timestamp_last_validator_stats_written = current_time;
@@ -894,7 +894,7 @@ impl HbbftMessageMemorium {
                         }
                     }
                     Err(error) => {
-                        error!(target: "consensus", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
+                        error!(target: "hbbft_message_memorium", "could not create validator stats file on disk:{:?} {:?}", output_path, error);
                     }
                 }
             }
