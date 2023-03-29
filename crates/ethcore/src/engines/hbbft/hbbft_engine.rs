@@ -3,8 +3,7 @@ use crate::{
     client::BlockChainClient,
     engines::hbbft::{
         contracts::{
-            random_hbbft::set_current_seed_tx_raw, staking::get_validator_internet_address,
-            validator_set::set_validator_internet_address,
+            random_hbbft::set_current_seed_tx_raw,
         },
         hbbft_message_memorium::BadSealReason,
         hbbft_peers_management::HbbftPeersManagement,

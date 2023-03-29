@@ -18,7 +18,6 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrder},
@@ -80,7 +79,7 @@ use stats::{PrometheusMetrics, PrometheusRegistry};
 use trace::LocalizedTrace;
 use verification::queue::{kind::blocks::Unverified, QueueInfo};
 
-use super::{registry::logs::Reserved, ReservedPeersManagement};
+use super::{ReservedPeersManagement};
 
 /// Test client.
 pub struct TestBlockChainClient {

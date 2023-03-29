@@ -306,7 +306,7 @@ fn connect_to_validator_core(client: &dyn EngineClient, block_chain_client: &dyn
 
     let mut guard = block_chain_client.reserved_peers_management().lock();
 
-    if let Some(mut peers_management) =  guard.as_deref_mut() {
+    if let Some(peers_management) =  guard.as_deref_mut() {
 
         let public_key = node_id.0.to_hex();
         let peer_string = format!("enode://{}@{}", public_key, ip);
