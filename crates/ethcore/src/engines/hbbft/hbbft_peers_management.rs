@@ -68,8 +68,6 @@ impl HbbftPeersManagement {
         }
 
         let block_chain_client = client_arc.as_full_client().ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
-        
-        let reserved_peers_management_lock = block_chain_client.reserved_peers_management().lock();
         let mut connected_current_pending_validators: Vec<ValidatorConnectionData> = Vec::new();
 
         // we need go get the nodeID from the smart contract
