@@ -260,7 +260,7 @@ impl HbbftPeersManagement {
                     },
                 };
 
-                let mut result =  connect_to_validator_core(client, block_chain_client, staking_address, &node_id);
+                let result =  connect_to_validator_core(client, block_chain_client, staking_address, &node_id);
                 if let Some(mut data) = result {
                     data.mining_address = *mining_address;
                 }
