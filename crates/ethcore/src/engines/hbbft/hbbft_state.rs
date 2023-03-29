@@ -6,11 +6,11 @@ use hbbft::{
     honey_badger::{self, HoneyBadgerBuilder},
     Epoched, NetworkInfo,
 };
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::{Arc, Mutex},
+    sync::{Arc},
 };
 use types::{header::Header, ids::BlockId};
 
@@ -111,7 +111,7 @@ impl HbbftState {
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             // we can disconnect the peers here.
-            if let Ok(mut peers_management) = peers_management_mutex.lock() {
+            if let Some(mut peers_management) = peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50)) {
                 peers_management.disconnect_all_validators();
             }
             return Some(());
@@ -123,10 +123,17 @@ impl HbbftState {
 
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
 
-        if let Ok(mut peers_management) = peers_management_mutex.lock() {
+
+        if let Some(mut peers_management) = peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50)) {
             peers_management.connect_to_current_validators(&network_info, &client);
         } else {
-            warn!(target: "engine", "no hbbft peers management!!");
+            // maybe we should work with signals that signals that connect_to_current_validators should happen
+            // instead of trying to achieve a lock here.
+            // in this case:
+            // if Node A cannot acquire the lock, but Node B can, then Node B connects to Node A,
+            // and we are find.
+            // if both nodes cannot acquire the lock, then we are busted.
+            warn!(target: "engine", "could not acquire to connect to current validators on switching to new validator set for staking epoch {}.", self.current_posdao_epoch);
         }
 
         Some(())

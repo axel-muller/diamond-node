@@ -23,7 +23,7 @@ use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
 use itertools::Itertools;
 use machine::EthereumMachine;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use rlp;
 use rmp_serde;
 use serde::Deserialize;
@@ -32,7 +32,7 @@ use std::{
     collections::BTreeMap,
     convert::TryFrom,
     ops::{BitXor},
-    sync::{atomic::AtomicBool, Arc, Mutex, Weak},
+    sync::{atomic::AtomicBool, Arc, Weak},
     time::Duration,
 };
 use types::{
@@ -688,13 +688,8 @@ impl HoneyBadgerBFT {
         step: HoneyBadgerStep,
         network_info: &NetworkInfo<NodeId>,
     ) {
-        let mut message_counter = match  self.message_counter.lock() {
-            Ok(val) => val,
-            Err(_) =>  {
-                warn!(target: "engine", "process step message_counter is poisoned.");
-                return;
-            },
-        };
+        let mut message_counter = self.message_counter.lock();
+        
 
         let messages = step.messages.into_iter().map(|msg| {
             *message_counter += 1;
@@ -875,7 +870,9 @@ impl HoneyBadgerBFT {
     }
 
     fn should_handle_internet_address_announcements(&self) -> bool {
-        if let Ok(peers) = self.peers_management.lock() {
+        // this will just called in the next hbbft validator node events again.
+        // if we don't get a lock, we will just a little be late with announcing our internet address.
+        if let Some(peers) = self.peers_management.try_lock() {
             return peers.should_announce_own_internet_address();
         }
 
@@ -960,7 +957,7 @@ impl HoneyBadgerBFT {
                         // since get latest nonce respects the pending transactions,
                         // we don't have to take care of sending 2 transactions at once.
                         if should_handle_internet_address_announcements {
-                            if let Ok(mut peers_management) = self.peers_management.lock() {
+                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
                                 if let Err(error) = peers_management.announce_own_internet_address(
                                     block_chain_client,
                                     engine_client,
@@ -982,7 +979,7 @@ impl HoneyBadgerBFT {
                             };
 
                             if let Some(network_info) = network_info_o {
-                                if let Ok(mut peers_management) = self.peers_management.lock() {
+                                if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
                                     // connecting to current validators.
                                     peers_management.connect_to_current_validators(&network_info, &client_arc);
                                     self.has_connected_to_validator_set.store(true, Ordering::SeqCst);
@@ -1014,14 +1011,16 @@ impl HoneyBadgerBFT {
                 let validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
-                        // peers management: set new peers to connect.
-                        if let Ok(mut peers_management) = self.peers_management.lock() {
-                            if validators.len() == 0 {
-                                peers_management.disconnect_pending_validators();
-                            }
-                        } else {
-                            error!(target: "engine", "Could not do peers management, peers management poisoned.");
+
+                        if validators.len() == 0 {
+                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) { 
+                                    peers_management.disconnect_pending_validators();
+                             
+                            } else {
+                                error!(target: "engine", "Could not disconnect_pending_validators, peers management lock not acquird within time.");
+                            }     // peers management: set new peers to connect.
                         }
+                   
 
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
@@ -1060,9 +1059,12 @@ impl HoneyBadgerBFT {
                     if let Ok(is_pending) = is_pending_validator(&*client, &signer.address()) {
                         trace!(target: "engine", "is_pending_validator: {}", is_pending);
                         if is_pending {
-                            if let Ok(mut peers_management) = self.peers_management.lock() {
-                                
-
+                            // we are a pending validator, so we need to connect to other pending validators.
+                            // so we start already the required communication channels.
+                            // but this is NOT Mission critical,
+                            // we will connect to the validators when we are in the validator set anyway.
+                            // so we won't lock and wait forever to be able to do this.
+                            if let Some(mut peers_management) = self.peers_management.try_lock() {
                                 peers_management.connect_to_pending_validators(&client, &validators);
                             }
                             let _err = self
@@ -1301,9 +1303,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
         if let Some(engine_signer) = signer.as_ref() {
-            if let Ok(mut peers_management) = self.peers_management.lock() {
-                peers_management.set_own_address(engine_signer.address());
-            }
+            // this is importamt, we really have to get that lock here.
+            self.peers_management.lock().set_own_address(engine_signer.address());
         }
 
         *self.signer.write() = signer;

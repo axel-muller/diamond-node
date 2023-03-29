@@ -529,7 +529,7 @@ pub trait BlockChainClient:
     /// Returns true, if underlying import queue is processing possible fork at the moment
     fn is_processing_fork(&self) -> bool;
 
-    // returns the reserved peer management that allow to read and manipulate the devp2p peer communication.
+    /// returns the reserved peer management that allow to read and manipulate the devp2p peer communication.
     fn reserved_peers_management(&self) -> &Mutex<Option<Box<dyn ReservedPeersManagement>>>;
 }
 
