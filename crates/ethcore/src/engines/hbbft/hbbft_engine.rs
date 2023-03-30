@@ -869,11 +869,11 @@ impl HoneyBadgerBFT {
         }
     }
 
-    fn should_handle_internet_address_announcements(&self) -> bool {
+    fn should_handle_internet_address_announcements(&self, client: &dyn BlockChainClient) -> bool {
         // this will just called in the next hbbft validator node events again.
         // if we don't get a lock, we will just a little be late with announcing our internet address.
         if let Some(peers) = self.peers_management.try_lock() {
-            return peers.should_announce_own_internet_address();
+            return peers.should_announce_own_internet_address(client);
         }
 
         false
@@ -883,20 +883,7 @@ impl HoneyBadgerBFT {
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
     fn do_validator_engine_actions(&self) -> Result<(), String> {
-        let should_handle_availability_announcements =
-            self.should_handle_availability_announcements();
-        let should_handle_internet_address_announcements =
-            self.should_handle_internet_address_announcements();
-
-        let should_connect_to_validator_set = self.should_connect_to_validator_set();
-
-        // if we do not have to do anything, we can return early.
-        if !(should_handle_availability_announcements
-            || should_handle_internet_address_announcements
-            || should_connect_to_validator_set)
-        {
-            return Ok(());
-        }
+    
 
         // here we need to differentiate the different engine functions,
         // that requre different levels of access to the client.
@@ -921,12 +908,35 @@ impl HoneyBadgerBFT {
 
                 let engine_client = client_arc.deref();
 
+                let block_chain_client = match engine_client.as_full_client() {
+                    Some(block_chain_client) => {block_chain_client},
+                    None => {
+                        return Err("Unable to retrieve client.as_full_client()".into());
+                    }
+                };
+
+                let should_handle_availability_announcements =
+                    self.should_handle_availability_announcements();
+                let should_handle_internet_address_announcements =
+                    self.should_handle_internet_address_announcements(block_chain_client);
+    
+                let should_connect_to_validator_set = self.should_connect_to_validator_set();
+    
+
+                // if we do not have to do anything, we can return early.
+                if !(should_handle_availability_announcements
+                    || should_handle_internet_address_announcements
+                    || should_connect_to_validator_set)
+                {
+                    return Ok(());
+                }
+
                 // TODO:
                 // staking by mining address could be cached.
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                match staking_by_mining_address(engine_client, &mining_address) {
+                let staking_address = match staking_by_mining_address(engine_client, &mining_address) {
                     Ok(staking_address) => {
                         if staking_address.is_zero() {
                             //TODO: here some fine handling can improve performance.
@@ -935,6 +945,7 @@ impl HoneyBadgerBFT {
                             //trace!(target: "engine", "availability handling not a validator");
                             return Ok(());
                         }
+                        staking_address
                     }
                     Err(call_error) => {
                         error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
@@ -943,62 +954,59 @@ impl HoneyBadgerBFT {
                     }
                 };
 
-                match engine_client.as_full_client() {
-                    Some(block_chain_client) => {
-                        // if we are not a potential validator, we already have already returned here.
-                        if should_handle_availability_announcements {
-                            self.handle_availability_announcements(
-                                engine_client,
-                                block_chain_client,
-                                &mining_address,
-                            );
+
+                // if we are not a potential validator, we already have already returned here.
+                if should_handle_availability_announcements {
+                    self.handle_availability_announcements(
+                        engine_client,
+                        block_chain_client,
+                        &mining_address,
+                    );
+                }
+
+                // since get latest nonce respects the pending transactions,
+                // we don't have to take care of sending 2 transactions at once.
+                if should_handle_internet_address_announcements {
+                    if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
+                        if let Err(error) = peers_management.announce_own_internet_address(
+                            block_chain_client,
+                            engine_client,
+                            &mining_address,
+                        ) {
+                            error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
+                        } else {
+                            
                         }
-
-                        // since get latest nonce respects the pending transactions,
-                        // we don't have to take care of sending 2 transactions at once.
-                        if should_handle_internet_address_announcements {
-                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
-                                if let Err(error) = peers_management.announce_own_internet_address(
-                                    block_chain_client,
-                                    engine_client,
-                                    &mining_address,
-                                ) {
-                                    error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
-                                } else {
-                                    
-                                }
-                            }
-                        }
-
-                        if should_connect_to_validator_set {
-
-                            let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() { 
-                                hbbft_state.get_current_network_info()
-                            } else {
-                                None
-                            };
-
-                            if let Some(network_info) = network_info_o {
-                                if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
-                                    // connecting to current validators.
-                                    peers_management.connect_to_current_validators(&network_info, &client_arc);
-                                    self.has_connected_to_validator_set.store(true, Ordering::SeqCst);
-                                }
-                            }
-
-                        }
-                        return Ok(());
-                    }
-                    None => {
-                        return Err("Unable to retrieve client.as_full_client()".into());
                     }
                 }
-            }
+
+                if should_connect_to_validator_set {
+
+                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() { 
+                        hbbft_state.get_current_network_info()
+                    } else {
+                        None
+                    };
+
+                    if let Some(network_info) = network_info_o {
+                        if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
+                            // connecting to current validators.
+                            peers_management.connect_to_current_validators(&network_info, &client_arc);
+                            self.has_connected_to_validator_set.store(true, Ordering::SeqCst);
+                        }
+                    }
+
+                }
+                        return Ok(());
+                    
+                },
+            
             None => {
                 // client arc not ready yet,
                 // can happen during initialization and shutdown.
                 return Ok(());
             }
+            
         }
     }
 

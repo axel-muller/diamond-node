@@ -49,11 +49,13 @@ impl HbbftPeersManagement {
     }
 
     /// connections are not always required
-    fn should_not_connect(&self) -> bool {
+    fn should_not_connect(&self, client: &dyn BlockChainClient) -> bool {
+
         // don't do any connections while the network is syncing.
         // the connection is not required yet, and might be outdated.
         // if we don't have a signing key, then we also do not need connections.
-        return self.is_syncing || self.own_validator_address.is_zero();
+        
+        return self.own_validator_address.is_zero() || client.is_major_syncing();
     }
 
     /// if we become a pending validator,
@@ -62,17 +64,15 @@ impl HbbftPeersManagement {
     /// The transition phase for changing the validator
     /// gives us enough time, so the switch from
     pub fn connect_to_pending_validators(&mut self,  client_arc: &Arc<dyn EngineClient>, pending_validators: &Vec<Address>) -> Result<usize, String> {
-        if self.should_not_connect() {
+
+        let block_chain_client = client_arc.as_full_client().ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
+        if self.should_not_connect(block_chain_client) {
             // warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
             return Ok(0);
         }
-
-        let block_chain_client = client_arc.as_full_client().ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
         let mut connected_current_pending_validators: Vec<ValidatorConnectionData> = Vec::new();
 
         // we need go get the nodeID from the smart contract
-        
-
         for pending_validator_address in pending_validators.iter() {
 
             if let Some(connection) = self.is_address_connected(pending_validator_address) {
@@ -106,18 +106,10 @@ impl HbbftPeersManagement {
         network_info: &NetworkInfo<NodeId>,
         client_arc: &Arc<dyn EngineClient>
     ) {
-        if self.should_not_connect() {
-            warn!("connect_to_current_validators should_not_connect" );
-            return;
-        }
-
-        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
-        let start_time = std::time::Instant::now();
-
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
-
+        
         let client = client_arc.as_ref();
 
         let block_chain_client = match client.as_full_client() {
@@ -127,6 +119,14 @@ impl HbbftPeersManagement {
                 return;
             }
         };
+
+        if self.should_not_connect(block_chain_client) {
+            // warn!("connect_to_current_validators should_not_connect" );
+            return;
+        }
+
+        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
+        let start_time = std::time::Instant::now();
 
         for node in ids.iter() {
  
@@ -159,8 +159,8 @@ impl HbbftPeersManagement {
         error!("TODO: disconnect_old_pending_validators");
     }
 
-    pub fn should_announce_own_internet_address(&self) -> bool {
-        return !self.is_syncing && self.last_written_internet_address.is_none();
+    pub fn should_announce_own_internet_address(&self, client: &dyn BlockChainClient) -> bool {
+        return !client.is_major_syncing() && self.last_written_internet_address.is_none();
     }
 
     // handles the announcements of the internet address for other peers as blockchain transactions
