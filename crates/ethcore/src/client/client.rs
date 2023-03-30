@@ -2860,6 +2860,7 @@ impl BlockChainClient for Client {
     }
 
     fn is_major_syncing(&self) -> bool {
+        // so far we know, this lock cannot result into a deadlock.
         match &*self.sync_provider.lock() {
             Some(sync_provider) => sync_provider.is_major_syncing(),
             // We also indicate the "syncing" state when the SyncProvider has not been set,

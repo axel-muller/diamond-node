@@ -30,7 +30,6 @@ struct ValidatorConnectionData {
 // }
 
 pub struct HbbftPeersManagement {
-    is_syncing: bool,
     own_validator_address: Address,
     last_written_internet_address: Option<SocketAddr>,
     connected_current_pending_validators: Vec<ValidatorConnectionData>,
@@ -40,7 +39,6 @@ pub struct HbbftPeersManagement {
 impl HbbftPeersManagement {
     pub fn new() -> Self {
         HbbftPeersManagement {
-            is_syncing: false,
             own_validator_address: Address::zero(),
             last_written_internet_address: None,
             connected_current_pending_validators: Vec::new(),
@@ -109,7 +107,7 @@ impl HbbftPeersManagement {
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
-        
+
         let client = client_arc.as_ref();
 
         let block_chain_client = match client.as_full_client() {
@@ -237,10 +235,6 @@ impl HbbftPeersManagement {
                 ));
             }
         }
-    }
-
-    pub fn set_is_syncing(&mut self, value: bool) {
-        self.is_syncing = value;
     }
 
     pub fn set_validator_address(&mut self, value: Address) {
