@@ -63,7 +63,7 @@ impl HbbftPeersManagement {
     /// gives us enough time, so the switch from
     pub fn connect_to_pending_validators(&mut self,  client_arc: &Arc<dyn EngineClient>, pending_validators: &Vec<Address>) -> Result<usize, String> {
         if self.should_not_connect() {
-            warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
+            // warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
             return Ok(0);
         }
 

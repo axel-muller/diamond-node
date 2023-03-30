@@ -1064,9 +1064,19 @@ impl HoneyBadgerBFT {
                             // but this is NOT Mission critical,
                             // we will connect to the validators when we are in the validator set anyway.
                             // so we won't lock and wait forever to be able to do this.
-                            if let Some(mut peers_management) = self.peers_management.try_lock() {
-                                peers_management.connect_to_pending_validators(&client, &validators);
+                            if let Some(mut peers_management) = self.peers_management.try_lock_for() {
+                                match peers_management.connect_to_pending_validators(&client, &validators) {
+                                    Ok(value) => {
+                                        debug!(target: "engine", "connected to additional {:?} nodes, because they are pending validators.",  value);
+                                    },
+                                    Err(err) => {
+                                        warn!(target: "engine", "Error connecting to other pending validators: {:?}", err);
+                                    },
+                                }
+                            } else {
+                                warn!(target: "engine", "Could not connect to other pending validators, peers management lock not acquird within time.");
                             }
+
                             let _err = self
                                 .keygen_transaction_sender
                                 .write()
