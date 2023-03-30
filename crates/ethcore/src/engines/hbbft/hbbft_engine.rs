@@ -1064,7 +1064,7 @@ impl HoneyBadgerBFT {
                             // but this is NOT Mission critical,
                             // we will connect to the validators when we are in the validator set anyway.
                             // so we won't lock and wait forever to be able to do this.
-                            if let Some(mut peers_management) = self.peers_management.try_lock_for() {
+                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(50)) {
                                 match peers_management.connect_to_pending_validators(&client, &validators) {
                                     Ok(value) => {
                                         debug!(target: "engine", "connected to additional {:?} nodes, because they are pending validators.",  value);
