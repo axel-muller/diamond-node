@@ -218,10 +218,10 @@ pub trait ChainSyncing: Send + Sync {
 /// Access to management of reserved peers in the network module.
 pub trait ReservedPeersManagement: Send + Sync {
     /// Add a reserved peer
-    fn add_reserved_peer(&mut self, peer: String) -> Result<(), String>;
+    fn add_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
 
     /// remove reserved peer
-    fn remove_reserved_peer(&mut self, peer: String) -> Result<(), ()> ;
+    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), ()> ;
 
     /// get the infos what peers have been added currently.
     fn get_reserved_peers(&self) -> &BTreeSet<String>;

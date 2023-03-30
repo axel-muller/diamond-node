@@ -14,25 +14,25 @@ impl ReservedPeersWrapper {
 }
 
 impl ReservedPeersManagement for ReservedPeersWrapper {
-    fn add_reserved_peer(&mut self, peer: String) -> Result<(), String> {
+    fn add_reserved_peer(&mut self, peer: &String) -> Result<(), String> {
 
 
-        if self.current_reserved_peers.contains(&peer) {
+        if self.current_reserved_peers.contains(peer) {
             return Ok(());
         }
 
         match self.manage_network.upgrade() {
-            Some(sync_arc) => sync_arc.add_reserved_peer(peer),
+            Some(sync_arc) => sync_arc.add_reserved_peer(peer.clone()),
             None => Err("ManageNetwork instance not available.".to_string()),
         }
     }
 
        /// remove reserved peer
-       fn remove_reserved_peer(&mut self, peer: String) -> Result<(), ()>  {
-        if self.current_reserved_peers.contains(&peer) {
+       fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), ()>  {
+        if self.current_reserved_peers.contains(peer) {
             match self.manage_network.upgrade() {
                 Some(sync_arc) => {
-                    let remove_result = sync_arc.remove_reserved_peer(peer);
+                    let remove_result = sync_arc.remove_reserved_peer(peer.clone());
                     return remove_result.map_err(|_e| ());
                 },
                 None => {
@@ -57,7 +57,7 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
 
         let mut disconnected = 0;
         for reserved_peer in reserved_peers_to_disconnect {
-            if self.remove_reserved_peer(reserved_peer).is_ok() {
+            if self.remove_reserved_peer(&reserved_peer).is_ok() {
                 disconnected += 1;
             }
         }
