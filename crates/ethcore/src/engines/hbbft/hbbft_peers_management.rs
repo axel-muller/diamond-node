@@ -11,6 +11,7 @@ use crate::{
 
 use bytes::ToPretty;
 use error_chain::example_generated::ResultExt;
+use ethereum_types::Address;
 use hbbft::NetworkInfo;
 use parking_lot::MutexGuard;
 
@@ -91,9 +92,41 @@ impl HbbftPeersManagement {
             }
         }
 
+
+        let mut old_peers_to_disconnect: Vec<String> = Vec::new();
+        // we disconnect from all validators that are not in the pending list anymore.
+        for old_validator in self.connected_current_pending_validators.iter() {
+
+            let newly_connected_count =  connected_current_pending_validators.iter().filter(|v| v.mining_address == old_validator.mining_address).count();
+
+            // should be 0 or 1.
+
+            if newly_connected_count == 0 { 
+                // maybe this validator is a active validator, then we keep the connection.
+
+                if self.is_miner_connected_as_current_validator(&old_validator.mining_address).is_none() {
+                    // we are neighter a pending validator, nor a current validator.
+                    // we have to disconnect.
+                    old_peers_to_disconnect.push(old_validator.peer_string.clone());
+                }
+            }
+        }
+
+
+        if old_peers_to_disconnect.len() > 0 {
+            // we have to disconnect from some peers
+            let mut peers_management_guard = block_chain_client.reserved_peers_management().lock();
+
+            if let Some(peers_management) = peers_management_guard.as_deref_mut() {
+                for peer_string in old_peers_to_disconnect.iter() {
+                    peers_management.remove_reserved_peer(&peer_string);
+                }
+            }
+        }
+
+
         // we overwrite here the data.
         // mahybe we should make sure that there are no connected_current_pending_validators
-        debug_assert!(self.connected_current_pending_validators.len() == 0);
         self.connected_current_pending_validators = connected_current_pending_validators;
 
         return Ok(self.connected_current_pending_validators.len());
