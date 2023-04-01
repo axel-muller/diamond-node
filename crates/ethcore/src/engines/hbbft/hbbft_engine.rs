@@ -1019,17 +1019,6 @@ impl HoneyBadgerBFT {
                 let validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
-
-                        if validators.len() == 0 {
-                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) { 
-                                    peers_management.disconnect_pending_validators();
-                             
-                            } else {
-                                error!(target: "engine", "Could not disconnect_pending_validators, peers management lock not acquird within time.");
-                            }     // peers management: set new peers to connect.
-                        }
-                   
-
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
@@ -1328,6 +1317,15 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         *self.signer.write() = signer;
 
         if let Some(client) = self.client_arc() {
+
+            // client.as_full_client().and_then(|c| {
+            //     self.peers_management.lock().set_peers_management(self.peers_management.clone());
+            //     None
+            //     }
+            // );
+            // setting peers management here.
+            
+
             warn!(target: "engine", "set_signer - update_honeybadger...");
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,
