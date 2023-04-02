@@ -68,7 +68,7 @@ impl HbbftPeersManagement {
     ) -> Result<usize, String> {
         let block_chain_client = client_arc
             .as_full_client()
-            .ok_or("could not retrieve BlockChainClient for connect_to_pending_validators")?;
+            .ok_or("reserverd peers: could not retrieve BlockChainClient for connect_to_pending_validators")?;
         if self.should_not_connect(block_chain_client) {
             // warn!(target: "Engine", "connect_to_pending_validators should_not_connect");
             return Ok(0);
@@ -119,7 +119,14 @@ impl HbbftPeersManagement {
 
             if let Some(peers_management) = peers_management_guard.as_deref_mut() {
                 for peer_string in old_peers_to_disconnect.iter() {
-                    peers_management.remove_reserved_peer(&peer_string);
+                    match peers_management.remove_reserved_peer(&peer_string) {
+                        Ok(_) => {
+                            info!(target: "Engine", "removed reserved peer {}", peer_string);
+                        }
+                        Err(_) => {
+                            warn!(target: "Engine", "could not remove reserved peer {}", peer_string);
+                        }
+                    }
                 }
             }
         }
@@ -150,7 +157,7 @@ impl HbbftPeersManagement {
         let block_chain_client = match client.as_full_client() {
             Some(full_client) => full_client,
             None => {
-                error!(target: "Engine", "could not retrieve BlockChainClient for adding Internet Addresses.");
+                error!(target: "Engine", "could not retrieve BlockChainClient for adding reserved peer.");
                 return;
             }
         };
@@ -171,7 +178,7 @@ impl HbbftPeersManagement {
             }
         }
 
-        warn!(target: "engine", "gathering Endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
+        warn!(target: "engine", "gathering endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
     }
 
     // if we drop out as a current validator,
@@ -347,7 +354,10 @@ impl HbbftPeersManagement {
                 );
                 if let Some(mut data) = result {
                     data.mining_address = *mining_address;
+                    info!("added reserved peer: {:?}", data);
                 }
+
+                
             }
             Err(call_error) => {
                 error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
