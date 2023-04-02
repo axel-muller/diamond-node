@@ -42,6 +42,7 @@ pub(crate) struct DispatchedSealMessage {
 }
 
 /// holds up the history of a node for a staking epoch history.
+#[derive(Debug)]
 pub(crate) struct NodeStakingEpochHistory {
     node_id: NodeId,
     last_good_sealing_message: u64,
@@ -205,10 +206,12 @@ impl NodeStakingEpochHistory {
 }
 
 /// holds up the history of all nodes for a staking epoch history.
+#[derive(Debug)]
 pub(crate) struct StakingEpochHistory {
     staking_epoch: u64,
     staking_epoch_start_block: u64,
     staking_epoch_end_block: u64,
+
     // stored the node staking epoch history.
     // since 25 is the exected maximum, a Vec has about the same perforamnce than a HashMap.
     node_staking_epoch_histories: Vec<NodeStakingEpochHistory>,
@@ -386,6 +389,8 @@ impl HbbftMessageDispatcher {
                 .push_back(message.clone());
         }
     }
+
+    
 
     fn ensure_worker_thread(&mut self) {
         if self.thread.is_none() {
@@ -706,13 +711,24 @@ impl HbbftMessageMemorium {
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
         warn!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
-        if let Ok(_) = self
+        if let Ok(epoch_history_index) = self
             .staking_epoch_history
             .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
         {
-            warn!(target: "hbbft_message_memorium", "New staking epoch reported twice: {}", staking_epoch);
+            self.staking_epoch_history[epoch_history_index].staking_epoch_start_block = staking_epoch_start_block;
         } else {
             debug!(target: "hbbft_message_memorium", "New staking epoch reported : {staking_epoch}");
+
+            // it might be possible that some messages already arrived in the old staking epoch.
+            // how to handle that ?
+            // maybe hbbft_message_memorium should be paused until fully synced ?
+            // and messages should always be handled with a large delay ?!
+            // or
+            // we do not process messages from the future,
+            // "the future" is defined by the latest imported block + 1 (one) - so we always can get statistics on the current 
+            // block that is currently being imported.
+            
+
             // if we have already a staking epoch stored, we can write the end block of the previous staking epoch.
             if let Some(previous) = self.staking_epoch_history.back_mut() {
                 previous.staking_epoch_end_block = staking_epoch_start_block - 1;
@@ -728,15 +744,54 @@ impl HbbftMessageMemorium {
     }
 
     fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-        for e in self.staking_epoch_history.iter_mut() {
-            if block_num > e.staking_epoch_start_block
-                && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
-            {
-                return Some(e);
+
+        
+        
+        {
+            //let histories = &mut self.staking_epoch_history;
+
+
+            // self.staking_epoch_history.get_mut(index)
+            for i in 0..self.staking_epoch_history.len() { 
+                let e = &self.staking_epoch_history[i];
+                if block_num > e.staking_epoch_start_block
+                    && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
+                {
+                    return Some(&mut self.staking_epoch_history[i]);
+                }
             }
         }
 
-        return None;
+        // if we have not found a staking epoch, we add it if possible.
+        // this can happen during timings, where new messages get's process,
+        // but a block import did not happen yet, and the report_new_epoch function was called.
+
+        // this is the case for example after booting up the node.
+        // per definition there must always be a staking epoch history, with an open staking_epoch_end_block.
+        // but in this case, we can not know the epoch start block.
+
+        // we know abolutly nothing about the history, not even the start block of the staking epoch, or even it's number.
+        // we mark this StakingEpochHistory as incomplete.
+
+        // i think this should only be possible if we have no staking epoch history at all.
+        //debug_assert!(self.staking_epoch_history.len() == 0);
+
+        
+        //let new_staking_epoch_history = StakingEpochHistory::new(0, 0, 0);
+
+        //self.staking_epoch_history.push_front(new_staking_epoch_history);
+        // return self.staking_epoch_history.front_mut().unwrap();
+
+        //lets print some debug infos so we can analyze this case in greater detail.
+
+        warn!("No staking epoch history found for block: {}", block_num);
+
+        for staking_epoch_history_entry in self.staking_epoch_history.iter() {
+            warn!("Staking Epoch History: {:?}", staking_epoch_history_entry);
+        }
+        
+
+        None
     }
 
     fn work_message(&mut self) -> bool {
@@ -901,6 +956,7 @@ impl HbbftMessageMemorium {
         }
         return false;
     }
+
 }
 
 #[cfg(test)]
