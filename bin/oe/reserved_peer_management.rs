@@ -77,3 +77,88 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use network::{ProtocolId, NetworkContext};
+    use sync::ManageNetwork;
+    use super::*;
+    use std::{sync::Arc, ops::RangeInclusive, net::{SocketAddrV4, Ipv4Addr}};
+
+
+pub struct TestManageNetwork;
+
+impl ManageNetwork for TestManageNetwork {
+    fn accept_unreserved_peers(&self) {}
+    fn deny_unreserved_peers(&self) {}
+    fn remove_reserved_peer(&self, _peer: String) -> Result<(), String> {
+        Ok(())
+    }
+    fn add_reserved_peer(&self, _peer: String) -> Result<(), String> {
+        Ok(())
+    }
+    fn start_network(&self) {}
+    fn stop_network(&self) {}
+    fn num_peers_range(&self) -> RangeInclusive<u32> {
+        25..=50
+    }
+    fn with_proto_context(&self, _: ProtocolId, _: &mut dyn FnMut(&dyn NetworkContext)) {}
+
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
+        Some(SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            30303,
+        )))
+    }
+}
+
+    #[test]
+    fn test_add_reserved_peer() {
+        
+        let manage_network = Arc::new(TestManageNetwork);
+        let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
+        let peer = "127.0.0.1:30303".to_string();
+        assert_eq!(wrapper.add_reserved_peer(&peer), Ok(()));
+        assert_eq!(wrapper.add_reserved_peer(&peer), Ok(()));
+    }
+
+    #[test]
+    fn test_remove_reserved_peer() {
+        let manage_network = Arc::new(TestManageNetwork);
+        let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
+        let peer = "127.0.0.1:30303".to_string();
+        assert_eq!(wrapper.remove_reserved_peer(&peer), Err(()));
+        assert_eq!(wrapper.add_reserved_peer(&peer), Ok(()));
+        assert_eq!(wrapper.remove_reserved_peer(&peer), Ok(()));
+    }
+
+    #[test]
+    fn test_get_reserved_peers() {
+        let manage_network = Arc::new(TestManageNetwork);
+        let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
+        assert_eq!(wrapper.get_reserved_peers().len(), 0);
+        let peer = "127.0.0.1:30303".to_string();
+        assert_eq!(wrapper.add_reserved_peer(&peer), Ok(()));
+        assert_eq!(wrapper.get_reserved_peers().len(), 1);
+    }
+
+    #[test]
+    fn test_disconnect_others_than() {
+        //
+        // 
+        //
+        
+        let manage_network = Arc::new(TestManageNetwork);
+        let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
+        let peer1 = "127.0.0.1:30303".to_string();
+        let peer2 = "127.0.0.1:30304".to_string();
+        let peer3 = "127.0.0.1:30305".to_string();
+        assert_eq!(wrapper.add_reserved_peer(&peer1), Ok(()));
+        assert_eq!(wrapper.add_reserved_peer(&peer2), Ok(()));
+        assert_eq!(wrapper.add_reserved_peer(&peer3), Ok(()));
+        let keep_list = ["127.0.0.1:30303", "127.0.0.1:30304"].iter().cloned().map(String::from).collect();
+        assert_eq!(wrapper.disconnect_others_than(keep_list), 1);
+        assert_eq!(wrapper.get_reserved_peers().len(), 2);
+    }
+}
