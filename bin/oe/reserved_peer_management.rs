@@ -116,7 +116,7 @@ impl ManageNetwork for TestManageNetwork {
     #[test]
     fn test_add_reserved_peer() {
         
-        let manage_network = Arc::new(TestManageNetwork);
+        let manage_network: Arc<dyn ManageNetwork> = Arc::new(TestManageNetwork);
         let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
         let peer = "127.0.0.1:30303".to_string();
         assert_eq!(wrapper.add_reserved_peer(&peer), Ok(()));
@@ -125,7 +125,7 @@ impl ManageNetwork for TestManageNetwork {
 
     #[test]
     fn test_remove_reserved_peer() {
-        let manage_network = Arc::new(TestManageNetwork);
+        let manage_network : Arc<dyn ManageNetwork> = Arc::new(TestManageNetwork);
         let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
         let peer = "127.0.0.1:30303".to_string();
         assert_eq!(wrapper.remove_reserved_peer(&peer), Err(()));
@@ -135,7 +135,7 @@ impl ManageNetwork for TestManageNetwork {
 
     #[test]
     fn test_get_reserved_peers() {
-        let manage_network = Arc::new(TestManageNetwork);
+        let manage_network : Arc<dyn ManageNetwork> = Arc::new(TestManageNetwork);
         let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
         assert_eq!(wrapper.get_reserved_peers().len(), 0);
         let peer = "127.0.0.1:30303".to_string();
@@ -149,7 +149,8 @@ impl ManageNetwork for TestManageNetwork {
         // 
         //
         
-        let manage_network = Arc::new(TestManageNetwork);
+        let manage_network: Arc<dyn ManageNetwork> = Arc::new(TestManageNetwork);
+
         let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));
         let peer1 = "127.0.0.1:30303".to_string();
         let peer2 = "127.0.0.1:30304".to_string();
