@@ -390,8 +390,6 @@ impl HbbftMessageDispatcher {
         }
     }
 
-    
-
     fn ensure_worker_thread(&mut self) {
         if self.thread.is_none() {
             // let mut memo = self;
@@ -715,7 +713,8 @@ impl HbbftMessageMemorium {
             .staking_epoch_history
             .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
         {
-            self.staking_epoch_history[epoch_history_index].staking_epoch_start_block = staking_epoch_start_block;
+            self.staking_epoch_history[epoch_history_index].staking_epoch_start_block =
+                staking_epoch_start_block;
         } else {
             debug!(target: "hbbft_message_memorium", "New staking epoch reported : {staking_epoch}");
 
@@ -725,9 +724,8 @@ impl HbbftMessageMemorium {
             // and messages should always be handled with a large delay ?!
             // or
             // we do not process messages from the future,
-            // "the future" is defined by the latest imported block + 1 (one) - so we always can get statistics on the current 
+            // "the future" is defined by the latest imported block + 1 (one) - so we always can get statistics on the current
             // block that is currently being imported.
-            
 
             // if we have already a staking epoch stored, we can write the end block of the previous staking epoch.
             if let Some(previous) = self.staking_epoch_history.back_mut() {
@@ -744,15 +742,11 @@ impl HbbftMessageMemorium {
     }
 
     fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-
-        
-        
         {
             //let histories = &mut self.staking_epoch_history;
 
-
             // self.staking_epoch_history.get_mut(index)
-            for i in 0..self.staking_epoch_history.len() { 
+            for i in 0..self.staking_epoch_history.len() {
                 let e = &self.staking_epoch_history[i];
                 if block_num > e.staking_epoch_start_block
                     && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
@@ -776,7 +770,6 @@ impl HbbftMessageMemorium {
         // i think this should only be possible if we have no staking epoch history at all.
         //debug_assert!(self.staking_epoch_history.len() == 0);
 
-        
         //let new_staking_epoch_history = StakingEpochHistory::new(0, 0, 0);
 
         //self.staking_epoch_history.push_front(new_staking_epoch_history);
@@ -789,7 +782,6 @@ impl HbbftMessageMemorium {
         for staking_epoch_history_entry in self.staking_epoch_history.iter() {
             warn!("Staking Epoch History: {:?}", staking_epoch_history_entry);
         }
-        
 
         None
     }
@@ -956,7 +948,6 @@ impl HbbftMessageMemorium {
         }
         return false;
     }
-
 }
 
 #[cfg(test)]

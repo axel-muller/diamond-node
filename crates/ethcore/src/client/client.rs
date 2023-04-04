@@ -1023,8 +1023,6 @@ impl Client {
             .and_then(|s| Address::from_str(s).ok());
         if let Some(ref addr) = registrar_address {
             trace!(target: "client", "Found registrar at {}", addr);
-
-
         }
 
         let client = Arc::new(Client {

@@ -79,7 +79,7 @@ use stats::{PrometheusMetrics, PrometheusRegistry};
 use trace::LocalizedTrace;
 use verification::queue::{kind::blocks::Unverified, QueueInfo};
 
-use super::{ReservedPeersManagement};
+use super::ReservedPeersManagement;
 
 /// Test client.
 pub struct TestBlockChainClient {

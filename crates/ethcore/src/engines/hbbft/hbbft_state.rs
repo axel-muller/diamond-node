@@ -6,11 +6,11 @@ use hbbft::{
     honey_badger::{self, HoneyBadgerBuilder},
     Epoched, NetworkInfo,
 };
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{Mutex, RwLock};
 use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::{Arc},
+    sync::Arc,
 };
 use types::{header::Header, ids::BlockId};
 
@@ -111,7 +111,9 @@ impl HbbftState {
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             // we can disconnect the peers here.
-            if let Some(mut peers_management) = peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50)) {
+            if let Some(mut peers_management) =
+                peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50))
+            {
                 peers_management.disconnect_all_validators();
             }
             return Some(());
@@ -123,8 +125,9 @@ impl HbbftState {
 
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
 
-
-        if let Some(mut peers_management) = peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50)) {
+        if let Some(mut peers_management) =
+            peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50))
+        {
             peers_management.connect_to_current_validators(&network_info, &client);
         } else {
             // maybe we should work with signals that signals that connect_to_current_validators should happen
@@ -505,7 +508,7 @@ impl HbbftState {
         self.network_info.clone()
     }
 
-    pub fn  get_current_network_info(&self ) -> Option<NetworkInfo<NodeId>> {
+    pub fn get_current_network_info(&self) -> Option<NetworkInfo<NodeId>> {
         return self.network_info.clone();
     }
 

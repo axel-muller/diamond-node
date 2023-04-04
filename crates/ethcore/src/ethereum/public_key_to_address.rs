@@ -19,9 +19,9 @@ pub fn public_key_to_address(public_key: &H512) -> Address {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-    use ethereum_types::{H512, Address};
     use crate::ethereum::public_key_to_address::public_key_to_address;
+    use ethereum_types::{Address, H512};
+    use std::str::FromStr;
 
     #[test]
     fn test_public_key_to_address() {

@@ -480,7 +480,7 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
     client.set_reserved_peers_management(Box::new(ReservedPeersWrapper::new(Arc::downgrade(
         &manage_network,
     ))));
-    
+
     service.add_notify(chain_notify.clone());
 
     // Propagate transactions as soon as they are imported.

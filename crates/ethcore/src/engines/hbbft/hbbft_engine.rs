@@ -2,10 +2,7 @@ use super::block_reward_hbbft::BlockRewardContract;
 use crate::{
     client::BlockChainClient,
     engines::hbbft::{
-        contracts::{
-            random_hbbft::set_current_seed_tx_raw,
-        },
-        hbbft_message_memorium::BadSealReason,
+        contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason,
         hbbft_peers_management::HbbftPeersManagement,
     },
 };
@@ -23,7 +20,7 @@ use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
 use itertools::Itertools;
 use machine::EthereumMachine;
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{Mutex, RwLock};
 use rlp;
 use rmp_serde;
 use serde::Deserialize;
@@ -31,7 +28,7 @@ use std::{
     cmp::{max, min},
     collections::BTreeMap,
     convert::TryFrom,
-    ops::{BitXor},
+    ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Weak},
     time::Duration,
 };
@@ -200,7 +197,7 @@ impl IoHandler<()> for TransitionHandler {
                     timer_duration = self.min_block_time_remaining(c.clone());
 
                     // If the minimum block time has passed we are ready to trigger new blocks.
-                    if timer_duration == Duration::from_secs(0) {                    
+                    if timer_duration == Duration::from_secs(0) {
                         // Always create blocks if we are in the keygen phase.
                         self.engine.start_hbbft_epoch_if_next_phase();
 
@@ -521,13 +518,8 @@ impl HoneyBadgerBFT {
 
         let message_block = message.epoch();
 
-        let mut lock = self.hbbft_state.write(); 
-        match lock.process_message(
-            client.clone(),
-            &self.signer,
-            sender_id,
-            message,
-        ) {
+        let mut lock = self.hbbft_state.write();
+        match lock.process_message(client.clone(), &self.signer, sender_id, message) {
             Ok(Some((step, network_info))) => {
                 std::mem::drop(lock);
                 if step.fault_log.0.is_empty() {
@@ -689,7 +681,6 @@ impl HoneyBadgerBFT {
         network_info: &NetworkInfo<NodeId>,
     ) {
         let mut message_counter = self.message_counter.lock();
-        
 
         let messages = step.messages.into_iter().map(|msg| {
             *message_counter += 1;
@@ -712,8 +703,9 @@ impl HoneyBadgerBFT {
             return Ok(());
         }
 
-        
-        let step = self.hbbft_state.write()
+        let step = self
+            .hbbft_state
+            .write()
             .contribute_if_contribution_threshold_reached(client.clone(), &self.signer);
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
@@ -728,14 +720,14 @@ impl HoneyBadgerBFT {
             return;
         }
 
-        let step = 
-        match self.hbbft_state.try_write_for(std::time::Duration::from_millis(10)) {
-            Some(mut state_lock) => {
-                state_lock.try_send_contribution(client.clone(), &self.signer)
-            },
+        let step = match self
+            .hbbft_state
+            .try_write_for(std::time::Duration::from_millis(10))
+        {
+            Some(mut state_lock) => state_lock.try_send_contribution(client.clone(), &self.signer),
             None => {
                 return;
-            },
+            }
         };
 
         if let Some((step, network_info)) = step {
@@ -788,22 +780,18 @@ impl HoneyBadgerBFT {
         let client = self.client_arc()?;
 
         // replaying cached messages is not so important that it cause deadlocks
-        // instead we gently try to get a lock for 10 ms, and if we do not get a lock, 
+        // instead we gently try to get a lock for 10 ms, and if we do not get a lock,
         // we will just try again in the next tick.
         // we could try to do some optimizations here to improve performance.
 
-        let steps = 
-            match self.hbbft_state.try_write_for(Duration::from_millis(10)) {
-                Some(mut hbbft_state_lock) => {
-                    hbbft_state_lock.replay_cached_messages(client.clone())
-                },
-                None => {
-                    trace!(target: "engine", "could not acquire write lock for replaying cached messages, stepping back..",);
-                    return None;
-                },
-            };
+        let steps = match self.hbbft_state.try_write_for(Duration::from_millis(10)) {
+            Some(mut hbbft_state_lock) => hbbft_state_lock.replay_cached_messages(client.clone()),
+            None => {
+                trace!(target: "engine", "could not acquire write lock for replaying cached messages, stepping back..",);
+                return None;
+            }
+        };
 
-        
         let mut processed_step = false;
         if let Some((steps, network_info)) = steps {
             for step in steps {
@@ -883,8 +871,6 @@ impl HoneyBadgerBFT {
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
     fn do_validator_engine_actions(&self) -> Result<(), String> {
-    
-
         // here we need to differentiate the different engine functions,
         // that requre different levels of access to the client.
 
@@ -909,7 +895,7 @@ impl HoneyBadgerBFT {
                 let engine_client = client_arc.deref();
 
                 let block_chain_client = match engine_client.as_full_client() {
-                    Some(block_chain_client) => {block_chain_client},
+                    Some(block_chain_client) => block_chain_client,
                     None => {
                         return Err("Unable to retrieve client.as_full_client()".into());
                     }
@@ -919,9 +905,8 @@ impl HoneyBadgerBFT {
                     self.should_handle_availability_announcements();
                 let should_handle_internet_address_announcements =
                     self.should_handle_internet_address_announcements(block_chain_client);
-    
+
                 let should_connect_to_validator_set = self.should_connect_to_validator_set();
-    
 
                 // if we do not have to do anything, we can return early.
                 if !(should_handle_availability_announcements
@@ -936,7 +921,10 @@ impl HoneyBadgerBFT {
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                let staking_address = match staking_by_mining_address(engine_client, &mining_address) {
+                let staking_address = match staking_by_mining_address(
+                    engine_client,
+                    &mining_address,
+                ) {
                     Ok(staking_address) => {
                         if staking_address.is_zero() {
                             //TODO: here some fine handling can improve performance.
@@ -954,7 +942,6 @@ impl HoneyBadgerBFT {
                     }
                 };
 
-
                 // if we are not a potential validator, we already have already returned here.
                 if should_handle_availability_announcements {
                     self.handle_availability_announcements(
@@ -967,7 +954,10 @@ impl HoneyBadgerBFT {
                 // since get latest nonce respects the pending transactions,
                 // we don't have to take care of sending 2 transactions at once.
                 if should_handle_internet_address_announcements {
-                    if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
+                    if let Some(mut peers_management) = self
+                        .peers_management
+                        .try_lock_for(Duration::from_millis(100))
+                    {
                         if let Err(error) = peers_management.announce_own_internet_address(
                             block_chain_client,
                             engine_client,
@@ -975,38 +965,38 @@ impl HoneyBadgerBFT {
                         ) {
                             error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
                         } else {
-                            
                         }
                     }
                 }
 
                 if should_connect_to_validator_set {
-
-                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() { 
+                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() {
                         hbbft_state.get_current_network_info()
                     } else {
                         None
                     };
 
                     if let Some(network_info) = network_info_o {
-                        if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(100)) {
+                        if let Some(mut peers_management) = self
+                            .peers_management
+                            .try_lock_for(Duration::from_millis(100))
+                        {
                             // connecting to current validators.
-                            peers_management.connect_to_current_validators(&network_info, &client_arc);
-                            self.has_connected_to_validator_set.store(true, Ordering::SeqCst);
+                            peers_management
+                                .connect_to_current_validators(&network_info, &client_arc);
+                            self.has_connected_to_validator_set
+                                .store(true, Ordering::SeqCst);
                         }
                     }
-
                 }
-                        return Ok(());
-                    
-                },
-            
+                return Ok(());
+            }
+
             None => {
                 // client arc not ready yet,
                 // can happen during initialization and shutdown.
                 return Ok(());
             }
-            
         }
     }
 
@@ -1061,14 +1051,19 @@ impl HoneyBadgerBFT {
                             // but this is NOT Mission critical,
                             // we will connect to the validators when we are in the validator set anyway.
                             // so we won't lock and wait forever to be able to do this.
-                            if let Some(mut peers_management) = self.peers_management.try_lock_for(Duration::from_millis(50)) {
-                                match peers_management.connect_to_pending_validators(&client, &validators) {
+                            if let Some(mut peers_management) = self
+                                .peers_management
+                                .try_lock_for(Duration::from_millis(50))
+                            {
+                                match peers_management
+                                    .connect_to_pending_validators(&client, &validators)
+                                {
                                     Ok(value) => {
                                         debug!(target: "engine", "connected to additional {:?} nodes, because they are pending validators.",  value);
-                                    },
+                                    }
                                     Err(err) => {
                                         warn!(target: "engine", "Error connecting to other pending validators: {:?}", err);
-                                    },
+                                    }
                                 }
                             } else {
                                 warn!(target: "engine", "Could not connect to other pending validators, peers management lock not acquird within time.");
@@ -1311,20 +1306,20 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
         if let Some(engine_signer) = signer.as_ref() {
             // this is importamt, we really have to get that lock here.
-            self.peers_management.lock().set_validator_address(engine_signer.address());
+            self.peers_management
+                .lock()
+                .set_validator_address(engine_signer.address());
         }
 
         *self.signer.write() = signer;
 
         if let Some(client) = self.client_arc() {
-
             // client.as_full_client().and_then(|c| {
             //     self.peers_management.lock().set_peers_management(self.peers_management.clone());
             //     None
             //     }
             // );
             // setting peers management here.
-            
 
             warn!(target: "engine", "set_signer - update_honeybadger...");
             if let None = self.hbbft_state.write().update_honeybadger(
@@ -1475,18 +1470,18 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 r.clone()
             }
         };
-        
+
         let tx = set_current_seed_tx_raw(&random_number);
 
         //  let mut call = engines::default_system_or_code_call(&self.machine, block);
         let result = self
             .machine
             .execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
-        
+
         match result {
             Ok(_) => {
                 return Ok(());
-            },
+            }
             Err(e) => {
                 //return Err(EngineError::Custom(format!("Error calling randomness contract: {:?}", e)).into());
                 return Err(e);

@@ -180,10 +180,10 @@ fn run_deadlock_detection_thread() {
     match spawned {
         Ok(_) => {
             info!("Deadlock detection thread successfully spawned.");
-        },
+        }
         Err(e) => {
             info!("Error spawning deadlock detection thread: {:?}", e);
-        },
+        }
     }
 }
 

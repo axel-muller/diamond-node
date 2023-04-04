@@ -16,7 +16,11 @@
 
 //! Traits implemented by client.
 
-use std::{collections::{BTreeMap, BTreeSet}, net::SocketAddr, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    sync::Arc,
+};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;
@@ -221,7 +225,7 @@ pub trait ReservedPeersManagement: Send + Sync {
     fn add_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
 
     /// remove reserved peer
-    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), String> ;
+    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
 
     /// get the infos what peers have been added currently.
     fn get_reserved_peers(&self) -> &BTreeSet<String>;

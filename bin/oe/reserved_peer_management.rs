@@ -43,7 +43,8 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
                         // this remove should never fail, because we check just before
                         self.current_reserved_peers.remove(peer);
                     }
-                    return remove_result.map_err(|_e| format!("remove_reserved_peer failed for peer: {peer}"));
+                    return remove_result
+                        .map_err(|_e| format!("remove_reserved_peer failed for peer: {peer}"));
                 }
                 None => {
                     warn!("ManageNetwork instance not available.");
@@ -51,7 +52,9 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
                 }
             }
         } else {
-            return Err(format!("Cannot remove reserved Peer: Peer not reserved: {peer}"))
+            return Err(format!(
+                "Cannot remove reserved Peer: Peer not reserved: {peer}"
+            ));
         }
     }
 
@@ -162,7 +165,6 @@ mod tests {
 
     #[test]
     fn test_disconnect_others_than() {
-
         let manage_network: Arc<dyn ManageNetwork> = Arc::new(TestManageNetwork);
 
         let mut wrapper = ReservedPeersWrapper::new(Arc::downgrade(&manage_network));

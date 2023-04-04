@@ -1,6 +1,6 @@
 use client::EngineClient;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
-use ethereum_types::{Address, U256, Public};
+use ethereum_types::{Address, Public, U256};
 use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     str::FromStr,
@@ -62,7 +62,6 @@ pub fn get_validator_internet_address(
                 || ip[6] > 0
                 || ip[7] > 0
             {
-
                 warn!("Port: {} - {}", port[0], port[1]);
                 return Ok(SocketAddr::V6(SocketAddrV6::new(
                     Ipv6Addr::from(ip),
@@ -71,7 +70,6 @@ pub fn get_validator_internet_address(
                     0,
                 )));
             } else {
-                
                 // we also return an V4 address if we have only 0.0.0.0 as well.
 
                 let be = u16::from_be_bytes(port);
@@ -80,7 +78,7 @@ pub fn get_validator_internet_address(
 
                 return Ok(SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
-                    be
+                    be,
                 )));
             }
         }
@@ -110,8 +108,7 @@ pub fn get_pool_public_key(
     let result = call_const_staking!(c, get_pool_public_key, staking_address.clone());
 
     match result {
-        Ok( pk ) => {
-
+        Ok(pk) => {
             // let nodeID: H512 =  H512::from_slice();
             return Ok(Public::from_slice(&pk));
         }

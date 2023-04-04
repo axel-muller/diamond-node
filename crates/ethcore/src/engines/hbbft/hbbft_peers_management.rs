@@ -92,26 +92,29 @@ impl HbbftPeersManagement {
             }
         }
 
-
         let mut old_peers_to_disconnect: Vec<String> = Vec::new();
         // we disconnect from all validators that are not in the pending list anymore.
         for old_validator in self.connected_current_pending_validators.iter() {
-
-            let newly_connected_count =  connected_current_pending_validators.iter().filter(|v| v.mining_address == old_validator.mining_address).count();
+            let newly_connected_count = connected_current_pending_validators
+                .iter()
+                .filter(|v| v.mining_address == old_validator.mining_address)
+                .count();
 
             // should be 0 or 1.
 
-            if newly_connected_count == 0 { 
+            if newly_connected_count == 0 {
                 // maybe this validator is a active validator, then we keep the connection.
 
-                if self.is_miner_connected_as_current_validator(&old_validator.mining_address).is_none() {
+                if self
+                    .is_miner_connected_as_current_validator(&old_validator.mining_address)
+                    .is_none()
+                {
                     // we are neighter a pending validator, nor a current validator.
                     // we have to disconnect.
                     old_peers_to_disconnect.push(old_validator.peer_string.clone());
                 }
             }
         }
-
 
         if old_peers_to_disconnect.len() > 0 {
             // we have to disconnect from some peers
@@ -130,7 +133,6 @@ impl HbbftPeersManagement {
                 }
             }
         }
-
 
         // we overwrite here the data.
         // mahybe we should make sure that there are no connected_current_pending_validators
@@ -356,8 +358,6 @@ impl HbbftPeersManagement {
                     data.mining_address = *mining_address;
                     info!("added reserved peer: {:?}", data);
                 }
-
-                
             }
             Err(call_error) => {
                 error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
