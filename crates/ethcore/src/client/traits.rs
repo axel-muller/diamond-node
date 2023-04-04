@@ -221,7 +221,7 @@ pub trait ReservedPeersManagement: Send + Sync {
     fn add_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
 
     /// remove reserved peer
-    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), ()> ;
+    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), String> ;
 
     /// get the infos what peers have been added currently.
     fn get_reserved_peers(&self) -> &BTreeSet<String>;
