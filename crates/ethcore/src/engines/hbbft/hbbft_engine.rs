@@ -1475,16 +1475,23 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 r.clone()
             }
         };
-        warn!("random number: {:?}", random_number);
-
+        
         let tx = set_current_seed_tx_raw(&random_number);
 
         //  let mut call = engines::default_system_or_code_call(&self.machine, block);
         let result = self
             .machine
             .execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
-        warn!("execution result: {result:?}");
-        return result.map(|_| ());
+        
+        match result {
+            Ok(_) => {
+                return Ok(());
+            },
+            Err(e) => {
+                //return Err(EngineError::Custom(format!("Error calling randomness contract: {:?}", e)).into());
+                return Err(e);
+            }
+        }
     }
 
     /// Allow mutating the header during seal generation.
