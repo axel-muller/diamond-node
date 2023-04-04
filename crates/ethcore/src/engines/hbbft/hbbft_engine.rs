@@ -921,7 +921,7 @@ impl HoneyBadgerBFT {
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                let staking_address = match staking_by_mining_address(
+                let _staking_address = match staking_by_mining_address(
                     engine_client,
                     &mining_address,
                 ) {

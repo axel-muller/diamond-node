@@ -59,7 +59,7 @@ impl TransactionBuilder {
             hash: H256::from_uint(&hash),
             nonce: self.nonce,
             gas_price: self.gas_price,
-            gas: 21_000.into(),
+            gas: self.gas,
             sender: self.sender,
             mem_usage: self.mem_usage,
         }

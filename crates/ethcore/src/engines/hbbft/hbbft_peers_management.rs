@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
     client::{BlockChainClient, EngineClient},
@@ -10,10 +10,10 @@ use crate::{
 };
 
 use bytes::ToPretty;
-use error_chain::example_generated::ResultExt;
+
 use ethereum_types::Address;
 use hbbft::NetworkInfo;
-use parking_lot::MutexGuard;
+
 
 use super::{contracts::staking::get_pool_public_key, NodeId};
 
