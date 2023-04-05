@@ -88,6 +88,8 @@ impl HbbftPeersManagement {
                     pending_validator_address,
                 ) {
                     connected_current_pending_validators.push(connected_validator);
+                } else {
+                    warn!(target: "Engine", "could not add pending validator to reserved peers: {}", pending_validator_address);
                 }
             }
         }
