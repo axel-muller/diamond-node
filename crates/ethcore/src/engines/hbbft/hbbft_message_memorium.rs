@@ -748,7 +748,7 @@ impl HbbftMessageMemorium {
             // self.staking_epoch_history.get_mut(index)
             for i in 0..self.staking_epoch_history.len() {
                 let e = &self.staking_epoch_history[i];
-                if block_num > e.staking_epoch_start_block
+                if block_num >= e.staking_epoch_start_block
                     && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
                 {
                     return Some(&mut self.staking_epoch_history[i]);
