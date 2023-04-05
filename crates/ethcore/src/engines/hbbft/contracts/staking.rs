@@ -71,11 +71,7 @@ pub fn get_validator_internet_address(
                 )));
             } else {
                 // we also return an V4 address if we have only 0.0.0.0 as well.
-
                 let be = u16::from_be_bytes(port);
-
-                warn!("port: {} - {} = be {be}", port[0], port[1]);
-
                 return Ok(SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(ip[12], ip[13], ip[14], ip[15]),
                     be,
