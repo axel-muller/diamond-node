@@ -62,10 +62,10 @@ pub fn get_validator_internet_address(
                 || ip[6] > 0
                 || ip[7] > 0
             {
-                warn!("Port: {} - {}", port[0], port[1]);
+                let be = u16::from_be_bytes(port);
                 return Ok(SocketAddr::V6(SocketAddrV6::new(
                     Ipv6Addr::from(ip),
-                    port[0] as u16 * 256 + port[1] as u16,
+                    be,
                     0,
                     0,
                 )));
