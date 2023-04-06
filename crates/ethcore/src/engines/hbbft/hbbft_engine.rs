@@ -1280,7 +1280,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn register_client(&self, client: Weak<dyn EngineClient>) {
-        warn!(target: "engine", "register_client");
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();

@@ -152,7 +152,7 @@ impl HbbftPeersManagement {
         network_info: &NetworkInfo<NodeId>,
         client_arc: &Arc<dyn EngineClient>,
     ) {
-        warn!(target: "Engine", "connecting to current validators.");
+        warn!(target: "Engine", "connecting to current validators: {}", network_info.validator_set().all_ids().count());
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
