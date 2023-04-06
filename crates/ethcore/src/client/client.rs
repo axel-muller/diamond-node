@@ -1177,7 +1177,6 @@ impl Client {
         &self,
         reserved_peers_management: Box<dyn ReservedPeersManagement>,
     ) {
-        info!("set_reserved_peers_management");
         *self.reserved_peers_management.lock() = Some(reserved_peers_management);
     }
 
