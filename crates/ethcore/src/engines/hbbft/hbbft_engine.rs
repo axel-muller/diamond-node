@@ -14,7 +14,7 @@ use engines::{
     SealingState,
 };
 use error::{BlockError, Error};
-use ethereum_types::{H160, H256, H512, U256};
+use ethereum_types::{H160, H256, H512, U256, Address};
 use ethjson::spec::HbbftParams;
 use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
@@ -827,18 +827,18 @@ impl HoneyBadgerBFT {
         &self,
         engine_client: &dyn EngineClient,
         block_chain_client: &dyn BlockChainClient,
-        validator_address: &H160,
+        mining_address: &Address
     ) {
         // handles the announcements of the availability of other peers as blockchain transactions
 
         // let engine_client = client.deref();
 
-        match get_validator_available_since(engine_client, &validator_address) {
+        match get_validator_available_since(engine_client, &mining_address) {
             Ok(s) => {
                 if s.is_zero() {
                     //debug!(target: "engine", "sending announce availability transaction");
                     info!(target: "engine", "sending announce availability transaction");
-                    match send_tx_announce_availability(block_chain_client, &validator_address) {
+                    match send_tx_announce_availability(block_chain_client, &mining_address) {
                         Ok(()) => {}
                         Err(call_error) => {
                             error!(target: "engine", "CallError during announce availability. {:?}", call_error);
@@ -921,7 +921,7 @@ impl HoneyBadgerBFT {
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
                 // a good solution for this is not to do this that fequently.
-                let _staking_address = match staking_by_mining_address(
+                let staking_address = match staking_by_mining_address(
                     engine_client,
                     &mining_address,
                 ) {
@@ -962,6 +962,7 @@ impl HoneyBadgerBFT {
                             block_chain_client,
                             engine_client,
                             &mining_address,
+                            &staking_address
                         ) {
                             error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
                         } else {
@@ -1054,7 +1055,8 @@ impl HoneyBadgerBFT {
                             if let Some(mut peers_management) = self
                                 .peers_management
                                 .try_lock_for(Duration::from_millis(50))
-                            {
+                            {   
+                                // problem: this get's called every block, not only when validators become pending.
                                 match peers_management
                                     .connect_to_pending_validators(&client, &validators)
                                 {

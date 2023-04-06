@@ -125,8 +125,10 @@ impl HbbftState {
 
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
 
+        // this is importent, but we should not risk deadlocks...
+        // maybe we should refactor this to a message Queue system, and pass a "connect_to_current_validators" message
         if let Some(mut peers_management) =
-            peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50))
+            peers_management_mutex.try_lock_for(std::time::Duration::from_millis(250))
         {
             peers_management.connect_to_current_validators(&network_info, &client);
         } else {

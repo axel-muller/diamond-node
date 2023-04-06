@@ -152,6 +152,7 @@ impl HbbftPeersManagement {
         network_info: &NetworkInfo<NodeId>,
         client_arc: &Arc<dyn EngineClient>,
     ) {
+        warn!(target: "Engine", "connecting to current validators.");
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
@@ -254,7 +255,8 @@ impl HbbftPeersManagement {
         &mut self,
         block_chain_client: &dyn BlockChainClient,
         engine_client: &dyn EngineClient,
-        node_address: &Address,
+        mining_address: &Address,
+        staking_address: &Address
     ) -> Result<(), String> {
         // updates the nodes internet address if the information on the blockchain is outdated.
 
@@ -286,7 +288,7 @@ impl HbbftPeersManagement {
         // todo: we can improve performance,
         // by assuming that we are the only one who writes the internet address.
         // so we have to query this data only once, and then we can cache it.
-        match get_validator_internet_address(engine_client, &node_address) {
+        match get_validator_internet_address(engine_client, &staking_address) {
             Ok(validator_internet_address) => {
                 warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
                 if validator_internet_address.eq(&current_endpoint) {
@@ -299,7 +301,7 @@ impl HbbftPeersManagement {
 
                 match set_validator_internet_address(
                     block_chain_client,
-                    &node_address,
+                    &mining_address,
                     &current_endpoint,
                 ) {
                     Ok(()) => {
