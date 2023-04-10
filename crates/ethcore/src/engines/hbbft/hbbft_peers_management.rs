@@ -361,6 +361,7 @@ impl HbbftPeersManagement {
                 if let Some(mut data) = result {
                     data.mining_address = *mining_address;
                     info!("added reserved peer: {:?}", data);
+                    return Some(data);
                 }
             }
             Err(call_error) => {

@@ -1061,7 +1061,7 @@ impl HoneyBadgerBFT {
                                     .connect_to_pending_validators(&client, &validators)
                                 {
                                     Ok(value) => {
-                                        debug!(target: "engine", "connected to additional {:?} nodes, because they are pending validators.",  value);
+                                        debug!(target: "engine", "added to additional {:?} reserved peers, because they are pending validators.",  value);
                                     }
                                     Err(err) => {
                                         warn!(target: "engine", "Error connecting to other pending validators: {:?}", err);
