@@ -1428,7 +1428,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-        trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        // trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
         let random_numbers = self.random_numbers.read();
         let random_number: U256 = match random_numbers.get(&block.header.number()) {
             None => {
