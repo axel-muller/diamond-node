@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
     client::{BlockChainClient, EngineClient},
@@ -13,7 +13,6 @@ use bytes::ToPretty;
 
 use ethereum_types::Address;
 use hbbft::NetworkInfo;
-
 
 use super::{contracts::staking::get_pool_public_key, NodeId};
 
@@ -56,11 +55,14 @@ impl HbbftPeersManagement {
         return self.own_validator_address.is_zero() || client.is_major_syncing();
     }
 
+    // pub fn connect_to_validators_core()
+
     /// if we become a pending validator,
     /// we have to start to communicate with all other
     /// potential future validators.
     /// The transition phase for changing the validator
-    /// gives us enough time, so the switch from
+    /// gives us enough time, so we already can build
+    /// up the connections to the potential validators.
     pub fn connect_to_pending_validators(
         &mut self,
         client_arc: &Arc<dyn EngineClient>,
@@ -77,6 +79,10 @@ impl HbbftPeersManagement {
 
         // we need go get the nodeID from the smart contract
         for pending_validator_address in pending_validators.iter() {
+            if pending_validator_address == &self.own_validator_address {
+                continue; // skip ourself.
+            }
+
             if let Some(connection) = self.is_miner_connected(pending_validator_address) {
                 // if we are already connected to this pending validator,
                 // than we just can keep the connection.
@@ -147,12 +153,15 @@ impl HbbftPeersManagement {
     // that we are a current valudator,
     // then we have to figure out the current devP2P endpoints
     // from the smart contract and connect to them.
+    // we cannot for sure disconnect the current validator,
+    // because the node could just get synced into the transition time frame as
+    // a current validator.
     pub fn connect_to_current_validators(
         &mut self,
         network_info: &NetworkInfo<NodeId>,
         client_arc: &Arc<dyn EngineClient>,
     ) {
-        warn!(target: "Engine", "connecting to current validators: {}", network_info.validator_set().all_ids().count());
+        warn!(target: "Engine", "adding current validators as reserved peers: {}", network_info.validator_set().all_ids().count());
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
@@ -172,18 +181,74 @@ impl HbbftPeersManagement {
             return;
         }
 
-        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
         let start_time = std::time::Instant::now();
+
+        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
+
+        // let mut validators_to_remove: BTreeSet<String> =  BTreeSet::new();
+
+        let mut validators_to_remove: BTreeSet<Address> = self
+            .connected_current_validators
+            .iter()
+            .map(|v| v.mining_address.clone())
+            .collect();
+
+        // validators_to_remove
+        let mut current_validator_connections: Vec<ValidatorConnectionData> = Vec::new();
 
         for node in ids.iter() {
             let address = public_key_to_address(&node.0);
-            if let Some(connected) = self.connect_to_validator(client, block_chain_client, &address)
+
+            if address == self.own_validator_address {
+                continue; // skip ourself.
+            }
+
+            if let Some(connection) = self.is_miner_connected(&address) {
+                current_validator_connections.push(connection.clone());
+                validators_to_remove.remove(&connection.mining_address);
+            } else if let Some(connection) =
+                self.connect_to_validator(client, block_chain_client, &address)
             {
-                self.connected_current_validators.push(connected);
+                validators_to_remove.remove(&connection.mining_address);
+                current_validator_connections.push(connection);
+            } else {
+                warn!(target: "Engine", "could not add current validator to reserved peers: {}", address);
             }
         }
 
-        warn!(target: "engine", "gathering endpoint internet adresses took {} ms", (std::time::Instant::now() - start_time).as_millis());
+        info!("removing {} reserved peers, because they are neither a pending validator nor a current validator.", validators_to_remove.len());
+
+        let mut peers_management_guard = block_chain_client.reserved_peers_management().lock();
+
+        if let Some(peers_management) = peers_management_guard.as_deref_mut() {
+            for current_validator in self.connected_current_validators.iter() {
+                if validators_to_remove.contains(&current_validator.mining_address) {
+                    match peers_management.remove_reserved_peer(&current_validator.peer_string) {
+                        Ok(_) => {
+                            info!(target: "Engine", "removed reserved peer {}", current_validator.peer_string);
+                        }
+                        Err(error) => {
+                            warn!(target: "Engine", "could not remove reserved peer {}: reason: {}", current_validator.peer_string, error);
+                        }
+                    }
+                }
+            }
+
+            peers_management
+                .get_reserved_peers()
+                .iter()
+                .for_each(|peer| {
+                    info!(target: "Engine", "reserved peer: {}", peer);
+                });
+        }
+
+        // we have now connected all additional current validators, kept the connection for those that have already been connected,
+        // and we have disconnected all previous validators that are not current validators anymore.
+        // so we now can set the information of collected validators.
+
+        self.connected_current_validators = current_validator_connections;
+
+        warn!(target: "engine", "connecting to current validators took {} ms", (std::time::Instant::now() - start_time).as_millis());
     }
 
     // if we drop out as a current validator,
@@ -256,7 +321,7 @@ impl HbbftPeersManagement {
         block_chain_client: &dyn BlockChainClient,
         engine_client: &dyn EngineClient,
         mining_address: &Address,
-        staking_address: &Address
+        staking_address: &Address,
     ) -> Result<(), String> {
         // updates the nodes internet address if the information on the blockchain is outdated.
 
@@ -330,6 +395,13 @@ impl HbbftPeersManagement {
     pub fn set_validator_address(&mut self, value: Address) {
         self.own_validator_address = value;
     }
+
+    // fn disconnect_validator(
+    //     &mut self,
+    //     block_chain_client: &dyn BlockChainClient,
+    //     mining_address: &Address,
+    // ) {
+    // }
 
     fn connect_to_validator(
         &self,
