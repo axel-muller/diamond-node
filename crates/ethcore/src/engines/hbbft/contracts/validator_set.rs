@@ -147,9 +147,7 @@ pub fn set_validator_internet_address(
         port_array,
     );
 
-    let nonce = full_client
-        .nonce(signer_address, BlockId::Latest)
-        .unwrap_or_default();
+    let nonce = full_client.next_nonce(signer_address);
 
     let transaction = TransactionRequest::call(*VALIDATOR_SET_ADDRESS, send_data.0)
         .gas(U256::from(100_000))
