@@ -68,6 +68,7 @@ impl HbbftPeersManagement {
         client_arc: &Arc<dyn EngineClient>,
         pending_validators: &Vec<Address>,
     ) -> Result<usize, String> {
+        
         let block_chain_client = client_arc
             .as_full_client()
             .ok_or("reserverd peers: could not retrieve BlockChainClient for connect_to_pending_validators")?;
@@ -253,6 +254,8 @@ impl HbbftPeersManagement {
     // all reserved connections.
     // in later addition, we will keep the Partner Node Connections here. (upcomming feature)
     pub fn disconnect_all_validators(&mut self, client_arc: &Arc<dyn EngineClient>) {
+        
+        // we safely can disconnect even in situation where we are syncing.
         
         // todo: maybe develop as signal message because of deadlock danger ?!
 
