@@ -114,7 +114,7 @@ impl HbbftState {
             if let Some(mut peers_management) =
                 peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50))
             {
-                peers_management.disconnect_all_validators();
+                peers_management.disconnect_all_validators(&client);
             }
             return Some(());
         }

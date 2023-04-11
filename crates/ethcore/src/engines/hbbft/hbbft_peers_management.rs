@@ -181,8 +181,6 @@ impl HbbftPeersManagement {
             return;
         }
 
-        let start_time = std::time::Instant::now();
-
         let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
 
         // let mut validators_to_remove: BTreeSet<String> =  BTreeSet::new();
@@ -248,14 +246,51 @@ impl HbbftPeersManagement {
 
         self.connected_current_validators = current_validator_connections;
 
-        warn!(target: "engine", "connecting to current validators took {} ms", (std::time::Instant::now() - start_time).as_millis());
     }
 
     // if we drop out as a current validator,
     // as well a pending validator, we should drop
     // all reserved connections.
-    pub fn disconnect_all_validators(&mut self) {
-        error!("TODO: disconnect all validators");
+    // in later addition, we will keep the Partner Node Connections here. (upcomming feature)
+    pub fn disconnect_all_validators(&mut self, client_arc: &Arc<dyn EngineClient>) {
+        
+        // todo: maybe develop as signal message because of deadlock danger ?!
+
+        let client: &dyn BlockChainClient = match  client_arc.as_ref().as_full_client() {
+            Some(block_chain_client) => block_chain_client,
+            None => {
+                return; 
+            }
+        };
+
+        let mut lock = client.reserved_peers_management().lock();
+        if let Some(peers_management) = lock.as_deref_mut() {
+
+            let mut removed : BTreeSet<String> = BTreeSet::new();
+
+            for connected_validator in self.connected_current_validators.iter() {
+                if let Err(err) = peers_management.remove_reserved_peer(&connected_validator.peer_string) {
+                    error!(target: "engine", "could not remove validator {}: {}", connected_validator.peer_string, err);
+                } else {
+                    removed.insert(connected_validator.peer_string.clone());
+                }
+            }
+
+            for connected_validator in self.connected_current_pending_validators.iter() {
+                if removed.contains(&connected_validator.peer_string) {
+                    // if we have already disconnected this pending validator, we can skip it#
+                    // because the reserved peers management only manages 1 instance per 
+                    continue;
+                }
+                if let Err(err) = peers_management.remove_reserved_peer(&connected_validator.peer_string) {
+                    error!(target: "engine", "could not remove pending validator {}: {}", connected_validator.peer_string, err);
+                }
+            }
+        }
+
+        // regardless of disconnect problems here, we clear all the data here.
+        self.connected_current_validators.clear();
+        self.connected_current_pending_validators.clear();
     }
 
     /// if a key gen round fails or succeeds,
