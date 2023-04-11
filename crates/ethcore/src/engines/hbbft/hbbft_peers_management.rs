@@ -287,8 +287,12 @@ impl HbbftPeersManagement {
                 }
                 if let Err(err) = peers_management.remove_reserved_peer(&connected_validator.peer_string) {
                     error!(target: "engine", "could not remove pending validator {}: {}", connected_validator.peer_string, err);
+                } else {
+                    removed.insert(connected_validator.peer_string.clone());
                 }
             }
+
+            info!(target: "engine", "removed {} peers from reserved peers management.", removed.len());
         }
 
         // regardless of disconnect problems here, we clear all the data here.
@@ -537,14 +541,12 @@ fn connect_to_validator_core(
     }
     let ip = socket_addr.to_string();
 
-    warn!(target: "engine", "adding reserved peer: {:?}", ip);
-
     let mut guard = block_chain_client.reserved_peers_management().lock();
 
     if let Some(peers_management) = guard.as_deref_mut() {
         let public_key = node_id.0.to_hex();
         let peer_string = format!("enode://{}@{}", public_key, ip);
-        warn!(target: "engine", "adding reserved peer: {}", peer_string);
+        info!(target: "engine", "adding reserved peer: {}", peer_string);
         if let Err(err) = peers_management.add_reserved_peer(&peer_string) {
             warn!(target: "engine", "failed to adding reserved: {} : {}", peer_string, err);
         }
