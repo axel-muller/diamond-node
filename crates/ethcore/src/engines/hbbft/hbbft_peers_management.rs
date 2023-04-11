@@ -68,7 +68,6 @@ impl HbbftPeersManagement {
         client_arc: &Arc<dyn EngineClient>,
         pending_validators: &Vec<Address>,
     ) -> Result<usize, String> {
-        
         let block_chain_client = client_arc
             .as_full_client()
             .ok_or("reserverd peers: could not retrieve BlockChainClient for connect_to_pending_validators")?;
@@ -246,7 +245,6 @@ impl HbbftPeersManagement {
         // so we now can set the information of collected validators.
 
         self.connected_current_validators = current_validator_connections;
-
     }
 
     // if we drop out as a current validator,
@@ -254,25 +252,25 @@ impl HbbftPeersManagement {
     // all reserved connections.
     // in later addition, we will keep the Partner Node Connections here. (upcomming feature)
     pub fn disconnect_all_validators(&mut self, client_arc: &Arc<dyn EngineClient>) {
-        
         // we safely can disconnect even in situation where we are syncing.
-        
+
         // todo: maybe develop as signal message because of deadlock danger ?!
 
-        let client: &dyn BlockChainClient = match  client_arc.as_ref().as_full_client() {
+        let client: &dyn BlockChainClient = match client_arc.as_ref().as_full_client() {
             Some(block_chain_client) => block_chain_client,
             None => {
-                return; 
+                return;
             }
         };
 
         let mut lock = client.reserved_peers_management().lock();
         if let Some(peers_management) = lock.as_deref_mut() {
-
-            let mut removed : BTreeSet<String> = BTreeSet::new();
+            let mut removed: BTreeSet<String> = BTreeSet::new();
 
             for connected_validator in self.connected_current_validators.iter() {
-                if let Err(err) = peers_management.remove_reserved_peer(&connected_validator.peer_string) {
+                if let Err(err) =
+                    peers_management.remove_reserved_peer(&connected_validator.peer_string)
+                {
                     error!(target: "engine", "could not remove validator {}: {}", connected_validator.peer_string, err);
                 } else {
                     removed.insert(connected_validator.peer_string.clone());
@@ -282,10 +280,12 @@ impl HbbftPeersManagement {
             for connected_validator in self.connected_current_pending_validators.iter() {
                 if removed.contains(&connected_validator.peer_string) {
                     // if we have already disconnected this pending validator, we can skip it#
-                    // because the reserved peers management only manages 1 instance per 
+                    // because the reserved peers management only manages 1 instance per
                     continue;
                 }
-                if let Err(err) = peers_management.remove_reserved_peer(&connected_validator.peer_string) {
+                if let Err(err) =
+                    peers_management.remove_reserved_peer(&connected_validator.peer_string)
+                {
                     error!(target: "engine", "could not remove pending validator {}: {}", connected_validator.peer_string, err);
                 } else {
                     removed.insert(connected_validator.peer_string.clone());
