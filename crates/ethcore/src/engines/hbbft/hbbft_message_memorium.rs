@@ -36,11 +36,6 @@ pub(crate) enum SealMessageState {
     Late(u64),
     Error(Box<sealing::Message>),
 }
-
-pub(crate) struct DispatchedSealMessage {
-    message: Option<sealing::Message>,
-}
-
 /// holds up the history of a node for a staking epoch history.
 #[derive(Debug)]
 pub(crate) struct NodeStakingEpochHistory {
