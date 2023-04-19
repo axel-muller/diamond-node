@@ -112,7 +112,7 @@ extern crate ethcore_call_contract as call_contract;
 // #[cfg(test)]
 extern crate tempdir;
 
-// #[cfg(test)]
+#[cfg(test)]
 extern crate rpc_servers;
 
 extern crate rpc_common;

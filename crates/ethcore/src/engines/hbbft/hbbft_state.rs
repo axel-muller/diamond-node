@@ -6,7 +6,7 @@ use hbbft::{
     honey_badger::{self, HoneyBadgerBuilder},
     Epoched, NetworkInfo,
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -21,6 +21,7 @@ use super::{
         validator_set::ValidatorType,
     },
     contribution::Contribution,
+    hbbft_peers_management::HbbftPeersManagement,
     NodeId,
 };
 
@@ -35,6 +36,7 @@ pub(crate) struct HbbftState {
     honey_badger: Option<HoneyBadger>,
     public_master_key: Option<PublicKey>,
     current_posdao_epoch: u64,
+    current_posdao_epoch_start_block: u64,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
 }
 
@@ -45,6 +47,7 @@ impl HbbftState {
             honey_badger: None,
             public_master_key: None,
             current_posdao_epoch: 0,
+            current_posdao_epoch_start_block: 0,
             future_messages_cache: BTreeMap::new(),
         }
     }
@@ -55,10 +58,16 @@ impl HbbftState {
         return Some(builder.build());
     }
 
+    /**
+     * Updates the underlying honeybadger instance, possible switching into a new
+     * honeybadger instance if according to contracts a new staking epoch has started.
+     * true if a new epoch has started and a new honeybadger instance has been created
+     */
     pub fn update_honeybadger(
         &mut self,
         client: Arc<dyn EngineClient>,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
+        peers_management_mutex: &Mutex<HbbftPeersManagement>,
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
@@ -96,17 +105,42 @@ impl HbbftState {
         self.honey_badger = None;
         // Set the current POSDAO epoch #
         self.current_posdao_epoch = target_posdao_epoch;
+        self.current_posdao_epoch_start_block = posdao_epoch_start.as_u64();
+
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            // we can disconnect the peers here.
+            if let Some(mut peers_management) =
+                peers_management_mutex.try_lock_for(std::time::Duration::from_millis(50))
+            {
+                peers_management.disconnect_all_validators(&client);
+            }
             return Some(());
         }
 
         let network_info = synckeygen_to_network_info(&synckeygen, pks, sks)?;
         self.network_info = Some(network_info.clone());
-        self.honey_badger = Some(self.new_honey_badger(network_info)?);
+        self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
 
         info!(target: "engine", "HoneyBadger Algorithm initialized! Running as validator node.");
+
+        // this is importent, but we should not risk deadlocks...
+        // maybe we should refactor this to a message Queue system, and pass a "connect_to_current_validators" message
+        if let Some(mut peers_management) =
+            peers_management_mutex.try_lock_for(std::time::Duration::from_millis(250))
+        {
+            peers_management.connect_to_current_validators(&network_info, &client);
+        } else {
+            // maybe we should work with signals that signals that connect_to_current_validators should happen
+            // instead of trying to achieve a lock here.
+            // in this case:
+            // if Node A cannot acquire the lock, but Node B can, then Node B connects to Node A,
+            // and we are find.
+            // if both nodes cannot acquire the lock, then we are busted.
+            warn!(target: "engine", "could not acquire to connect to current validators on switching to new validator set for staking epoch {}.", self.current_posdao_epoch);
+        }
+
         Some(())
     }
 
@@ -199,36 +233,53 @@ impl HbbftState {
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
         sender_id: NodeId,
         message: HbMessage,
-    ) -> Option<(HoneyBadgerStep, NetworkInfo<NodeId>)> {
-        self.skip_to_current_epoch(client, signer)?;
+    ) -> Result<Option<(HoneyBadgerStep, NetworkInfo<NodeId>)>, honey_badger::Error> {
+        match self.skip_to_current_epoch(client, signer) {
+            Some(_) => (),
+            None => return Ok(None),
+        }
 
         // If honey_badger is None we are not a validator, nothing to do.
-        let honey_badger = self.honey_badger.as_mut()?;
+        let honey_badger = match self.honey_badger.as_mut() {
+            Some(hb) => hb,
+            None => return Ok(None),
+        };
 
         let message_epoch = message.epoch();
+        let hb_epoch = honey_badger.epoch();
         // Note that if the message is for a future epoch we do not know if the current honey_badger
         // instance is the correct one to use. Tt may change if the the POSDAO epoch changes, causing
         // consensus messages to get lost.
-        if message_epoch > honey_badger.epoch() {
+        if message_epoch > hb_epoch {
             trace!(target: "consensus", "Message from future epoch, caching it for handling it in when the epoch is current. Current hbbft epoch is: {}", honey_badger.epoch());
             self.future_messages_cache
                 .entry(message.epoch())
                 .or_default()
                 .push((sender_id, message));
-            return None;
+            return Ok(None);
         }
 
-        let network_info = self.network_info.as_ref()?.clone();
+        match self.network_info.as_ref() {
+            Some(network_info) => {
+                match honey_badger.handle_message(&sender_id, message) {
+                    Ok(step) => return Ok(Some((step, network_info.clone()))),
+                    Err(err) => {
+                        // TODO: Report consensus step errors
+                        // maybe we are not part of the HBBFT Set anymore ?
+                        // maybe the sender is not Part of the hbbft set ?
+                        // maybe we have the wrong hbbft for decryption ?
 
-        match honey_badger.handle_message(&sender_id, message) {
-            Ok(step) => Some((step, network_info)),
-            Err(err) => {
-                // TODO: Report consensus step errors
-                // maybe we are not part of the HBBFT Set anymore ?
-                // maybe the sender is not Part of the hbbft set ?
-                // maybe we have the wrong hbbft for decryption ?
-                error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}",sender_id, message_epoch, err);
-                None
+                        error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}", sender_id, message_epoch, err);
+                        return Err(err);
+                    }
+                }
+            }
+            None => {
+                // We are not a validator, but we still need to handle the message to keep the
+                // network in sync.
+                // honey_badger.handle_message(&sender_id, message);
+                warn!(target: "consensus", "Message from node {} for block {} received - but no network info available.: current Block: {}", sender_id.0, message_epoch, hb_epoch);
+                return Ok(None);
             }
         }
     }
@@ -330,7 +381,7 @@ impl HbbftState {
                 Some(key) => key.clone(),
             };
             // add all transactions for that sender and delete the sender from the map.
-            if let Some(mut ts) = transactions_by_sender.remove(&chosen_key) {
+            if let Some(ts) = transactions_by_sender.remove(&chosen_key) {
                 // Even after block import there may still be transactions in the pending set which already
                 // have been included on the chain. We filter out transactions where the nonce is too low.
                 let min_nonce = full_client.latest_nonce(&chosen_key);
@@ -457,5 +508,17 @@ impl HbbftState {
         }
 
         self.network_info.clone()
+    }
+
+    pub fn get_current_network_info(&self) -> Option<NetworkInfo<NodeId>> {
+        return self.network_info.clone();
+    }
+
+    pub fn get_current_posdao_epoch(&self) -> u64 {
+        self.current_posdao_epoch
+    }
+
+    pub fn get_current_posdao_epoch_start_block(&self) -> u64 {
+        self.current_posdao_epoch_start_block
     }
 }

@@ -17,7 +17,7 @@
 use super::{Address, Transaction, H256, U256};
 use ethereum_types::BigEndianHash;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct TransactionBuilder {
     nonce: U256,
     gas_price: U256,
@@ -59,9 +59,21 @@ impl TransactionBuilder {
             hash: H256::from_uint(&hash),
             nonce: self.nonce,
             gas_price: self.gas_price,
-            gas: 21_000.into(),
+            gas: self.gas,
             sender: self.sender,
             mem_usage: self.mem_usage,
+        }
+    }
+}
+
+impl Default for TransactionBuilder {
+    fn default() -> Self {
+        TransactionBuilder {
+            nonce: 0.into(),
+            gas_price: 0.into(),
+            gas: 21_000.into(),
+            sender: Address::default(),
+            mem_usage: 0,
         }
     }
 }

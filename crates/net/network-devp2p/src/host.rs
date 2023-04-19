@@ -336,6 +336,7 @@ impl Host {
         let path = config.net_config_path.clone();
         // Setup the server socket
         let tcp_listener = TcpListener::bind(&listen_address)?;
+
         listen_address = SocketAddr::new(listen_address.ip(), tcp_listener.local_addr()?.port());
         debug!(target: "network", "Listening at {:?}", listen_address);
         let udp_port = config.udp_port.unwrap_or_else(|| listen_address.port());

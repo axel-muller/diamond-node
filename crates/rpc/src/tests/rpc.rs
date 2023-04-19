@@ -14,10 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(any(test, feature = "test-helpers"))]
 use http::{self, hyper};
+
+#[cfg(any(test, feature = "test-helpers"))]
 use rpc_servers::{HttpServer, MetaIoHandler};
 
+#[cfg(any(test, feature = "test-helpers"))]
 use tests::{helpers::Server, http_client};
+
+#[cfg(any(test, feature = "test-helpers"))]
 use v1::{extractors, Metadata};
 
 #[cfg(any(test, feature = "test-helpers"))]

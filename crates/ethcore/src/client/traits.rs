@@ -16,7 +16,11 @@
 
 //! Traits implemented by client.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    sync::Arc,
+};
 
 use blockchain::{BlockReceipts, TreeRoute};
 use bytes::Bytes;
@@ -26,6 +30,7 @@ use ethereum_types::{Address, H256, H512, U256};
 use evm::Schedule;
 use itertools::Itertools;
 use kvdb::DBValue;
+use parking_lot::Mutex;
 use types::{
     basic_account::BasicAccount,
     block_status::BlockStatus,
@@ -214,6 +219,24 @@ pub trait ChainSyncing: Send + Sync {
     fn is_major_syncing(&self) -> bool;
 }
 
+/// Access to management of reserved peers in the network module.
+pub trait ReservedPeersManagement: Send + Sync {
+    /// Add a reserved peer
+    fn add_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
+
+    /// remove reserved peer
+    fn remove_reserved_peer(&mut self, peer: &String) -> Result<(), String>;
+
+    /// get the infos what peers have been added currently.
+    fn get_reserved_peers(&self) -> &BTreeSet<String>;
+
+    /// disconnect peers, but keeps those in keep_list, returns number of removed.
+    fn disconnect_others_than(&mut self, keep_list: BTreeSet<String>) -> usize;
+
+    /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
+}
+
 /// IO operations that should off-load heavy work to another thread.
 pub trait IoClient: Sync + Send {
     /// Queue transactions for importing.
@@ -294,7 +317,7 @@ pub trait BlockChainClient:
     /// Get value of the storage at given position at the latest block's state.
     fn latest_storage_at(&self, address: &Address, position: &H256) -> H256 {
         self.storage_at(address, position, BlockId::Latest.into())
-			.expect("storage_at will return Some if given BlockId::Latest. storage_at was given BlockId::Latest. \
+            .expect("storage_at will return Some if given BlockId::Latest. storage_at was given BlockId::Latest. \
 			Therefore storage_at has returned Some; qed")
     }
 
@@ -509,6 +532,9 @@ pub trait BlockChainClient:
 
     /// Returns true, if underlying import queue is processing possible fork at the moment
     fn is_processing_fork(&self) -> bool;
+
+    /// returns the reserved peer management that allow to read and manipulate the devp2p peer communication.
+    fn reserved_peers_management(&self) -> &Mutex<Option<Box<dyn ReservedPeersManagement>>>;
 }
 
 /// The data required for a `Client` to create a transaction.

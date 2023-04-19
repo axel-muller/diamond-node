@@ -5,7 +5,7 @@ use client::{
 use crypto::publickey::Public;
 use engines::hbbft::utils::bound_contract::{BoundContract, CallError};
 use ethereum_types::{Address, U256};
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, net::SocketAddr, str::FromStr};
 use types::{ids::BlockId, transaction::Error};
 
 use_contract!(
@@ -114,6 +114,48 @@ pub fn get_validator_available_since(
 pub fn get_pending_validators(client: &dyn EngineClient) -> Result<Vec<Address>, CallError> {
     let c = BoundContract::bind(client, BlockId::Latest, *VALIDATOR_SET_ADDRESS);
     call_const_validator!(c, get_pending_validators)
+}
+
+/// Sets this validators internet address.
+/// Can only be called if there is a pool existing for this signer.
+pub fn set_validator_internet_address(
+    full_client: &dyn BlockChainClient,
+    signer_address: &Address,
+    socket_addr: &SocketAddr,
+) -> Result<(), Error> {
+    let mut ip_address_array: [u8; 16] = [0; 16];
+
+    match socket_addr.ip() {
+        std::net::IpAddr::V4(ipv4) => {
+            let o = ipv4.octets();
+            ip_address_array[12] = o[0];
+            ip_address_array[13] = o[1];
+            ip_address_array[14] = o[2];
+            ip_address_array[15] = o[3];
+        }
+        std::net::IpAddr::V6(ipv6) => {
+            let o = ipv6.octets();
+            ip_address_array.copy_from_slice(&o);
+        }
+    }
+
+    let port = socket_addr.port();
+    let port_array: [u8; 2] = u16::to_be_bytes(port); //  [(port / 256) as u8, (port - (port / 256)) as u8];
+
+    let send_data = validator_set_hbbft::functions::set_validator_internet_address::call(
+        ip_address_array,
+        port_array,
+    );
+
+    let nonce = full_client.next_nonce(signer_address);
+
+    let transaction = TransactionRequest::call(*VALIDATOR_SET_ADDRESS, send_data.0)
+        .gas(U256::from(100_000))
+        .nonce(nonce);
+
+    info!(target:"consensus", "set_validator_internet_address: ip: {} nonce: {}", socket_addr, nonce);
+    full_client.transact_silently(transaction)?;
+    Ok(())
 }
 
 pub fn send_tx_announce_availability(

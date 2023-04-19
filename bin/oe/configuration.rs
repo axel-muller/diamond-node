@@ -127,7 +127,7 @@ impl Configuration {
     /// # Example
     ///
     /// ```
-    /// let _cfg = openethereum::Configuration::parse_cli(&["--light", "--chain", "kovan"]).unwrap();
+    /// let _cfg = diamond_node::Configuration::parse_cli(&["--light", "--chain", "kovan"]).unwrap();
     /// ```
     pub fn parse_cli<S: AsRef<str>>(command: &[S]) -> Result<Self, ArgsError> {
         let config = Configuration {

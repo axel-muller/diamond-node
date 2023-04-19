@@ -61,6 +61,7 @@ extern crate rustc_hex;
 extern crate serde;
 extern crate stats;
 extern crate time_utils;
+extern crate tiny_keccak;
 extern crate trie_db as trie;
 extern crate triehash_ethereum as triehash;
 extern crate unexpected;

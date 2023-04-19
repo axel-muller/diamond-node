@@ -15,7 +15,10 @@
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
 use self::ethcore_network::{NetworkContext, ProtocolId};
-use std::ops::RangeInclusive;
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    ops::RangeInclusive,
+};
 use sync::ManageNetwork;
 
 extern crate ethcore_network;
@@ -38,4 +41,11 @@ impl ManageNetwork for TestManageNetwork {
         25..=50
     }
     fn with_proto_context(&self, _: ProtocolId, _: &mut dyn FnMut(&dyn NetworkContext)) {}
+
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
+        Some(SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            30303,
+        )))
+    }
 }

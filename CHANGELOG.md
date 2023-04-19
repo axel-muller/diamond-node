@@ -65,6 +65,12 @@ Fixes:
 * Support for POSDAO contract hardfork (#633)
 * Update rpc server (#619)
 
+## OpenEthereum v3.3.5
+Enhancements:
+
+* Support for POSDAO contract hardfork (#633)
+* Update rpc server (#619)
+
 ## OpenEthereum v3.3.4
 
 Enhancements:
