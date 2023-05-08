@@ -1,6 +1,7 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
+use stats::PrometheusMetrics;
 use std::collections::VecDeque;
 
 // use threshold_crypto::{SignatureShare};
@@ -944,6 +945,40 @@ impl HbbftMessageMemorium {
         return false;
     }
 }
+
+impl PrometheusMetrics for NodeStakingEpochHistory { 
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) { 
+        
+        let prefix  = self.node_id.to_string();
+        
+        let name = format!("{}_cumulative_lateness", prefix);
+
+        r.register_counter(name.as_str(), "", self.cumulative_lateness as i64);
+    }
+}
+
+impl PrometheusMetrics for StakingEpochHistory {
+
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) { 
+        for epoch_history in self.node_staking_epoch_histories.iter() {
+            epoch_history.prometheus_metrics(r);
+        }
+    }
+}
+impl PrometheusMetrics for HbbftMessageMemorium {
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
+
+        //let epoch_history_len = self.staking_epoch_history.len() as i64;
+
+        if let Some(history) = self.staking_epoch_history.iter().last() {
+            history.prometheus_metrics(r);
+        }
+        
+    
+        // r.register_gauge(name, help, value)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {}
