@@ -3555,14 +3555,16 @@ impl PrometheusMetrics for Client {
             report.transactions_applied as i64,
         );
 
-        self.state_db.try_read_for(Duration::from_millis(200)).map(|state_db| {
-            let state_db_size = state_db.cache_size();
-            r.register_gauge(
-                "statedb_cache_size",
-                "State DB cache size",
-                state_db_size as i64,
-            );
-        });
+        self.state_db
+            .try_read_for(Duration::from_millis(200))
+            .map(|state_db| {
+                let state_db_size = state_db.cache_size();
+                r.register_gauge(
+                    "statedb_cache_size",
+                    "State DB cache size",
+                    state_db_size as i64,
+                );
+            });
 
         // blockchain cache
         let blockchain_cache_info = self.blockchain_cache_info();

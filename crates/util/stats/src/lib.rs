@@ -51,7 +51,7 @@ impl PrometheusRegistry {
         let c = prometheus::IntCounter::new(name.as_str(), help)
             .expect("name and help must be non-empty");
         c.inc_by(value as u64);
-        
+
         self.registry
             .register(Box::new(c))
             .expect("prometheus identifiers must be unique");
