@@ -347,7 +347,7 @@ impl HbbftState {
         // validators needed to create a block (which is 2/3 of the total active validators).
         let min_required_nodes = (network_info.num_correct() / 2) + 1;
         let max_transactions_for_block = client.queued_transactions();
-        let transactions_subset_size = (max_transactions_for_block.len() / min_required_nodes) + 1;
+        let transactions_subset_size = (max_transactions_for_block.len() / min_required_nodes) + 4;
 
         // Since every transaction sender can send multiple transactions we need to make sure
         // not to create nonce gaps. To avoid these gaps we randomly select senders instead of
