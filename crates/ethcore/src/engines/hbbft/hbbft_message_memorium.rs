@@ -1,7 +1,8 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
-use std::collections::VecDeque;
+use stats::PrometheusMetrics;
+use std::{collections::VecDeque, time::Duration};
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -942,6 +943,120 @@ impl HbbftMessageMemorium {
             }
         }
         return false;
+    }
+}
+
+impl PrometheusMetrics for HbbftMessageDispatcher {
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        if let Some(memorium) = self.memorial.try_read_for(Duration::from_millis(100)) {
+            memorium.prometheus_metrics(registry);
+        } else {
+            error!(target: "hbbft_message_memorium", "could not get read lock on memorium for prometheus metrics");
+        }
+    }
+}
+
+impl PrometheusMetrics for NodeStakingEpochHistory {
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
+        // one problem that occurs here is that we have a dynamic name of the gauges.
+        // that could lead to troubles later in the UI, because we would have to adapt the UI to the dynamic names.
+        // a solution could be to give every node a number from 0 to n (n=25 for DMD), and supply the name as a text value,
+        // so we still can figure out the node id, but the name of the gauge keeps static.
+
+        let prefix = self.node_id.to_string();
+
+        r.register_gauge(
+            format!("{}_cumulative_lateness", prefix).as_str(),
+            format!("cumulative lateness from {}", prefix).as_str(),
+            self.cumulative_lateness as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_sealing_blocks_good", prefix).as_str(),
+            format!("good sealed blocks from {}", prefix).as_str(),
+            self.sealing_blocks_good.len() as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_sealing_blocks_late", prefix).as_str(),
+            format!("late sealed blocks from {}", prefix).as_str(),
+            self.sealing_blocks_late.len() as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_sealing_blocks_bad", prefix).as_str(),
+            format!("bad seals from {}", prefix).as_str(),
+            self.sealing_blocks_bad.len() as i64,
+        );
+
+        // last_good_sealing_message: u64,
+        // last_late_sealing_message: u64,
+        // last_error_sealing_message: u64,
+
+        r.register_gauge(
+            format!("{}_last_good_sealing_message", prefix).as_str(),
+            format!("last_good_sealing_message from {}", prefix).as_str(),
+            self.last_good_sealing_message as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_last_late_sealing_message", prefix).as_str(),
+            format!("last late sealing message from {}", prefix).as_str(),
+            self.last_late_sealing_message as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_last_error_sealing_message", prefix).as_str(),
+            format!("last error sealing message from {}", prefix).as_str(),
+            self.last_error_sealing_message as i64,
+        );
+
+        // last_message_faulty: u64,
+        // last_message_good: u64,
+
+        // num_faulty_messages: u64,
+        // num_good_messages: u64,
+
+        r.register_gauge(
+            format!("{}_last_message_faulty", prefix).as_str(),
+            format!("last faulty message from {}", prefix).as_str(),
+            self.last_message_faulty as i64,
+        );
+
+        r.register_gauge(
+            format!("{}_last_message_good", prefix).as_str(),
+            format!("last good message from {}", prefix).as_str(),
+            self.last_message_faulty as i64,
+        );
+    }
+}
+
+impl PrometheusMetrics for StakingEpochHistory {
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
+        r.register_gauge(
+            "staking_epoch",
+            "Staking Epoch Number",
+            self.staking_epoch as i64,
+        );
+        r.register_gauge(
+            "staking_epoch_start_block",
+            "Staking Epoch Start Block",
+            self.staking_epoch_start_block as i64,
+        );
+
+        for epoch_history in self.node_staking_epoch_histories.iter() {
+            epoch_history.prometheus_metrics(r);
+        }
+    }
+}
+
+impl PrometheusMetrics for HbbftMessageMemorium {
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
+        //let epoch_history_len = self.staking_epoch_history.len() as i64;
+
+        if let Some(history) = self.staking_epoch_history.iter().last() {
+            history.prometheus_metrics(r);
+        }
     }
 }
 

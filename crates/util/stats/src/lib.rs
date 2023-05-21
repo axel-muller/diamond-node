@@ -50,7 +50,8 @@ impl PrometheusRegistry {
         let name = format!("{}{}", self.prefix, name);
         let c = prometheus::IntCounter::new(name.as_str(), help)
             .expect("name and help must be non-empty");
-        c.inc_by(value);
+        c.inc_by(value as u64);
+
         self.registry
             .register(Box::new(c))
             .expect("prometheus identifiers must be unique");
@@ -59,9 +60,11 @@ impl PrometheusRegistry {
     /// Adds a new prometheus gauge with the specified gauge
     pub fn register_gauge(&mut self, name: &str, help: &str, value: i64) {
         let name = format!("{}{}", self.prefix, name);
+
         let g = prometheus::IntGauge::new(name.as_str(), help)
             .expect("name and help must be non-empty");
         g.set(value);
+
         self.registry
             .register(Box::new(g))
             .expect("prometheus identifiers must be are unique");

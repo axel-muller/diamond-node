@@ -227,7 +227,6 @@ fn to_toml(
         Value::String("1000000000".into()),
     );
     mining.insert("reseal_on_txs".into(), Value::String("none".into()));
-    mining.insert("extra_data".into(), Value::String("Parity".into()));
     mining.insert("reseal_min_period".into(), Value::Integer(0));
 
     if let Some(tx_queue_per_sender_) = tx_queue_per_sender {
