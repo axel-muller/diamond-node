@@ -574,6 +574,9 @@ pub trait Engine<M: Machine>: Sync + Send {
     fn use_block_author(&self) -> bool {
         true
     }
+
+    /// Optional entry point for adding engine specific metrics.
+    fn prometheus_metrics(&self, _registry: &mut stats::PrometheusRegistry) {}
 }
 
 /// t_nb 9.3 Check whether a given block is the best block based on the default total difficulty rule.

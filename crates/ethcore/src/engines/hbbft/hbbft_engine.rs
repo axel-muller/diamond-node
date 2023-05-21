@@ -24,6 +24,7 @@ use parking_lot::{Mutex, RwLock};
 use rlp;
 use rmp_serde;
 use serde::Deserialize;
+use stats::PrometheusMetrics;
 use std::{
     cmp::{max, min},
     collections::BTreeMap,
@@ -1575,6 +1576,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         } else {
             error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
         }
+    }
+
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        self.hbbft_message_dispatcher.prometheus_metrics(registry);
     }
 }
 

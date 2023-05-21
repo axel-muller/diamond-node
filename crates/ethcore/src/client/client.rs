@@ -3667,6 +3667,10 @@ impl PrometheusMetrics for Client {
 
         // database info
         self.db.read().key_value().prometheus_metrics(r);
+
+        // engine specific metrics.
+
+        self.engine.prometheus_metrics(r);
     }
 }
 
