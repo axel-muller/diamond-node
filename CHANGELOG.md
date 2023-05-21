@@ -1,6 +1,16 @@
 
 
 
+## Diamond Node Software 3.3.5-hbbft-0.8.6
+
+- client Software now known as diamond-node
+- [deadlock on locking HBBFT State after receiving Agreements](https://github.com/DMDcoin/diamond-node/issues/7)
+- [Write random number fork block](https://github.com/DMDcoin/diamond-node/issues/1)
+- [provide hbbft data by via Prometheus Interface](https://github.com/DMDcoin/diamond-node/issues/14)
+- [Prometheus logging can result in a deadlock ](https://github.com/DMDcoin/diamond-node/issues/13)
+- [Nonce problem with announce availability and setting IP address](https://github.com/DMDcoin/diamond-node/issues/8)
+- [hbbft automatic reserved peers management](https://github.com/DMDcoin/diamond-node/issues/5)
+
 ## Diamond Node Software 3.3.5-hbbft-0.8.5
 
 - [Automatic shutdown on validator candidate unavailability](https://github.com/DMDcoin/openethereum-3.x/issues/87)
