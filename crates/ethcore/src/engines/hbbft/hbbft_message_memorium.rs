@@ -1,7 +1,7 @@
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
-use stats::PrometheusMetrics;
+use stats::{prometheus::core::Metric, PrometheusMetrics};
 use std::{collections::VecDeque, time::Duration};
 
 // use threshold_crypto::{SignatureShare};
@@ -963,29 +963,36 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // a solution could be to give every node a number from 0 to n (n=25 for DMD), and supply the name as a text value,
         // so we still can figure out the node id, but the name of the gauge keeps static.
 
-        let prefix = self.node_id.to_string();
+        //let metric: Metric = Metric::new();
+        //r.registry().register(c)
 
-        r.register_gauge(
-            format!("{}_cumulative_lateness", prefix).as_str(),
-            format!("cumulative lateness from {}", prefix).as_str(),
+        let label = self.get_node_id().0.to_string();
+        //r.register_gauge_with_label(name, help, label, value)
+        r.register_gauge_with_label(
+            format!("cumulative_lateness").as_str(),
+            format!("cumulative lateness").as_str(),
+            label.as_str(),
             self.cumulative_lateness as i64,
         );
 
-        r.register_gauge(
-            format!("{}_sealing_blocks_good", prefix).as_str(),
-            format!("good sealed blocks from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("sealing_blocks_good").as_str(),
+            format!("good sealed block messages").as_str(),
+            label.as_str(),
             self.sealing_blocks_good.len() as i64,
         );
 
-        r.register_gauge(
-            format!("{}_sealing_blocks_late", prefix).as_str(),
-            format!("late sealed blocks from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("sealing_blocks_late").as_str(),
+            format!("late sealed blocks").as_str(),
+            label.as_str(),
             self.sealing_blocks_late.len() as i64,
         );
 
-        r.register_gauge(
-            format!("{}_sealing_blocks_bad", prefix).as_str(),
-            format!("bad seals from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("sealing_blocks_bad").as_str(),
+            format!("bad block seals").as_str(),
+            label.as_str(),
             self.sealing_blocks_bad.len() as i64,
         );
 
@@ -993,21 +1000,24 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // last_late_sealing_message: u64,
         // last_error_sealing_message: u64,
 
-        r.register_gauge(
-            format!("{}_last_good_sealing_message", prefix).as_str(),
-            format!("last_good_sealing_message from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("last_good_sealing_message").as_str(),
+            format!("block number").as_str(),
+            label.as_str(),
             self.last_good_sealing_message as i64,
         );
 
-        r.register_gauge(
-            format!("{}_last_late_sealing_message", prefix).as_str(),
-            format!("last late sealing message from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("last_late_sealing_message").as_str(),
+            format!("block number").as_str(),
+            label.as_str(),
             self.last_late_sealing_message as i64,
         );
 
-        r.register_gauge(
-            format!("{}_last_error_sealing_message", prefix).as_str(),
-            format!("last error sealing message from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("last_error_sealing_message").as_str(),
+            format!("block number").as_str(),
+            label.as_str(),
             self.last_error_sealing_message as i64,
         );
 
@@ -1017,15 +1027,17 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // num_faulty_messages: u64,
         // num_good_messages: u64,
 
-        r.register_gauge(
-            format!("{}_last_message_faulty", prefix).as_str(),
-            format!("last faulty message from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("last_message_faulty").as_str(),
+            format!("block number").as_str(),
+            label.as_str(),
             self.last_message_faulty as i64,
         );
 
-        r.register_gauge(
-            format!("{}_last_message_good", prefix).as_str(),
-            format!("last good message from {}", prefix).as_str(),
+        r.register_gauge_with_label(
+            format!("last_message_good").as_str(),
+            format!("block number").as_str(),
+            label.as_str(),
             self.last_message_faulty as i64,
         );
     }

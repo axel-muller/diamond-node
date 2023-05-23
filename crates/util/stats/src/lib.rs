@@ -70,6 +70,29 @@ impl PrometheusRegistry {
             .expect("prometheus identifiers must be are unique");
     }
 
+    /// Adds a new prometheus gauge with a label
+    pub fn register_gauge_with_label(&mut self, name: &str, help: &str, label: &str, value: i64) {
+        //let label_formated = format!("{}", label);
+        let name_formatted = format!("{}{}", self.prefix, name);
+        let mut opts = prometheus::Opts::new(name_formatted, help);
+
+        // add labels here .
+        opts.variable_labels.push(label.to_string());
+
+        if let Ok(g) = prometheus::IntGauge::with_opts(opts) {
+            g.set(value);
+
+            self.registry
+                .register(Box::new(g))
+                .expect("prometheus identifiers must be are unique");
+        } else {
+            warn!(
+                "failed to create gauge with label {} {} {}",
+                name, help, label
+            );
+        }
+    }
+
     /// Adds a new prometheus counter with the time spent in running the specified function
     pub fn register_optime<F: Fn() -> T, T>(&mut self, name: &str, f: &F) -> T {
         let start = Instant::now();
