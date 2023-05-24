@@ -1,3 +1,4 @@
+use bytes::ToPretty;
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
@@ -966,7 +967,7 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         //let metric: Metric = Metric::new();
         //r.registry().register(c)
 
-        let label = self.get_node_id().0.to_string();
+        let label = self.get_node_id().0.to_hex();
         //r.register_gauge_with_label(name, help, label, value)
         r.register_gauge_with_label(
             format!("cumulative_lateness").as_str(),
