@@ -76,6 +76,7 @@ stats = { path = "../util/stats" }
 tempdir = {version="0.3", optional = true}
 tempfile = "3.1.0"
 time-utils = { path = "../util/time-utils" }
+tiny-keccak = "2.0.2"
 trace-time = "0.1"
 triehash-ethereum = { version = "0.2",  path = "../util/triehash-ethereum" }
 unexpected = { path = "../util/unexpected" }

@@ -35,6 +35,7 @@ use crate::{
         fatdb_switch_to_bool, mode_switch_to_bool, tracing_switch_to_bool, AccountsConfig,
         GasPricerConfig, MinerExtras, Pruning, SpecType, Switch,
     },
+    reserved_peer_management::ReservedPeersWrapper,
     rpc, rpc_apis, secretstore, signer,
     sync::{self, SyncConfig, SyncProvider},
     user_defaults::UserDefaults,
@@ -475,6 +476,10 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
                 .map(|f| f as Arc<dyn crate::sync::ConnectionFilter + 'static>),
         )
         .map_err(|e| format!("Sync error: {}", e))?;
+
+    client.set_reserved_peers_management(Box::new(ReservedPeersWrapper::new(Arc::downgrade(
+        &manage_network,
+    ))));
 
     service.add_notify(chain_notify.clone());
 

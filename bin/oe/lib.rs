@@ -105,6 +105,7 @@ mod metrics;
 mod modules;
 mod params;
 mod presale;
+mod reserved_peer_management;
 mod rpc;
 mod rpc_apis;
 mod run;
@@ -151,8 +152,11 @@ fn run_deadlock_detection_thread() {
     use std::{thread, time::Duration};
 
     info!("Starting deadlock detection thread.");
+
+    let builder = std::thread::Builder::new().name("DeadlockDetection".to_string());
+
     // Create a background thread which checks for deadlocks every 10s
-    thread::spawn(move || loop {
+    let spawned = builder.spawn(move || loop {
         thread::sleep(Duration::from_secs(10));
         let deadlocks = deadlock::check_deadlock();
         if deadlocks.is_empty() {
@@ -172,6 +176,15 @@ fn run_deadlock_detection_thread() {
             }
         }
     });
+
+    match spawned {
+        Ok(_) => {
+            info!("Deadlock detection thread successfully spawned.");
+        }
+        Err(e) => {
+            info!("Error spawning deadlock detection thread: {:?}", e);
+        }
+    }
 }
 
 /// Action that OpenEthereum performed when running `start`.

@@ -65,7 +65,7 @@ use call_contract::RegistryInfo;
 use client::{
     ancient_import::AncientVerifier,
     bad_blocks,
-    traits::{ChainSyncing, ForceUpdateSealing, TransactionRequest},
+    traits::{ChainSyncing, ForceUpdateSealing, ReservedPeersManagement, TransactionRequest},
     AccountData, BadBlocks, Balance, BlockChain as BlockChainTrait, BlockChainClient,
     BlockChainReset, BlockId, BlockInfo, BlockProducer, BroadcastProposalBlock, Call,
     CallAnalytics, ChainInfo, ChainMessageType, ChainNotify, ChainRoute, ClientConfig,
@@ -256,6 +256,8 @@ pub struct Client {
 
     /// Accessor to query chain syncing state.
     sync_provider: Mutex<Option<Box<dyn ChainSyncing>>>,
+
+    reserved_peers_management: Mutex<Option<Box<dyn ReservedPeersManagement>>>,
 
     importer: Importer,
 }
@@ -1049,6 +1051,7 @@ impl Client {
             registrar_address,
             exit_handler: Mutex::new(None),
             sync_provider: Mutex::new(None),
+            reserved_peers_management: Mutex::new(None),
             importer,
             config,
         });
@@ -1167,6 +1170,14 @@ impl Client {
     /// Sets sync provider trait object to access chain sync state from the client/engine.
     pub fn set_sync_provider(&self, sync_provider: Box<dyn ChainSyncing>) {
         *self.sync_provider.lock() = Some(sync_provider);
+    }
+
+    /// Sets the accessor to reserved peers management functionality.
+    pub fn set_reserved_peers_management(
+        &self,
+        reserved_peers_management: Box<dyn ReservedPeersManagement>,
+    ) {
+        *self.reserved_peers_management.lock() = Some(reserved_peers_management);
     }
 
     /// Returns engine reference.
@@ -2179,106 +2190,6 @@ impl BadBlocks for Client {
 }
 
 impl BlockChainClient for Client {
-    fn replay(&self, id: TransactionId, analytics: CallAnalytics) -> Result<Executed, CallError> {
-        let address = self
-            .transaction_address(id)
-            .ok_or(CallError::TransactionNotFound)?;
-        let block = BlockId::Hash(address.block_hash);
-
-        const PROOF: &'static str =
-            "The transaction address contains a valid index within block; qed";
-        Ok(self
-            .replay_block_transactions(block, analytics)?
-            .nth(address.index)
-            .expect(PROOF)
-            .1)
-    }
-
-    fn replay_block_transactions(
-        &self,
-        block: BlockId,
-        analytics: CallAnalytics,
-    ) -> Result<Box<dyn Iterator<Item = (H256, Executed)>>, CallError> {
-        let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
-        let body = self.block_body(block).ok_or(CallError::StatePruned)?;
-        let mut state = self
-            .state_at_beginning(block)
-            .ok_or(CallError::StatePruned)?;
-        let txs = body.transactions();
-        let engine = self.engine.clone();
-
-        const PROOF: &'static str =
-            "Transactions fetched from blockchain; blockchain transactions are valid; qed";
-        const EXECUTE_PROOF: &'static str = "Transaction replayed; qed";
-
-        Ok(Box::new(txs.into_iter().map(move |t| {
-            let transaction_hash = t.hash();
-            let t = SignedTransaction::new(t).expect(PROOF);
-            let machine = engine.machine();
-            let x = Self::do_virtual_call(machine, &env_info, &mut state, &t, analytics)
-                .expect(EXECUTE_PROOF);
-            env_info.gas_used = env_info.gas_used + x.gas_used;
-            (transaction_hash, x)
-        })))
-    }
-
-    fn mode(&self) -> Mode {
-        let r = self.mode.lock().clone().into();
-        trace!(target: "mode", "Asked for mode = {:?}. returning {:?}", &*self.mode.lock(), r);
-        r
-    }
-
-    fn disable(&self) {
-        self.set_mode(Mode::Off);
-        self.enabled.store(false, AtomicOrdering::SeqCst);
-        self.clear_queue();
-    }
-
-    fn set_mode(&self, new_mode: Mode) {
-        trace!(target: "mode", "Client::set_mode({:?})", new_mode);
-        if !self.enabled.load(AtomicOrdering::SeqCst) {
-            return;
-        }
-        {
-            let mut mode = self.mode.lock();
-            *mode = new_mode.clone().into();
-            trace!(target: "mode", "Mode now {:?}", &*mode);
-            if let Some(ref mut f) = *self.on_user_defaults_change.lock() {
-                trace!(target: "mode", "Making callback...");
-                f(Some((&*mode).clone()))
-            }
-        }
-        match new_mode {
-            Mode::Active => self.wake_up(),
-            Mode::Off => self.sleep(true),
-            _ => {
-                (*self.sleep_state.lock()).last_activity = Some(Instant::now());
-            }
-        }
-    }
-
-    fn spec_name(&self) -> String {
-        self.config.spec_name.clone()
-    }
-
-    fn is_canon(&self, hash: &H256) -> bool {
-        self.chain.read().is_canon(hash)
-    }
-
-    fn set_spec_name(&self, new_spec_name: String) -> Result<(), ()> {
-        trace!(target: "mode", "Client::set_spec_name({:?})", new_spec_name);
-        if !self.enabled.load(AtomicOrdering::SeqCst) {
-            return Err(());
-        }
-        if let Some(ref h) = *self.exit_handler.lock() {
-            (*h)(new_spec_name);
-            Ok(())
-        } else {
-            warn!("Not hypervised; cannot change chain.");
-            Err(())
-        }
-    }
-
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
         self.block_number_ref(&id)
     }
@@ -2296,13 +2207,6 @@ impl BlockChainClient for Client {
             Some(hash) => self.importer.block_queue.status(&hash).into(),
             None => BlockStatus::Unknown,
         }
-    }
-
-    fn is_processing_fork(&self) -> bool {
-        let chain = self.chain.read();
-        self.importer
-            .block_queue
-            .is_processing_fork(&chain.best_block_hash(), &chain)
     }
 
     fn block_total_difficulty(&self, id: BlockId) -> Option<U256> {
@@ -2332,6 +2236,10 @@ impl BlockChainClient for Client {
 
         // Converting from `Option<Option<Arc<Bytes>>>` to `Option<Option<Bytes>>`
         result.map(|c| c.map(|c| (&*c).clone()))
+    }
+
+    fn is_canon(&self, hash: &H256) -> bool {
+        self.chain.read().is_canon(hash)
     }
 
     fn storage_at(&self, address: &Address, position: &H256, state: StateOrBlock) -> Option<H256> {
@@ -2554,6 +2462,10 @@ impl BlockChainClient for Client {
         self.chain.read().find_uncle_hashes(hash, MAX_UNCLE_AGE)
     }
 
+    fn state_data(&self, hash: &H256) -> Option<Bytes> {
+        self.state_db.read().journal_db().state(hash)
+    }
+
     fn block_receipts(&self, hash: &H256) -> Option<BlockReceipts> {
         self.chain.read().block_receipts(hash)
     }
@@ -2667,6 +2579,49 @@ impl BlockChainClient for Client {
         Ok(chain.logs(blocks, |entry| filter.matches(entry), filter.limit))
     }
 
+    fn replay(&self, id: TransactionId, analytics: CallAnalytics) -> Result<Executed, CallError> {
+        let address = self
+            .transaction_address(id)
+            .ok_or(CallError::TransactionNotFound)?;
+        let block = BlockId::Hash(address.block_hash);
+
+        const PROOF: &'static str =
+            "The transaction address contains a valid index within block; qed";
+        Ok(self
+            .replay_block_transactions(block, analytics)?
+            .nth(address.index)
+            .expect(PROOF)
+            .1)
+    }
+
+    fn replay_block_transactions(
+        &self,
+        block: BlockId,
+        analytics: CallAnalytics,
+    ) -> Result<Box<dyn Iterator<Item = (H256, Executed)>>, CallError> {
+        let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
+        let body = self.block_body(block).ok_or(CallError::StatePruned)?;
+        let mut state = self
+            .state_at_beginning(block)
+            .ok_or(CallError::StatePruned)?;
+        let txs = body.transactions();
+        let engine = self.engine.clone();
+
+        const PROOF: &'static str =
+            "Transactions fetched from blockchain; blockchain transactions are valid; qed";
+        const EXECUTE_PROOF: &'static str = "Transaction replayed; qed";
+
+        Ok(Box::new(txs.into_iter().map(move |t| {
+            let transaction_hash = t.hash();
+            let t = SignedTransaction::new(t).expect(PROOF);
+            let machine = engine.machine();
+            let x = Self::do_virtual_call(machine, &env_info, &mut state, &t, analytics)
+                .expect(EXECUTE_PROOF);
+            env_info.gas_used = env_info.gas_used + x.gas_used;
+            (transaction_hash, x)
+        })))
+    }
+
     fn filter_traces(&self, filter: TraceFilter) -> Option<Vec<LocalizedTrace>> {
         if !self.tracedb.read().tracing_enabled() {
             return None;
@@ -2771,6 +2726,59 @@ impl BlockChainClient for Client {
         self.engine.signing_chain_id(&self.latest_env_info())
     }
 
+    fn mode(&self) -> Mode {
+        let r = self.mode.lock().clone().into();
+        trace!(target: "mode", "Asked for mode = {:?}. returning {:?}", &*self.mode.lock(), r);
+        r
+    }
+
+    fn set_mode(&self, new_mode: Mode) {
+        trace!(target: "mode", "Client::set_mode({:?})", new_mode);
+        if !self.enabled.load(AtomicOrdering::SeqCst) {
+            return;
+        }
+        {
+            let mut mode = self.mode.lock();
+            *mode = new_mode.clone().into();
+            trace!(target: "mode", "Mode now {:?}", &*mode);
+            if let Some(ref mut f) = *self.on_user_defaults_change.lock() {
+                trace!(target: "mode", "Making callback...");
+                f(Some((&*mode).clone()))
+            }
+        }
+        match new_mode {
+            Mode::Active => self.wake_up(),
+            Mode::Off => self.sleep(true),
+            _ => {
+                (*self.sleep_state.lock()).last_activity = Some(Instant::now());
+            }
+        }
+    }
+
+    fn spec_name(&self) -> String {
+        self.config.spec_name.clone()
+    }
+
+    fn set_spec_name(&self, new_spec_name: String) -> Result<(), ()> {
+        trace!(target: "mode", "Client::set_spec_name({:?})", new_spec_name);
+        if !self.enabled.load(AtomicOrdering::SeqCst) {
+            return Err(());
+        }
+        if let Some(ref h) = *self.exit_handler.lock() {
+            (*h)(new_spec_name);
+            Ok(())
+        } else {
+            warn!("Not hypervised; cannot change chain.");
+            Err(())
+        }
+    }
+
+    fn disable(&self) {
+        self.set_mode(Mode::Off);
+        self.enabled.store(false, AtomicOrdering::SeqCst);
+        self.clear_queue();
+    }
+
     fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>> {
         self.block_header_decoded(id)
             .map(|header| self.engine.extra_info(&header))
@@ -2849,6 +2857,7 @@ impl BlockChainClient for Client {
     }
 
     fn is_major_syncing(&self) -> bool {
+        // so far we know, this lock cannot result into a deadlock.
         match &*self.sync_provider.lock() {
             Some(sync_provider) => sync_provider.is_major_syncing(),
             // We also indicate the "syncing" state when the SyncProvider has not been set,
@@ -2865,8 +2874,15 @@ impl BlockChainClient for Client {
         self.registrar_address.clone()
     }
 
-    fn state_data(&self, hash: &H256) -> Option<Bytes> {
-        self.state_db.read().journal_db().state(hash)
+    fn is_processing_fork(&self) -> bool {
+        let chain = self.chain.read();
+        self.importer
+            .block_queue
+            .is_processing_fork(&chain.best_block_hash(), &chain)
+    }
+
+    fn reserved_peers_management(&self) -> &Mutex<Option<Box<dyn ReservedPeersManagement>>> {
+        &self.reserved_peers_management
     }
 }
 
@@ -3160,6 +3176,7 @@ impl BroadcastProposalBlock for Client {
 impl SealedBlockImporter for Client {}
 
 impl ::miner::TransactionVerifierClient for Client {}
+
 impl ::miner::BlockChainClient for Client {}
 
 impl super::traits::EngineClient for Client {
@@ -3538,12 +3555,16 @@ impl PrometheusMetrics for Client {
             report.transactions_applied as i64,
         );
 
-        let state_db = self.state_db.read();
-        r.register_gauge(
-            "statedb_cache_size",
-            "State DB cache size",
-            state_db.cache_size() as i64,
-        );
+        self.state_db
+            .try_read_for(Duration::from_millis(200))
+            .map(|state_db| {
+                let state_db_size = state_db.cache_size();
+                r.register_gauge(
+                    "statedb_cache_size",
+                    "State DB cache size",
+                    state_db_size as i64,
+                );
+            });
 
         // blockchain cache
         let blockchain_cache_info = self.blockchain_cache_info();
@@ -3646,6 +3667,10 @@ impl PrometheusMetrics for Client {
 
         // database info
         self.db.read().key_value().prometheus_metrics(r);
+
+        // engine specific metrics.
+
+        self.engine.prometheus_metrics(r);
     }
 }
 
@@ -3823,7 +3848,7 @@ mod tests {
                         transaction_index: 1,
                         transaction_log_index: 1,
                         log_index: 2,
-                    }
+                    },
                 ],
                 log_bloom: Default::default(),
                 outcome: TransactionOutcome::StateRoot(state_root),

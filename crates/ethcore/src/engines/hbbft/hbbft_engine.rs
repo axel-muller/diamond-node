@@ -1,6 +1,11 @@
-use crate::engines::{self, hbbft::contracts::random_hbbft::set_current_seed_tx_raw};
-
 use super::block_reward_hbbft::BlockRewardContract;
+use crate::{
+    client::BlockChainClient,
+    engines::hbbft::{
+        contracts::random_hbbft::set_current_seed_tx_raw, hbbft_message_memorium::BadSealReason,
+        hbbft_peers_management::HbbftPeersManagement,
+    },
+};
 use block::ExecutedBlock;
 use client::traits::{EngineClient, ForceUpdateSealing};
 use crypto::publickey::Signature;
@@ -9,16 +14,17 @@ use engines::{
     SealingState,
 };
 use error::{BlockError, Error};
-use ethereum_types::{H256, H512, U256};
+use ethereum_types::{Address, H160, H256, H512, U256};
 use ethjson::spec::HbbftParams;
 use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
 use itertools::Itertools;
 use machine::EthereumMachine;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rlp;
 use rmp_serde;
 use serde::Deserialize;
+use stats::PrometheusMetrics;
 use std::{
     cmp::{max, min},
     collections::BTreeMap,
@@ -74,12 +80,15 @@ pub struct HoneyBadgerBFT {
     signer: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     machine: EthereumMachine,
     hbbft_state: RwLock<HbbftState>,
-    hbbft_message_dispatcher: RwLock<HbbftMessageDispatcher>,
+    hbbft_message_dispatcher: HbbftMessageDispatcher,
     sealing: RwLock<BTreeMap<BlockNumber, Sealing>>,
     params: HbbftParams,
-    message_counter: RwLock<usize>,
+    message_counter: Mutex<usize>,
     random_numbers: RwLock<BTreeMap<BlockNumber, U256>>,
     keygen_transaction_sender: RwLock<KeygenTransactionSender>,
+    has_sent_availability_tx: AtomicBool,
+    has_connected_to_validator_set: AtomicBool,
+    peers_management: Mutex<HbbftPeersManagement>,
 }
 
 struct TransitionHandler {
@@ -132,11 +141,23 @@ impl TransitionHandler {
     fn max_block_time_remaining(&self, client: Arc<dyn EngineClient>) -> Duration {
         self.block_time_until(client, self.engine.params.maximum_block_time)
     }
+
+    /// executes all operations that have to be delayed after the chain has synced to the current tail.
+    /// returns: true if all delayed operation have been done now.
+    fn execute_delayed_unitl_synced_operations(&self) -> bool {
+        warn!(target: "consensus", "execute_delayed_unitl_synced_operations has been called");
+        true
+    }
 }
 
 // Arbitrary identifier for the timer we register with the event handler.
 const ENGINE_TIMEOUT_TOKEN: TimerToken = 1;
 const ENGINE_SHUTDOWN_IF_UNAVAILABLE: TimerToken = 2;
+// Some Operations should be executed if the chain is synced to the current tail.
+const ENGINE_DELAYED_UNITL_SYNCED_TOKEN: TimerToken = 3;
+// Some Operations have no urge on the timing, but are rather expensive.
+// those are handeled by this slow ticking timer.
+const ENGINE_VALIDATOR_CANDIDATE_ACTIONS: TimerToken = 4;
 
 impl IoHandler<()> for TransitionHandler {
     fn initialize(&self, io: &IoContext<()>) {
@@ -148,11 +169,17 @@ impl IoHandler<()> for TransitionHandler {
 
         io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(1200))
             .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
+
+        // io.register_timer_once(ENGINE_DELAYED_UNITL_SYNCED_TOKEN, Duration::from_secs(10))
+        //     .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_DELAYED_UNITL_SYNCED_TOKEN Timer failed: {}.", e));
+
+        io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
+            .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
         if timer == ENGINE_TIMEOUT_TOKEN {
-            //trace!(target: "consensus", "Honey Badger IoHandler timeout called");
+            // trace!(target: "consensus", "Honey Badger IoHandler timeout called");
             // The block may be complete, but not have been ready to seal - trigger a new seal attempt.
             // TODO: In theory, that should not happen. The seal is ready exactly when the sealing entry is `Complete`.
             if let Some(ref weak) = *self.client.read() {
@@ -163,10 +190,6 @@ impl IoHandler<()> for TransitionHandler {
 
             // Periodically allow messages received for future epochs to be processed.
             self.engine.replay_cached_messages();
-
-            if let Err(e) = self.engine.do_availability_handling() {
-                error!(target: "engine", "Error during do_availability_handling: {}", e)
-            }
 
             // The client may not be registered yet on startup, we set the default duration.
             let mut timer_duration = DEFAULT_DURATION;
@@ -317,6 +340,20 @@ impl IoHandler<()> for TransitionHandler {
                     warn!(target: "consensus", "Could not query Honey Badger check if validator is staked. {:?}", error);
                 }
             }
+        } else if timer == ENGINE_DELAYED_UNITL_SYNCED_TOKEN {
+            if !self.execute_delayed_unitl_synced_operations() {
+                io.register_timer_once(ENGINE_DELAYED_UNITL_SYNCED_TOKEN, Duration::from_secs(10))
+                .unwrap_or_else(
+                    |e| warn!(target: "consensus", "Failed to restart Engine is syncedconsensus step timer: {}.", e),
+                );
+            } else {
+                trace!(target: "consensus", "All Operation that had to be done after syncing have been done now.");
+            }
+        } else if timer == ENGINE_VALIDATOR_CANDIDATE_ACTIONS {
+            warn!(target: "consensus", "do_validator_engine_actions");
+            if let Err(err) = self.engine.do_validator_engine_actions() {
+                error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
+            }
         }
     }
 }
@@ -324,24 +361,33 @@ impl IoHandler<()> for TransitionHandler {
 impl HoneyBadgerBFT {
     /// Creates an instance of the Honey Badger BFT Engine.
     pub fn new(params: HbbftParams, machine: EthereumMachine) -> Result<Arc<Self>, Error> {
+        let is_unit_test = params.is_unit_test.unwrap_or(false);
         let engine = Arc::new(HoneyBadgerBFT {
             transition_service: IoService::<()>::start("Hbbft")?,
             client: Arc::new(RwLock::new(None)),
             signer: Arc::new(RwLock::new(None)),
             machine,
             hbbft_state: RwLock::new(HbbftState::new()),
-            hbbft_message_dispatcher: RwLock::new(HbbftMessageDispatcher::new(
+            hbbft_message_dispatcher: HbbftMessageDispatcher::new(
                 params.blocks_to_keep_on_disk.unwrap_or(0),
                 params
                     .blocks_to_keep_directory
                     .clone()
                     .unwrap_or("data/messages/".to_string()),
-            )),
+                if is_unit_test {
+                    "".to_string()
+                } else {
+                    "data".to_string()
+                },
+            ),
             sealing: RwLock::new(BTreeMap::new()),
             params,
-            message_counter: RwLock::new(0),
+            message_counter: Mutex::new(0),
             random_numbers: RwLock::new(BTreeMap::new()),
             keygen_transaction_sender: RwLock::new(KeygenTransactionSender::new()),
+            has_sent_availability_tx: AtomicBool::new(false),
+            has_connected_to_validator_set: AtomicBool::new(false),
+            peers_management: Mutex::new(HbbftPeersManagement::new()),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -353,7 +399,6 @@ impl HoneyBadgerBFT {
                 .transition_service
                 .register_handler(Arc::new(handler))?;
         }
-
         Ok(engine)
     }
 
@@ -377,7 +422,7 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Batch received for epoch {}, creating new Block.", batch.epoch);
 
         // Decode and de-duplicate transactions
-        let mut batch_txns: Vec<_> = batch
+        let batch_txns: Vec<_> = batch
             .contributions
             .iter()
             .flat_map(|(_, c)| &c.transactions)
@@ -470,21 +515,44 @@ impl HoneyBadgerBFT {
         trace!(target: "consensus", "Received message of idx {}  {:?} from {}", msg_idx, message, sender_id);
 
         // store received messages here.
-        self.hbbft_message_dispatcher
-            .write()
-            .on_message_received(&message);
+        self.hbbft_message_dispatcher.on_message_received(&message);
 
-        let step = self.hbbft_state.write().process_message(
-            client.clone(),
-            &self.signer,
-            sender_id,
-            message,
-        );
+        let message_block = message.epoch();
 
-        if let Some((step, network_info)) = step {
-            self.process_step(client, step, &network_info);
-            self.join_hbbft_epoch()?;
+        let mut lock = self.hbbft_state.write();
+        match lock.process_message(client.clone(), &self.signer, sender_id, message) {
+            Ok(Some((step, network_info))) => {
+                std::mem::drop(lock);
+                if step.fault_log.0.is_empty() {
+                    //TODO:  report good message here.
+                    self.hbbft_message_dispatcher
+                        .report_message_good(&sender_id, message_block);
+                } else {
+                    for f in step.fault_log.0.iter() {
+                        warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, f.node_id, f.kind);
+                        self.hbbft_message_dispatcher.report_message_faulty(
+                            &f.node_id,
+                            message_block,
+                            Some(f.kind.clone()),
+                        );
+                    }
+                }
+                self.process_step(client, step, &network_info);
+                self.join_hbbft_epoch()?;
+            }
+            Ok(None) => {}
+            Err(err) => {
+                std::mem::drop(lock);
+                // this error is thrown on a step error.
+                warn!(target: "consensus", "Block {} Node {} reported fault: {:?}", message_block, &sender_id, err);
+                self.hbbft_message_dispatcher.report_message_faulty(
+                    &sender_id,
+                    message_block,
+                    None,
+                );
+            }
         }
+
         Ok(())
     }
 
@@ -495,17 +563,21 @@ impl HoneyBadgerBFT {
         block_num: BlockNumber,
     ) -> Result<(), EngineError> {
         // store received messages here.
-        self.hbbft_message_dispatcher
-            .write()
-            .on_sealing_message_received(&message, block_num);
+        // self.hbbft_message_dispatcher
+        //     .write()
+        //     .on_sealing_message_received(&message, block_num, &sender_id);
 
         let client = self.client_arc().ok_or(EngineError::RequiresClient)?;
-        trace!(target: "consensus", "Received sealing message for block {} from {} : {:?} ",block_num, sender_id, message);
+        trace!(target: "consensus", "Received sealing message for block {} from {}",block_num, sender_id);
         if let Some(latest) = client.block_number(BlockId::Latest) {
             if latest >= block_num {
+                self.hbbft_message_dispatcher
+                    .report_seal_late(&sender_id, block_num, latest);
                 return Ok(()); // Message is obsolete.
             }
         }
+
+        // client.staking
 
         let network_info = match self.hbbft_state.write().network_info_for(
             client.clone(),
@@ -515,6 +587,11 @@ impl HoneyBadgerBFT {
             Some(n) => n,
             None => {
                 error!(target: "consensus", "Sealing message for block #{} could not be processed due to missing/mismatching network info.", block_num);
+                self.hbbft_message_dispatcher.report_seal_bad(
+                    &sender_id,
+                    block_num,
+                    BadSealReason::MismatchedNetworkInfo,
+                );
                 return Err(EngineError::UnexpectedMessage);
             }
         };
@@ -527,8 +604,19 @@ impl HoneyBadgerBFT {
             .or_insert_with(|| self.new_sealing(&network_info))
             .handle_message(&sender_id, message);
         match step_result {
-            Ok(step) => self.process_seal_step(client, step, block_num, &network_info),
-            Err(err) => error!(target: "consensus", "Error on ThresholdSign step: {:?}", err), // TODO: Errors
+            Ok(step) => {
+                self.hbbft_message_dispatcher
+                    .report_seal_good(&sender_id, block_num);
+                self.process_seal_step(client, step, block_num, &network_info);
+            }
+            Err(err) => {
+                error!(target: "consensus", "Error on ThresholdSign step: {:?}", err);
+                self.hbbft_message_dispatcher.report_seal_bad(
+                    &sender_id,
+                    block_num,
+                    BadSealReason::ErrorTresholdSignStep,
+                );
+            }
         }
         Ok(())
     }
@@ -593,7 +681,8 @@ impl HoneyBadgerBFT {
         step: HoneyBadgerStep,
         network_info: &NetworkInfo<NodeId>,
     ) {
-        let mut message_counter = self.message_counter.write();
+        let mut message_counter = self.message_counter.lock();
+
         let messages = step.messages.into_iter().map(|msg| {
             *message_counter += 1;
             TargetedMessage {
@@ -602,6 +691,7 @@ impl HoneyBadgerBFT {
             }
         });
         self.dispatch_messages(&client, messages, network_info);
+        std::mem::drop(message_counter);
         self.process_output(client, step.output, network_info);
     }
 
@@ -613,12 +703,15 @@ impl HoneyBadgerBFT {
             trace!(target: "consensus", "tried to join HBBFT Epoch, but still syncing.");
             return Ok(());
         }
+
         let step = self
             .hbbft_state
             .write()
             .contribute_if_contribution_threshold_reached(client.clone(), &self.signer);
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
+        } else {
+            // trace!(target: "consensus", "tried to join HBBFT Epoch, but contribution threshold not reached.");
         }
         Ok(())
     }
@@ -627,10 +720,17 @@ impl HoneyBadgerBFT {
         if self.is_syncing(&client) {
             return;
         }
-        let step = self
+
+        let step = match self
             .hbbft_state
-            .write()
-            .try_send_contribution(client.clone(), &self.signer);
+            .try_write_for(std::time::Duration::from_millis(10))
+        {
+            Some(mut state_lock) => state_lock.try_send_contribution(client.clone(), &self.signer),
+            None => {
+                return;
+            }
+        };
+
         if let Some((step, network_info)) = step {
             self.process_step(client, step, &network_info)
         }
@@ -679,10 +779,20 @@ impl HoneyBadgerBFT {
 
     fn replay_cached_messages(&self) -> Option<()> {
         let client = self.client_arc()?;
-        let steps = self
-            .hbbft_state
-            .write()
-            .replay_cached_messages(client.clone());
+
+        // replaying cached messages is not so important that it cause deadlocks
+        // instead we gently try to get a lock for 10 ms, and if we do not get a lock,
+        // we will just try again in the next tick.
+        // we could try to do some optimizations here to improve performance.
+
+        let steps = match self.hbbft_state.try_write_for(Duration::from_millis(10)) {
+            Some(mut hbbft_state_lock) => hbbft_state_lock.replay_cached_messages(client.clone()),
+            None => {
+                trace!(target: "engine", "could not acquire write lock for replaying cached messages, stepping back..",);
+                return None;
+            }
+        };
+
         let mut processed_step = false;
         if let Some((steps, network_info)) = steps {
             for step in steps {
@@ -706,87 +816,190 @@ impl HoneyBadgerBFT {
         Some(())
     }
 
-    fn do_availability_handling(&self) -> Result<(), String> {
-        // only try once on startup-
-        static HAS_SENT: AtomicBool = AtomicBool::new(false);
+    fn should_handle_availability_announcements(&self) -> bool {
+        !self.has_sent_availability_tx.load(Ordering::SeqCst)
+    }
 
-        if !HAS_SENT.load(Ordering::SeqCst) {
-            // If we have no signer there is nothing for us to send.
-            let address = match self.signer.read().as_ref() {
-                Some(signer) => signer.address(),
-                None => {
-                    // warn!("Could not retrieve address for writing availability transaction.");
-                    return Ok(());
-                }
-            };
+    fn should_connect_to_validator_set(&self) -> bool {
+        !self.has_connected_to_validator_set.load(Ordering::SeqCst)
+    }
 
-            match self.client_arc() {
-                Some(client) => {
-                    if !self.is_syncing(&client) {
-                        let engine_client = client.deref();
+    fn handle_availability_announcements(
+        &self,
+        engine_client: &dyn EngineClient,
+        block_chain_client: &dyn BlockChainClient,
+        mining_address: &Address,
+    ) {
+        // handles the announcements of the availability of other peers as blockchain transactions
 
-                        match staking_by_mining_address(engine_client, &address) {
-                            Ok(staking_address) => {
-                                if staking_address.is_zero() {
-                                    //TODO: here some fine handling can improve performance.
-                                    //with this implementation every node (validator or not)
-                                    //needs to query this state every block.
-                                    //trace!(target: "engine", "availability handling not a validator");
-                                    return Ok(());
-                                }
-                            }
-                            Err(call_error) => {
-                                error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                                let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                                return Err(message.into());
-                            }
-                        }
+        // let engine_client = client.deref();
 
-                        match get_validator_available_since(engine_client, &address) {
-                            Ok(s) => {
-                                if s.is_zero() {
-                                    //let c : &dyn BlockChainClient = client.into();
-                                    match client.as_full_client() {
-                                        Some(c) => {
-                                            //debug!(target: "engine", "sending announce availability transaction");
-                                            info!(target: "engine", "sending announce availability transaction");
-                                            match send_tx_announce_availability(c, &address) {
-                                                Ok(()) => {}
-                                                Err(call_error) => {
-                                                    //error!(target: "engine", "CallError during announce availability. {:?}", call_error);
-                                                    return Err(format!("CallError during announce availability. {:?}", call_error));
-                                                }
-                                            }
-                                        }
-                                        None => {
-                                            return Err(
-                                                "Unable to retrieve client.as_full_client()".into(),
-                                            );
-                                        }
-                                    }
-                                }
-                                // we store "HAS_SENT" if we SEND,
-                                // or if we are already marked as available.
-                                HAS_SENT.store(true, Ordering::SeqCst);
-                            }
-                            Err(e) => {
-                                //return Err(format!("Error trying to send availability check: {:?}", e));
-                                return Err(format!(
-                                    "Error trying to send availability check: {:?}",
-                                    e
-                                ));
-                            }
+        match get_validator_available_since(engine_client, &mining_address) {
+            Ok(s) => {
+                if s.is_zero() {
+                    //debug!(target: "engine", "sending announce availability transaction");
+                    info!(target: "engine", "sending announce availability transaction");
+                    match send_tx_announce_availability(block_chain_client, &mining_address) {
+                        Ok(()) => {}
+                        Err(call_error) => {
+                            error!(target: "engine", "CallError during announce availability. {:?}", call_error);
                         }
                     }
                 }
-                None => {
-                    //during bootup and shutdown, the ARC is not available. - it's fine, will send later
-                    return Ok(());
-                }
+
+                // we store "HAS_SENT" if we SEND,
+                // or if we are already marked as available.
+                self.has_sent_availability_tx.store(true, Ordering::SeqCst);
+                //return Ok(());
+            }
+            Err(e) => {
+                error!(target: "engine", "Error trying to send availability check: {:?}", e);
             }
         }
+    }
 
-        return Ok(());
+    fn should_handle_internet_address_announcements(&self, client: &dyn BlockChainClient) -> bool {
+        // this will just called in the next hbbft validator node events again.
+        // if we don't get a lock, we will just a little be late with announcing our internet address.
+        if let Some(peers) = self.peers_management.try_lock() {
+            return peers.should_announce_own_internet_address(client);
+        }
+
+        false
+    }
+
+    // some actions are required for hbbft validator nodes.
+    // this functions figures out what kind of actions are required and executes them.
+    // this will lock the client and some deeper layers.
+    fn do_validator_engine_actions(&self) -> Result<(), String> {
+        // here we need to differentiate the different engine functions,
+        // that requre different levels of access to the client.
+
+        match self.client_arc() {
+            Some(client_arc) => {
+                if self.is_syncing(&client_arc) {
+                    // we are syncing - do not do anything.
+                    return Ok(());
+                }
+
+                // If we have no signer there is nothing for us to send.
+                let mining_address = match self.signer.read().as_ref() {
+                    Some(signer) => signer.address(),
+                    None => {
+                        // we do not have a signer on Full and RPC nodes.
+                        // here is a possible performance improvement:
+                        // this won't change during the lifetime of the application ?!
+                        return Ok(());
+                    }
+                };
+
+                let engine_client = client_arc.deref();
+
+                let block_chain_client = match engine_client.as_full_client() {
+                    Some(block_chain_client) => block_chain_client,
+                    None => {
+                        return Err("Unable to retrieve client.as_full_client()".into());
+                    }
+                };
+
+                let should_handle_availability_announcements =
+                    self.should_handle_availability_announcements();
+                let should_handle_internet_address_announcements =
+                    self.should_handle_internet_address_announcements(block_chain_client);
+
+                let should_connect_to_validator_set = self.should_connect_to_validator_set();
+
+                // if we do not have to do anything, we can return early.
+                if !(should_handle_availability_announcements
+                    || should_handle_internet_address_announcements
+                    || should_connect_to_validator_set)
+                {
+                    return Ok(());
+                }
+
+                // TODO:
+                // staking by mining address could be cached.
+                // but it COULD also get changed in the contracts, during the time the node is running.
+                // most likely since a Node can get staked, and than it becomes a mining address.
+                // a good solution for this is not to do this that fequently.
+                let staking_address = match staking_by_mining_address(
+                    engine_client,
+                    &mining_address,
+                ) {
+                    Ok(staking_address) => {
+                        if staking_address.is_zero() {
+                            //TODO: here some fine handling can improve performance.
+                            //with this implementation every node (validator or not)
+                            //needs to query this state every block.
+                            //trace!(target: "engine", "availability handling not a validator");
+                            return Ok(());
+                        }
+                        staking_address
+                    }
+                    Err(call_error) => {
+                        error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                        let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                        return Err(message.into());
+                    }
+                };
+
+                // if we are not a potential validator, we already have already returned here.
+                if should_handle_availability_announcements {
+                    self.handle_availability_announcements(
+                        engine_client,
+                        block_chain_client,
+                        &mining_address,
+                    );
+                }
+
+                // since get latest nonce respects the pending transactions,
+                // we don't have to take care of sending 2 transactions at once.
+                if should_handle_internet_address_announcements {
+                    if let Some(mut peers_management) = self
+                        .peers_management
+                        .try_lock_for(Duration::from_millis(100))
+                    {
+                        if let Err(error) = peers_management.announce_own_internet_address(
+                            block_chain_client,
+                            engine_client,
+                            &mining_address,
+                            &staking_address,
+                        ) {
+                            error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
+                        } else {
+                        }
+                    }
+                }
+
+                if should_connect_to_validator_set {
+                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() {
+                        hbbft_state.get_current_network_info()
+                    } else {
+                        None
+                    };
+
+                    if let Some(network_info) = network_info_o {
+                        if let Some(mut peers_management) = self
+                            .peers_management
+                            .try_lock_for(Duration::from_millis(100))
+                        {
+                            // connecting to current validators.
+                            peers_management
+                                .connect_to_current_validators(&network_info, &client_arc);
+                            self.has_connected_to_validator_set
+                                .store(true, Ordering::SeqCst);
+                        }
+                    }
+                }
+                return Ok(());
+            }
+
+            None => {
+                // client arc not ready yet,
+                // can happen during initialization and shutdown.
+                return Ok(());
+            }
+        }
     }
 
     /// Returns true if we are in the keygen phase and a new key has been generated.
@@ -795,14 +1008,14 @@ impl HoneyBadgerBFT {
             None => false,
             Some(client) => {
                 // If we are not in key generation phase, return false.
-                let num_validators = match get_pending_validators(&*client) {
+                let validators = match get_pending_validators(&*client) {
                     Err(_) => return false,
                     Ok(validators) => {
                         // If the validator set is empty then we are not in the key generation phase.
                         if validators.is_empty() {
                             return false;
                         }
-                        validators.len()
+                        validators
                     }
                 };
 
@@ -810,7 +1023,7 @@ impl HoneyBadgerBFT {
                 // The execution needs to be *identical* on all nodes, which means it should *not* use the local signer
                 // when attempting to initialize the synckeygen.
                 if let Ok(all_available) =
-                    all_parts_acks_available(&*client, block_timestamp, num_validators)
+                    all_parts_acks_available(&*client, block_timestamp, validators.len())
                 {
                     if all_available {
                         let null_signer = Arc::new(RwLock::new(None));
@@ -835,6 +1048,30 @@ impl HoneyBadgerBFT {
                     if let Ok(is_pending) = is_pending_validator(&*client, &signer.address()) {
                         trace!(target: "engine", "is_pending_validator: {}", is_pending);
                         if is_pending {
+                            // we are a pending validator, so we need to connect to other pending validators.
+                            // so we start already the required communication channels.
+                            // but this is NOT Mission critical,
+                            // we will connect to the validators when we are in the validator set anyway.
+                            // so we won't lock and wait forever to be able to do this.
+                            if let Some(mut peers_management) = self
+                                .peers_management
+                                .try_lock_for(Duration::from_millis(50))
+                            {
+                                // problem: this get's called every block, not only when validators become pending.
+                                match peers_management
+                                    .connect_to_pending_validators(&client, &validators)
+                                {
+                                    Ok(value) => {
+                                        debug!(target: "engine", "added to additional {:?} reserved peers, because they are pending validators.",  value);
+                                    }
+                                    Err(err) => {
+                                        warn!(target: "engine", "Error connecting to other pending validators: {:?}", err);
+                                    }
+                                }
+                            } else {
+                                warn!(target: "engine", "Could not connect to other pending validators, peers management lock not acquird within time.");
+                            }
+
                             let _err = self
                                 .keygen_transaction_sender
                                 .write()
@@ -1046,24 +1283,51 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn register_client(&self, client: Weak<dyn EngineClient>) {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
+            let mut state = self.hbbft_state.write();
+            match state.update_honeybadger(
                 client,
                 &self.signer,
+                &self.peers_management,
                 BlockId::Latest,
                 true,
             ) {
-                // As long as the client is set we should be able to initialize as a regular node.
-                error!(target: "engine", "Error during HoneyBadger initialization!");
+                Some(_) => {
+                    let posdao_epoch = state.get_current_posdao_epoch();
+                    let epoch_start_block = state.get_current_posdao_epoch_start_block();
+                    // we got all infos from the state, we can drop the lock.
+                    std::mem::drop(state);
+                    warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
+                    self.hbbft_message_dispatcher
+                        .report_new_epoch(posdao_epoch, epoch_start_block);
+                }
+                None => error!(target: "engine", "Error during HoneyBadger initialization!"),
             }
         }
     }
 
     fn set_signer(&self, signer: Option<Box<dyn EngineSigner>>) {
+        if let Some(engine_signer) = signer.as_ref() {
+            // this is importamt, we really have to get that lock here.
+            self.peers_management
+                .lock()
+                .set_validator_address(engine_signer.address());
+        }
+
         *self.signer.write() = signer;
+
         if let Some(client) = self.client_arc() {
+            // client.as_full_client().and_then(|c| {
+            //     self.peers_management.lock().set_peers_management(self.peers_management.clone());
+            //     None
+            //     }
+            // );
+            // setting peers management here.
+
+            warn!(target: "engine", "set_signer - update_honeybadger...");
             if let None = self.hbbft_state.write().update_honeybadger(
                 client,
                 &self.signer,
+                &self.peers_management,
                 BlockId::Latest,
                 true,
             ) {
@@ -1165,7 +1429,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn on_before_transactions(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-        trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
+        // trace!(target: "consensus", "on_before_transactions: {:?} extra data: {:?}", block.header.number(), block.header.extra_data());
         let random_numbers = self.random_numbers.read();
         let random_number: U256 = match random_numbers.get(&block.header.number()) {
             None => {
@@ -1178,12 +1442,15 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 // so we only accept data with the correct length.
                 let r_ = if extra_data.len() == 32 {
                     let r = U256::from_big_endian(extra_data);
-                    warn!(
+                    debug!(
                         "restored random number from header for block {} random number: {:?}",
                         block.header.number(),
                         r
                     );
                     r
+                } else if extra_data.len() == 6 && extra_data == &[80, 97, 114, 105, 116, 121] {
+                    warn!("detected Parity as random number, ignoring.",);
+                    return Ok(());
                 } else {
                     // if there is no header data,
                     // than it is because the old node software created blocks without random data in the header.
@@ -1205,7 +1472,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 r.clone()
             }
         };
-        warn!("random number: {:?}", random_number);
 
         let tx = set_current_seed_tx_raw(&random_number);
 
@@ -1213,8 +1479,16 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         let result = self
             .machine
             .execute_as_system(block, tx.0, U256::max_value(), Some(tx.1));
-        warn!("execution result: {result:?}");
-        return result.map(|_| ());
+
+        match result {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(e) => {
+                //return Err(EngineError::Custom(format!("Error calling randomness contract: {:?}", e)).into());
+                return Err(e);
+            }
+        }
     }
 
     /// Allow mutating the header during seal generation.
@@ -1265,7 +1539,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
 
         self.hbbft_message_dispatcher
-            .write()
             .free_memory(block.header.number());
 
         Ok(())
@@ -1273,17 +1546,40 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn on_chain_commit(&self, block_hash: &H256) {
         if let Some(client) = self.client_arc() {
-            if let None = self.hbbft_state.write().update_honeybadger(
-                client,
+            let mut state = self.hbbft_state.write();
+            let old_posdao_epoch = state.get_current_posdao_epoch();
+            match state.update_honeybadger(
+                client.clone(),
                 &self.signer,
-                BlockId::Hash(*block_hash),
+                &self.peers_management,
+                BlockId::Hash(block_hash.clone()),
                 false,
             ) {
-                error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed");
+                Some(_) => {
+                    let new_posdao_epoch = state.get_current_posdao_epoch();
+                    std::mem::drop(state);
+                    if new_posdao_epoch != old_posdao_epoch {
+                        info!(target: "consensus", "POSDAO epoch changed from {old_posdao_epoch} to {new_posdao_epoch}.");
+                        if let Some(block_number) = client.block_number(BlockId::Hash(*block_hash))
+                        {
+                            self.hbbft_message_dispatcher
+                                .report_new_epoch(new_posdao_epoch, block_number);
+                        } else {
+                            error!(target: "engine", "could not retrieve Block on_chain_commit for updating message memoriumaupdate honey badger after importing block {block_hash}: update honeybadger failed")
+                        }
+                    }
+                }
+                None => {
+                    error!(target: "engine", "could not update honey badger after importing block {block_hash}: update honeybadger failed")
+                }
             }
         } else {
             error!(target: "engine", "could not update honey badger after importing the block {block_hash}: no client");
         }
+    }
+
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        self.hbbft_message_dispatcher.prometheus_metrics(registry);
     }
 }
 

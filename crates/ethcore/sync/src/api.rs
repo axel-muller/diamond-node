@@ -745,6 +745,8 @@ pub trait ManageNetwork: Send + Sync {
     fn num_peers_range(&self) -> RangeInclusive<u32>;
     /// Get network context for protocol.
     fn with_proto_context(&self, proto: ProtocolId, f: &mut dyn FnMut(&dyn NetworkContext));
+    /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr>;
 }
 
 impl ManageNetwork for EthSync {
@@ -794,6 +796,11 @@ impl ManageNetwork for EthSync {
 
     fn with_proto_context(&self, proto: ProtocolId, f: &mut dyn FnMut(&dyn NetworkContext)) {
         self.network.with_context_eval(proto, f);
+    }
+
+    /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.
+    fn get_devp2p_network_endpoint(&self) -> Option<SocketAddr> {
+        self.network.get_devp2p_network_endpoint()
     }
 }
 
