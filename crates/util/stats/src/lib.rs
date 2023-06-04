@@ -79,8 +79,6 @@ impl PrometheusRegistry {
         // add labels here .
         opts.variable_labels.push(label.to_string());
 
-        
-
         match prometheus::IntGauge::with_opts(opts) {
             Ok(g) => {
                 g.set(value);
@@ -90,11 +88,11 @@ impl PrometheusRegistry {
                     .expect("prometheus identifiers must be are unique");
             }
             Err(e) => {
-                    warn!(
-                        "failed to create gauge with label {} {} {} : {:?}",
-                        name, help, label, e
-                    );
-                }
+                warn!(
+                    "failed to create gauge with label {} {} {} : {:?}",
+                    name, help, label, e
+                );
+            }
         }
     }
 
