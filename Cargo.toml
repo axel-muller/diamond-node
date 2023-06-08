@@ -93,7 +93,7 @@ lazy_static = "1.2.0"
 winapi = { version = "0.3.4", features = ["winsock2", "winuser", "shellapi"] }
 
 [features]
-default = ["accounts", "deadlock_detection"]
+default = ["accounts"]
 accounts = ["ethcore-accounts", "parity-rpc/accounts"]
 miner-debug = ["ethcore/miner-debug"]
 json-tests = ["ethcore/json-tests"]
