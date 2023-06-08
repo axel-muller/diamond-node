@@ -1,6 +1,13 @@
 
 
 
+
+## Diamond Node Software 3.3.5-hbbft-0.8.7
+
+- removed deadlock detection from default config
+- added missing categorisation from hbbft_message_memorium
+- increased sleeping timer for hbbft_message_memoriumto increase performance, since we often have messages that can't be processed.
+
 ## Diamond Node Software 3.3.5-hbbft-0.8.6
 
 - client Software now known as diamond-node

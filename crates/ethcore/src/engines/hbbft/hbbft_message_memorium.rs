@@ -401,7 +401,7 @@ impl HbbftMessageDispatcher {
                 // and don't block the work thread for too long.
                 let work_result = arc_clone.write().work_message();
                 if !work_result {
-                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    std::thread::sleep(std::time::Duration::from_millis(5000));
                 }
             }) {
                 Ok(thread) => {
@@ -774,10 +774,10 @@ impl HbbftMessageMemorium {
 
         //lets print some debug infos so we can analyze this case in greater detail.
 
-        warn!("No staking epoch history found for block: {}", block_num);
+        warn!(target: "hbbft_message_memorium", "No staking epoch history found for block: {}", block_num);
 
         for staking_epoch_history_entry in self.staking_epoch_history.iter() {
-            warn!("Staking Epoch History: {:?}", staking_epoch_history_entry);
+            warn!(target: "hbbft_message_memorium", "Staking Epoch History: {:?}", staking_epoch_history_entry);
         }
 
         None

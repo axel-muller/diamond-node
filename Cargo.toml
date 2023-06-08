@@ -2,7 +2,7 @@
 description = "Diamond Node"
 name = "diamond-node"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "3.3.5-hbbft-0.8.6"
+version = "3.3.5-hbbft-0.8.7"
 license = "GPL-3.0"
 authors = [
 	"bit.diamonds developers",
@@ -93,7 +93,7 @@ lazy_static = "1.2.0"
 winapi = { version = "0.3.4", features = ["winsock2", "winuser", "shellapi"] }
 
 [features]
-default = ["accounts", "deadlock_detection"]
+default = ["accounts"]
 accounts = ["ethcore-accounts", "parity-rpc/accounts"]
 miner-debug = ["ethcore/miner-debug"]
 json-tests = ["ethcore/json-tests"]
