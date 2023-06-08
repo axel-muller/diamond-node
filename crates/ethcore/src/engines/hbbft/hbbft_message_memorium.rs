@@ -401,7 +401,7 @@ impl HbbftMessageDispatcher {
                 // and don't block the work thread for too long.
                 let work_result = arc_clone.write().work_message();
                 if !work_result {
-                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    std::thread::sleep(std::time::Duration::from_millis(5000));
                 }
             }) {
                 Ok(thread) => {
