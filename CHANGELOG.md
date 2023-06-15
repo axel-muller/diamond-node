@@ -1,6 +1,8 @@
 
+## Diamond Node Software 3.3.5-hbbft-0.8.8
+Hotfix Release 
 
-
+- https://github.com/DMDcoin/diamond-node/issues/23
 
 ## Diamond Node Software 3.3.5-hbbft-0.8.7
 
