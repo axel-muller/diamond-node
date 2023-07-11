@@ -791,11 +791,11 @@ impl HbbftMessageMemorium {
 
         //lets print some debug infos so we can analyze this case in greater detail.
 
-        warn!(target: "hbbft_message_memorium", "No staking epoch history found for block: {}", block_num);
+        // warn!(target: "hbbft_message_memorium", "No staking epoch history found for block: {}", block_num);
 
-        for staking_epoch_history_entry in self.staking_epoch_history.iter() {
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History: {:?}", staking_epoch_history_entry);
-        }
+        // for staking_epoch_history_entry in self.staking_epoch_history.iter() {
+        //     warn!(target: "hbbft_message_memorium", "Staking Epoch History: {:?}", staking_epoch_history_entry);
+        // }
 
         None
     }
