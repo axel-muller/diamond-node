@@ -3594,8 +3594,6 @@ impl PrometheusMetrics for Client {
             blockchain_cache_info.total() as i64,
         );
 
-        
-
         // chain info
         let chain = self.chain_info();
 
@@ -3670,7 +3668,6 @@ impl PrometheusMetrics for Client {
             "Number of items being verified",
             queue.verifying_queue_size as i64,
         );
-
 
         // database info
         self.db.read().key_value().prometheus_metrics(r);
