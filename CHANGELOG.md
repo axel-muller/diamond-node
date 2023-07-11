@@ -1,6 +1,5 @@
 
 ## Diamond Node Software 3.3.5-hbbft-0.8.9
-Hotfix Release 
 
 - [fixed logspam because of syncing nodes](https://github.com/DMDcoin/diamond-node/issues/29)
 - [prometheus: is_major_syncing](https://github.com/DMDcoin/diamond-node/issues/32) 
