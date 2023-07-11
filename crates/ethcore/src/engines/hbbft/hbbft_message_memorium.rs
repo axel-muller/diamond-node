@@ -2,7 +2,7 @@ use bytes::ToPretty;
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
-use stats::{prometheus::core::Metric, PrometheusMetrics};
+use stats::PrometheusMetrics;
 use std::{collections::VecDeque, time::Duration};
 
 // use threshold_crypto::{SignatureShare};
@@ -532,6 +532,12 @@ pub(crate) struct HbbftMessageMemorium {
     // timestamp when the last stat report for hbbft node health was written.
     timestamp_last_validator_stats_written: u64,
     // interval in seconds how often we write the hbbft node health report.
+
+    /// latest known stacking epoch number
+    latest_epoch: u64,
+    
+    /// start block of latest known epoch start.
+    latest_epoch_start_block: u64
 }
 
 impl HbbftMessageMemorium {
@@ -560,6 +566,8 @@ impl HbbftMessageMemorium {
             dispatched_message_event_good: VecDeque::new(),
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
+            latest_epoch: 0,
+            latest_epoch_start_block: 0
         }
     }
 
@@ -645,10 +653,25 @@ impl HbbftMessageMemorium {
             epoch_history.on_seal_good(seal);
             return true;
         } else {
-            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
+            return self.event_handle_history_not_set_up(seal.block_num);
         }
-        return false;
+    }
+
+    fn event_handle_history_not_set_up(&self, block_num: u64) -> bool {
+        
+        if block_num > self.latest_epoch_start_block {
+
+            if self.latest_epoch_start_block  == 0 {
+                warn!(target: "hbbft_message_memorium", "latest_epoch_start_block not set up yet.");    
+            }
+            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
+            info!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
+            return false;
+        } else {
+            // return true to indicate that we do not want this message to get processed anymore.
+            // this is just an old seal message from an epoch before.
+            return true; 
+        }
     }
 
     // process a late seal message in to the history.
@@ -659,10 +682,8 @@ impl HbbftMessageMemorium {
             epoch_history.on_seal_late(seal);
             return true;
         } else {
-            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
+            return self.event_handle_history_not_set_up(seal.block_num);
         }
-        return false;
     }
 
     fn on_seal_bad(&mut self, seal: &SealEventBad) -> bool {
@@ -672,10 +693,8 @@ impl HbbftMessageMemorium {
             epoch_history.on_seal_bad(seal);
             return true;
         } else {
-            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
+            return self.event_handle_history_not_set_up(seal.block_num);
         }
-        return false;
     }
 
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
@@ -685,10 +704,8 @@ impl HbbftMessageMemorium {
             epoch_history.on_message_faulty(event);
             return true;
         } else {
-            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
+            return self.event_handle_history_not_set_up(event.block_num);
         }
-        return false;
     }
 
     fn on_message_good(&mut self, event: &MessageEventGood) -> bool {
@@ -697,15 +714,15 @@ impl HbbftMessageMemorium {
             epoch_history.on_message_good(event);
             return true;
         } else {
-            // this can happen if a epoch switch is not processed yet, but messages are already incomming.
-            warn!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", event.block_num);
+            return self.event_handle_history_not_set_up(event.block_num);
         }
-        return false;
     }
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
         warn!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
+        self.latest_epoch = staking_epoch;
+        self.latest_epoch_start_block = staking_epoch_start_block;
         if let Ok(epoch_history_index) = self
             .staking_epoch_history
             .binary_search_by_key(&staking_epoch, |x| x.staking_epoch)
