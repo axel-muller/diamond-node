@@ -14,7 +14,7 @@ use engines::{
     SealingState,
 };
 use error::{BlockError, Error};
-use ethereum_types::{Address, H160, H256, H512, U256};
+use ethereum_types::{Address, H256, H512, U256};
 use ethjson::spec::HbbftParams;
 use hbbft::{NetworkInfo, Target};
 use io::{IoContext, IoHandler, IoService, TimerToken};
