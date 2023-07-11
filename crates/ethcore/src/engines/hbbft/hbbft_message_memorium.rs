@@ -532,12 +532,11 @@ pub(crate) struct HbbftMessageMemorium {
     // timestamp when the last stat report for hbbft node health was written.
     timestamp_last_validator_stats_written: u64,
     // interval in seconds how often we write the hbbft node health report.
-
     /// latest known stacking epoch number
     latest_epoch: u64,
-    
+
     /// start block of latest known epoch start.
-    latest_epoch_start_block: u64
+    latest_epoch_start_block: u64,
 }
 
 impl HbbftMessageMemorium {
@@ -567,7 +566,7 @@ impl HbbftMessageMemorium {
             staking_epoch_history: VecDeque::new(),
             timestamp_last_validator_stats_written: 0,
             latest_epoch: 0,
-            latest_epoch_start_block: 0
+            latest_epoch_start_block: 0,
         }
     }
 
@@ -658,11 +657,9 @@ impl HbbftMessageMemorium {
     }
 
     fn event_handle_history_not_set_up(&self, block_num: u64) -> bool {
-        
         if block_num > self.latest_epoch_start_block {
-
-            if self.latest_epoch_start_block  == 0 {
-                warn!(target: "hbbft_message_memorium", "latest_epoch_start_block not set up yet.");    
+            if self.latest_epoch_start_block == 0 {
+                warn!(target: "hbbft_message_memorium", "latest_epoch_start_block not set up yet.");
             }
             // this can happen if a epoch switch is not processed yet, but messages are already incomming.
             info!(target: "hbbft_message_memorium", "Staking Epoch History not set up for block: {}", block_num);
@@ -670,7 +667,7 @@ impl HbbftMessageMemorium {
         } else {
             // return true to indicate that we do not want this message to get processed anymore.
             // this is just an old seal message from an epoch before.
-            return true; 
+            return true;
         }
     }
 
