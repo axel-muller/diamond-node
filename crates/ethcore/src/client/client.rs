@@ -3624,6 +3624,10 @@ impl PrometheusMetrics for Client {
             chain.best_block_number as i64,
         );
 
+        let is_syncing_val: i64 = self.is_major_syncing() as i64;
+        // 0 or 1 if we are syncing.
+        r.register_gauge("is_major_syncing", "syncing, boolean", is_syncing_val);
+
         // prunning info
         let prunning = self.pruning_info();
         r.register_gauge(
