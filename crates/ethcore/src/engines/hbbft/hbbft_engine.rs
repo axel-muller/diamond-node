@@ -456,6 +456,9 @@ impl HoneyBadgerBFT {
             .map(|(_, c)| c.timestamp)
             .sorted();
 
+        // todo: use timstamps for calculating negative score.
+        // https://github.com/DMDcoin/diamond-node/issues/37
+
         let timestamp = match timestamps.iter().nth(timestamps.len() / 2) {
             Some(t) => t.clone(),
             None => {
