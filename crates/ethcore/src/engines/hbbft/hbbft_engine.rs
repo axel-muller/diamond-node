@@ -89,6 +89,7 @@ pub struct HoneyBadgerBFT {
     has_sent_availability_tx: AtomicBool,
     has_connected_to_validator_set: AtomicBool,
     peers_management: Mutex<HbbftPeersManagement>,
+    current_minimum_gas_price: Mutex<Option<U256>>,
 }
 
 struct TransitionHandler {
@@ -388,6 +389,7 @@ impl HoneyBadgerBFT {
             has_sent_availability_tx: AtomicBool::new(false),
             has_connected_to_validator_set: AtomicBool::new(false),
             peers_management: Mutex::new(HbbftPeersManagement::new()),
+            current_minimum_gas_price: Mutex::new(None),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -1288,6 +1290,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
             ) {
@@ -1328,6 +1331,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
             ) {
@@ -1344,10 +1348,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             None => Err(EngineError::RequiresSigner.into()),
         }
     }
-
-    //     Ok(vec![])
-
-    // }
 
     fn sealing_state(&self) -> SealingState {
         // Purge obsolete sealing processes.
@@ -1552,6 +1552,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client.clone(),
                 &self.signer,
                 &self.peers_management,
+                &self.current_minimum_gas_price,
                 BlockId::Hash(block_hash.clone()),
                 false,
             ) {

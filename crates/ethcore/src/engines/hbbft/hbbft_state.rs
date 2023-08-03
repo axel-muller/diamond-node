@@ -1,6 +1,7 @@
 use client::traits::EngineClient;
 use engines::signer::EngineSigner;
 use ethcore_miner::pool::{PoolVerifiedTransaction, ScoredTransaction};
+use ethereum_types::U256;
 use hbbft::{
     crypto::{PublicKey, Signature},
     honey_badger::{self, HoneyBadgerBuilder},
@@ -68,6 +69,7 @@ impl HbbftState {
         client: Arc<dyn EngineClient>,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
         peers_management_mutex: &Mutex<HbbftPeersManagement>,
+        current_minimum_gas_price: &Mutex<Option<U256>>,
         block_id: BlockId,
         force: bool,
     ) -> Option<()> {
@@ -108,6 +110,12 @@ impl HbbftState {
         self.current_posdao_epoch_start_block = posdao_epoch_start.as_u64();
 
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
+
+        // apply DAO updates here.
+        // update the current minimum gas price.
+        // todo: function calls here.
+        *current_minimum_gas_price.lock() = Some(U256::zero());
+
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
             // we can disconnect the peers here.
