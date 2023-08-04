@@ -1,8 +1,11 @@
 use ethereum_types::{Address, U256};
 use std::str::FromStr;
 
+use crate::{
+    client::EngineClient,
+    engines::hbbft::utils::bound_contract::{BoundContract, CallError},
+};
 use types::ids::BlockId;
-use crate::{client::EngineClient, engines::hbbft::utils::bound_contract::{BoundContract, CallError}};
 
 use_contract!(permission_contract, "res/contracts/permission_hbbft.json");
 
@@ -17,8 +20,10 @@ macro_rules! call_const_permission {
     };
 }
 
-pub fn get_minimum_gas_from_permission_contract(client: &dyn EngineClient, block_id: BlockId) -> Result<U256, CallError> {
-
+pub fn get_minimum_gas_from_permission_contract(
+    client: &dyn EngineClient,
+    block_id: BlockId,
+) -> Result<U256, CallError> {
     // permission_contract.
     //let decoder = permission_contract::functions::minimum_gas_price::call();
     // let decoder = random_hbbft_contract::functions::set_current_seed::call(random_value);
