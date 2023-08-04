@@ -50,10 +50,17 @@ impl HbbftTestClient {
     pub fn transfer(&mut self, sender: &KeyPair, receiver: &Address, amount: &U256) {
         let nonce = self.client.next_nonce(&sender.address());
         let transaction = create_transfer(sender, receiver, amount, &nonce);
-        if let Err(err) = self.miner
-            .import_own_transaction(self.client.as_ref(), transaction.into(), false) {
-                //err.
-            error!("could not transfer from {} to {} error: {:?}", sender.address(), receiver, err);
+        if let Err(err) =
+            self.miner
+                .import_own_transaction(self.client.as_ref(), transaction.into(), false)
+        {
+            //err.
+            error!(
+                "could not transfer from {} to {} error: {:?}",
+                sender.address(),
+                receiver,
+                err
+            );
         }
     }
 
