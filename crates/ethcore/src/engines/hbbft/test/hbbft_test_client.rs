@@ -56,7 +56,7 @@ impl HbbftTestClient {
         {
             //err.
             error!(
-                "could not transfer from {} to {} error: {:?}",
+                "could not transfer from {:?} to {:?} error: {:?}",
                 sender.address(),
                 receiver,
                 err
