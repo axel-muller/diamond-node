@@ -15,6 +15,8 @@ use std::{
 };
 use types::{header::Header, ids::BlockId};
 
+use crate::engines::hbbft::contracts::permission::get_minimum_gas_from_permission_contract;
+
 use super::{
     contracts::{
         keygen_history::{initialize_synckeygen, synckeygen_to_network_info},
@@ -113,8 +115,15 @@ impl HbbftState {
 
         // apply DAO updates here.
         // update the current minimum gas price.
-        // todo: function calls here.
-        *current_minimum_gas_price.lock() = Some(U256::zero());
+
+        match get_minimum_gas_from_permission_contract(client.as_ref(), BlockId::Number(self.current_posdao_epoch_start_block)) {
+            Ok(min_gas) => {
+                *current_minimum_gas_price.lock() = Some(min_gas);
+            },
+            Err(err) => {
+                warn!(target: "engine", "Could not read min gas from hbbft permission contract.  {:?}.", err);
+            },
+        }
 
         if sks.is_none() {
             info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");

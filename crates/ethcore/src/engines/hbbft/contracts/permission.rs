@@ -11,7 +11,7 @@ use_contract!(permission_contract, "res/contracts/permission_hbbft.json");
 
 lazy_static! {
     static ref PERMISSION_CONTRACT_ADDRESS: Address =
-        Address::from_str("0x4000000000000000000000000000000000000001").unwrap();
+        Address::from_str("4000000000000000000000000000000000000001").unwrap();
 }
 
 macro_rules! call_const_permission {
