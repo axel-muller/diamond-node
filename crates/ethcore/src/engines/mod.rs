@@ -703,6 +703,12 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
     fn allow_non_eoa_sender(&self, best_block_number: BlockNumber) -> bool {
         self.params().eip3607_transition > best_block_number
     }
+
+    /// Some Engine might define the minimum gas price by themselve.
+    /// (for example: contract)
+    fn minimum_gas_price(&self) -> Option<U256> {
+        None
+    }
 }
 
 // convenience wrappers for existing functions.
