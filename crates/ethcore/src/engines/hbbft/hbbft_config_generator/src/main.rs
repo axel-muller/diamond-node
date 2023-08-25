@@ -109,6 +109,7 @@ fn to_toml(
     signer_address: &Address,
     total_num_of_nodes: usize,
     tx_queue_per_sender: Option<i64>,
+    metrics_port: Option<u16>,
 ) -> Value {
     let base_port = 30300i64;
     let base_rpc_port = 8540i64;
@@ -243,6 +244,8 @@ fn to_toml(
     );
     misc.insert("log_file".into(), Value::String("parity.log".into()));
 
+    // metrics.insert("");
+
     let mut map = Map::new();
     map.insert("parity".into(), Value::Table(parity));
     map.insert("network".into(), Value::Table(network));
@@ -253,6 +256,13 @@ fn to_toml(
     map.insert("account".into(), Value::Table(account));
     map.insert("mining".into(), Value::Table(mining));
     map.insert("misc".into(), Value::Table(misc));
+
+    if let Some(port) = metrics_port {
+        let mut metrics = Map::new();
+
+        map.insert("metrics".into(), Value::Table(metrics));
+    }
+
     Value::Table(map)
 }
 
@@ -323,6 +333,12 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("metrics_port")
+                .long("metrics_port")
+                .required(false)
+                .takes_value(true),
+        )
         .get_matches();
 
     let num_nodes_validators: usize = matches
@@ -344,6 +360,13 @@ fn main() {
                     .expect("tx_queue_per_sender need to be of integer type"),
             )
         });
+
+    let metrics_port: Option<u16> = matches.value_of("metrics_port").map_or(None, |v| {
+        Some(
+            v.parse::<u16>()
+                .expect("metrics_port need to be an integer port definition 1-65555"),
+        )
+    });
 
     assert!(
         num_nodes_total >= num_nodes_validators,
@@ -405,6 +428,7 @@ fn main() {
             &enode.address,
             num_nodes_total,
             tx_queue_per_sender.clone(),
+            metrics_port,
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -435,6 +459,7 @@ fn main() {
         &Address::default(), // todo: insert HBBFT Contracts pot here.
         num_nodes_total,
         tx_queue_per_sender.clone(),
+        metrics_port
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");
