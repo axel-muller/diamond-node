@@ -109,7 +109,8 @@ fn to_toml(
     signer_address: &Address,
     total_num_of_nodes: usize,
     tx_queue_per_sender: Option<i64>,
-    metrics_port: Option<u16>,
+    base_metrics_port: Option<u16>,
+    metrics_interface: Option<&str>,
 ) -> Value {
     let base_port = 30300i64;
     let base_rpc_port = 8540i64;
@@ -257,8 +258,26 @@ fn to_toml(
     map.insert("mining".into(), Value::Table(mining));
     map.insert("misc".into(), Value::Table(misc));
 
-    if let Some(port) = metrics_port {
+    if let Some(port_base) = base_metrics_port {
         let mut metrics = Map::new();
+
+        let port = (port_base as usize) + i;
+
+        // metrics.insert("interface".into(), Value::String("local".into()));
+        //     Metrics:
+        // --metrics
+        //     Enable prometheus metrics (only full client).
+
+        // --metrics-port=[PORT]
+        //     Specify the port portion of the metrics server. (default: 3000)
+
+        // --metrics-interface=[IP]
+        //     Specify the hostname portion of the metrics server, IP should be an interface's IP address, or all (all
+        //     interfaces) or local. (default: local)
+
+        if let Some(metrics_interface_) = metrics_interface {
+            metrics.insert("interface".into(), Value::String(metrics_interface_.into()));
+        }
 
         map.insert("metrics".into(), Value::Table(metrics));
     }
@@ -334,8 +353,16 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("metrics_port")
+            Arg::with_name("metrics_port_base")
                 .long("metrics_port")
+                .help("activates prometheus metrics. The port is the base port, the node index is added to it.")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics_interface")
+                .long("metrics_interface")
+                .help("internet interface of metrics. 'all', 'local' or ip address.")
                 .required(false)
                 .takes_value(true),
         )
@@ -361,12 +388,14 @@ fn main() {
             )
         });
 
-    let metrics_port: Option<u16> = matches.value_of("metrics_port").map_or(None, |v| {
+    let metrics_port_base: Option<u16> = matches.value_of("metrics_port").map_or(None, |v| {
         Some(
             v.parse::<u16>()
                 .expect("metrics_port need to be an integer port definition 1-65555"),
         )
     });
+
+    let metrics_interface = matches.value_of("metrics_interface");
 
     assert!(
         num_nodes_total >= num_nodes_validators,
@@ -428,7 +457,8 @@ fn main() {
             &enode.address,
             num_nodes_total,
             tx_queue_per_sender.clone(),
-            metrics_port,
+            metrics_port_base,
+            metrics_interface,
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -459,7 +489,8 @@ fn main() {
         &Address::default(), // todo: insert HBBFT Contracts pot here.
         num_nodes_total,
         tx_queue_per_sender.clone(),
-        metrics_port
+        metrics_port_base,
+        metrics_interface, 
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");
