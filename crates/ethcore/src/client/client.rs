@@ -2726,6 +2726,12 @@ impl BlockChainClient for Client {
         self.engine.signing_chain_id(&self.latest_env_info())
     }
 
+    /// Some Engine might define the minimum gas price by themselve.
+    /// (for example: contract)
+    fn minimum_gas_price(&self) -> Option<U256> {
+        self.engine.minimum_gas_price()
+    }
+
     fn mode(&self) -> Mode {
         let r = self.mode.lock().clone().into();
         trace!(target: "mode", "Asked for mode = {:?}. returning {:?}", &*self.mode.lock(), r);

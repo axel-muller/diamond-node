@@ -31,7 +31,7 @@ lazy_static! {
     ///     c. Fund the new MOC address sufficiently
     /// 5. Copy the private key of the MOC to initialize the MASTER_OF_CEREMONIES_KEYPAIR variable below.
     static ref MASTER_OF_CEREMONIES_KEYPAIR: KeyPair = KeyPair::from_secret(
-        Secret::from_str("3467568AEB6505121C3F5DE131D7EAD9EDC01B309A521BF1A321173B0BC849D8")
+        Secret::from_str("5bbd61411b3f6f7c38187c0534060e3b310597868933d8820105410dd223b8d7")
             .expect("Secret from hex string must succeed")
     )
     .expect("KeyPair generation from secret must succeed");
