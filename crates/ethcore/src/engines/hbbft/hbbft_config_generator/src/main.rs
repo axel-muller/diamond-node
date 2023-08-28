@@ -46,7 +46,7 @@ impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        let port = 30300usize + self.idx;
+        let port = 31300usize + self.idx;
         format!("enode://{:x}@{}:{}", self.public, self.ip, port)
     }
 }
@@ -112,9 +112,9 @@ fn to_toml(
     base_metrics_port: Option<u16>,
     metrics_interface: Option<&str>,
 ) -> Value {
-    let base_port = 30300i64;
-    let base_rpc_port = 8540i64;
-    let base_ws_port = 9540i64;
+    let base_port = 31300i64;
+    let base_rpc_port = 18540i64;
+    let base_ws_port = 19540i64;
 
     let mut parity = Map::new();
     match config_type {
@@ -263,6 +263,10 @@ fn to_toml(
 
         let port = (port_base as usize) + i;
 
+        metrics.insert("enable".into(), Value::Boolean(true));
+
+        metrics.insert("port".into(), Value::Integer(port as i64));
+
         // metrics.insert("interface".into(), Value::String("local".into()));
         //     Metrics:
         // --metrics
@@ -354,7 +358,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("metrics_port_base")
-                .long("metrics_port")
+                .long("metrics_port_base")
                 .help("activates prometheus metrics. The port is the base port, the node index is added to it.")
                 .required(false)
                 .takes_value(true),
@@ -388,12 +392,14 @@ fn main() {
             )
         });
 
-    let metrics_port_base: Option<u16> = matches.value_of("metrics_port").map_or(None, |v| {
+    let metrics_port_base: Option<u16> = matches.value_of("metrics_port_base").map_or(None, |v| {
         Some(
             v.parse::<u16>()
                 .expect("metrics_port need to be an integer port definition 1-65555"),
         )
     });
+
+    std::println!("metrics_port_base: {:?}", metrics_port_base);
 
     let metrics_interface = matches.value_of("metrics_interface");
 
