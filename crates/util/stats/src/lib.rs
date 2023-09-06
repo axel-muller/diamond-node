@@ -79,10 +79,10 @@ impl PrometheusRegistry {
         // add labels here .
         opts.variable_labels.push(label.to_string());
 
-        match prometheus::IntGauge::with_opts(opts) {
+       
+        match prometheus::register_int_gauge_with_registry!(opts, self.registry) {
             Ok(g) => {
                 g.set(value);
-
                 self.registry
                     .register(Box::new(g))
                     .expect("prometheus identifiers must be are unique");
