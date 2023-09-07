@@ -496,7 +496,7 @@ fn main() {
         num_nodes_total,
         tx_queue_per_sender.clone(),
         metrics_port_base,
-        metrics_interface, 
+        metrics_interface,
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");
