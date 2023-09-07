@@ -983,9 +983,19 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
 
         //let label = self.get_node_id().0.to_hex();
 
-        let node_id = self.get_node_id().0.0;
+        let node_id = self.get_node_id().0 .0;
 
-        let label = std::format!("n{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}", node_id[0], node_id[1], node_id[2], node_id[3], node_id[4], node_id[5], node_id[6], node_id[7]);
+        let label = std::format!(
+            "n{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+            node_id[0],
+            node_id[1],
+            node_id[2],
+            node_id[3],
+            node_id[4],
+            node_id[5],
+            node_id[6],
+            node_id[7]
+        );
 
         //r.register_gauge_with_label(name, help, label, value)
         r.register_gauge_with_label(

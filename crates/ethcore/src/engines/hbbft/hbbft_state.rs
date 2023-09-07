@@ -116,13 +116,16 @@ impl HbbftState {
         // apply DAO updates here.
         // update the current minimum gas price.
 
-        match get_minimum_gas_from_permission_contract(client.as_ref(), BlockId::Number(self.current_posdao_epoch_start_block)) {
+        match get_minimum_gas_from_permission_contract(
+            client.as_ref(),
+            BlockId::Number(self.current_posdao_epoch_start_block),
+        ) {
             Ok(min_gas) => {
                 *current_minimum_gas_price.lock() = Some(min_gas);
-            },
+            }
             Err(err) => {
                 warn!(target: "engine", "Could not read min gas from hbbft permission contract.  {:?}.", err);
-            },
+            }
         }
 
         if sks.is_none() {

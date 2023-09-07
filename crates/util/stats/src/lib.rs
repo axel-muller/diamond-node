@@ -72,7 +72,7 @@ impl PrometheusRegistry {
 
     /// Adds a new prometheus gauge with a label
     pub fn register_gauge_with_label(&mut self, name: &str, help: &str, label: &str, value: i64) {
-        let label_formated = format!("{}{}",name, label);
+        let label_formated = format!("{}{}", name, label);
         // let label_formated = format!("{}{}", self.prefix, name);
         let opts = prometheus::Opts::new(label_formated, help);
 
