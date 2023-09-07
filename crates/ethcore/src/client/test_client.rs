@@ -1032,6 +1032,12 @@ impl BlockChainClient for TestBlockChainClient {
         None
     }
 
+    /// Some Engine might define the minimum gas price by themselve.
+    /// (for example: contract)
+    fn minimum_gas_price(&self) -> Option<U256> {
+        None
+    }
+
     fn mode(&self) -> Mode {
         Mode::Active
     }

@@ -46,7 +46,7 @@ impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        let port = 30300usize + self.idx;
+        let port = 31300usize + self.idx;
         format!("enode://{:x}@{}:{}", self.public, self.ip, port)
     }
 }
@@ -109,10 +109,12 @@ fn to_toml(
     signer_address: &Address,
     total_num_of_nodes: usize,
     tx_queue_per_sender: Option<i64>,
+    base_metrics_port: Option<u16>,
+    metrics_interface: Option<&str>,
 ) -> Value {
-    let base_port = 30300i64;
-    let base_rpc_port = 8540i64;
-    let base_ws_port = 9540i64;
+    let base_port = 31300i64;
+    let base_rpc_port = 18540i64;
+    let base_ws_port = 19540i64;
 
     let mut parity = Map::new();
     match config_type {
@@ -243,6 +245,8 @@ fn to_toml(
     );
     misc.insert("log_file".into(), Value::String("parity.log".into()));
 
+    // metrics.insert("");
+
     let mut map = Map::new();
     map.insert("parity".into(), Value::Table(parity));
     map.insert("network".into(), Value::Table(network));
@@ -253,6 +257,35 @@ fn to_toml(
     map.insert("account".into(), Value::Table(account));
     map.insert("mining".into(), Value::Table(mining));
     map.insert("misc".into(), Value::Table(misc));
+
+    if let Some(port_base) = base_metrics_port {
+        let mut metrics = Map::new();
+
+        let port = (port_base as usize) + i;
+
+        metrics.insert("enable".into(), Value::Boolean(true));
+
+        metrics.insert("port".into(), Value::Integer(port as i64));
+
+        // metrics.insert("interface".into(), Value::String("local".into()));
+        //     Metrics:
+        // --metrics
+        //     Enable prometheus metrics (only full client).
+
+        // --metrics-port=[PORT]
+        //     Specify the port portion of the metrics server. (default: 3000)
+
+        // --metrics-interface=[IP]
+        //     Specify the hostname portion of the metrics server, IP should be an interface's IP address, or all (all
+        //     interfaces) or local. (default: local)
+
+        if let Some(metrics_interface_) = metrics_interface {
+            metrics.insert("interface".into(), Value::String(metrics_interface_.into()));
+        }
+
+        map.insert("metrics".into(), Value::Table(metrics));
+    }
+
     Value::Table(map)
 }
 
@@ -323,6 +356,20 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("metrics_port_base")
+                .long("metrics_port_base")
+                .help("activates prometheus metrics. The port is the base port, the node index is added to it.")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics_interface")
+                .long("metrics_interface")
+                .help("internet interface of metrics. 'all', 'local' or ip address.")
+                .required(false)
+                .takes_value(true),
+        )
         .get_matches();
 
     let num_nodes_validators: usize = matches
@@ -344,6 +391,17 @@ fn main() {
                     .expect("tx_queue_per_sender need to be of integer type"),
             )
         });
+
+    let metrics_port_base: Option<u16> = matches.value_of("metrics_port_base").map_or(None, |v| {
+        Some(
+            v.parse::<u16>()
+                .expect("metrics_port need to be an integer port definition 1-65555"),
+        )
+    });
+
+    std::println!("metrics_port_base: {:?}", metrics_port_base);
+
+    let metrics_interface = matches.value_of("metrics_interface");
 
     assert!(
         num_nodes_total >= num_nodes_validators,
@@ -405,6 +463,8 @@ fn main() {
             &enode.address,
             num_nodes_total,
             tx_queue_per_sender.clone(),
+            metrics_port_base,
+            metrics_interface,
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -435,6 +495,8 @@ fn main() {
         &Address::default(), // todo: insert HBBFT Contracts pot here.
         num_nodes_total,
         tx_queue_per_sender.clone(),
+        metrics_port_base,
+        metrics_interface,
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");
