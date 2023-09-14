@@ -26,6 +26,7 @@ use blockchain::{BlockChainDB, BlockChainDBHandler};
 use ethcore::{
     client::{ChainNotify, Client, ClientConfig, ClientIoMessage},
     error::{Error as EthcoreError, ErrorKind},
+    exit::ShutdownManager,
     miner::Miner,
     snapshot::{
         service::{Service as SnapshotService, ServiceParams as SnapServiceParams},
@@ -55,6 +56,7 @@ impl ClientService {
         restoration_db_handler: Box<dyn BlockChainDBHandler>,
         _ipc_path: &Path,
         miner: Arc<Miner>,
+        shutdown: ShutdownManager,
     ) -> Result<ClientService, Error> {
         let io_service = IoService::<ClientIoMessage>::start("Client")?;
 
@@ -71,6 +73,7 @@ impl ClientService {
             blockchain_db.clone(),
             miner.clone(),
             io_service.channel(),
+            shutdown,
         )?;
         miner.set_io_channel(io_service.channel());
         miner.set_in_chain_checker(&client.clone());

@@ -25,6 +25,7 @@ use std::{
 use crate::{hash::keccak, types::ids::BlockId};
 use ethcore::{
     client::{DatabaseCompactionProfile, Mode, VMType},
+    exit::ShutdownManager,
     miner::Miner,
     snapshot::{
         io::{PackedReader, PackedWriter, SnapshotReader},
@@ -239,6 +240,7 @@ impl SnapshotCommand {
             // TODO [ToDr] don't use test miner here
             // (actually don't require miner at all)
             Arc::new(Miner::new_for_tests(&spec, None)),
+            ShutdownManager::null(),
         )
         .map_err(|e| format!("Client service error: {:?}", e))?;
 

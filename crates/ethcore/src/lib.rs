@@ -123,6 +123,7 @@ pub mod error;
 pub mod ethereum;
 pub mod executed;
 pub mod executive;
+pub mod exit;
 pub mod machine;
 pub mod miner;
 pub mod pod_account;

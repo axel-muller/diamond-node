@@ -107,6 +107,8 @@ use db::{keys::BlockDetails, Readable, Writable};
 pub use reth_util::queue::ExecutionQueue;
 pub use types::{block_status::BlockStatus, blockchain_info::BlockChainInfo};
 pub use verification::QueueInfo as BlockQueueInfo;
+
+use crate::exit::ShutdownManager;
 use_contract!(registry, "res/contracts/registrar.json");
 
 const ANCIENT_BLOCKS_QUEUE_SIZE: usize = 4096;
@@ -260,6 +262,8 @@ pub struct Client {
     reserved_peers_management: Mutex<Option<Box<dyn ReservedPeersManagement>>>,
 
     importer: Importer,
+
+    shutdown: ShutdownManager,
 }
 
 impl Importer {
@@ -946,6 +950,7 @@ impl Client {
         db: Arc<dyn BlockChainDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
+        shutdown: ShutdownManager,
     ) -> Result<Arc<Client>, ::error::Error> {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
@@ -1054,6 +1059,7 @@ impl Client {
             reserved_peers_management: Mutex::new(None),
             importer,
             config,
+            shutdown,
         });
 
         let exec_client = client.clone();

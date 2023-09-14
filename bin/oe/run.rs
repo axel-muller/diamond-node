@@ -46,6 +46,7 @@ use ethcore::{
     client::{
         BlockChainClient, BlockInfo, ChainSyncing, Client, DatabaseCompactionProfile, Mode, VMType,
     },
+    exit::ShutdownManager,
     miner::{self, stratum, Miner, MinerOptions, MinerService},
     snapshot::{self, SnapshotConfiguration},
     verification::queue::VerifierSettings,
@@ -163,7 +164,11 @@ impl ChainSyncing for SyncProviderWrapper {
 /// Executes the given run command.
 ///
 /// On error, returns what to print on stderr.
-pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient, String> {
+pub fn execute(
+    cmd: RunCmd,
+    logger: Arc<RotatingLogger>,
+    shutdown: ShutdownManager,
+) -> Result<RunningClient, String> {
     // load spec
     let spec = cmd.spec.spec(&cmd.dirs.cache)?;
 
@@ -378,6 +383,7 @@ pub fn execute(cmd: RunCmd, logger: Arc<RotatingLogger>) -> Result<RunningClient
         restoration_db_handler,
         &cmd.dirs.ipc_path(),
         miner.clone(),
+        shutdown,
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
