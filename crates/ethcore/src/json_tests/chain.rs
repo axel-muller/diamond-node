@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
+use crate::exit::ShutdownManager;
+
 use super::HookType;
 use client::{
     Balance, BlockChainClient, BlockId, ChainInfo, Client, ClientConfig, EvmTestClient,
@@ -199,6 +201,7 @@ pub fn json_chain_test<H: FnMut(&str, HookType)>(
                     db,
                     Arc::new(Miner::new_for_tests(&spec, None)),
                     IoChannel::disconnected(),
+                    ShutdownManager::null(),
                 )
                 .expect("Failed to instantiate a new Client");
 

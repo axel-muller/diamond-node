@@ -1241,6 +1241,10 @@ impl super::traits::EngineClient for TestBlockChainClient {
         self.miner
             .create_pending_block_at(self, txns, timestamp, block_number)
     }
+
+    fn demand_shutdown(&self) {
+
+    }
 }
 
 impl PrometheusMetrics for TestBlockChainClient {
