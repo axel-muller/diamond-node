@@ -299,15 +299,20 @@ impl IoHandler<()> for TransitionHandler {
                                     //    info!(target: "engine", "Signal result: {signal_result}");
                                     // }
 
-                                    let child = Command::new("/bin/kill")
-                                        .arg(id.to_string())
-                                        .spawn()
-                                        .expect("failed to execute child");
+                                    //let child = Command::new("/bin/kill")
+                                    //    .arg(id.to_string())
+                                    //    .spawn()
+                                    //    .expect("failed to execute child");
 
-                                    let kill_id = child.id();
-                                    info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
+                                    //let kill_id = child.id();
+                                    //info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
 
-                                    // if let Some(ref weak) = *self.client.read() {
+                                    if let Some(ref weak) = *self.client.read() {
+                                        if let Some(client) = weak.upgrade() {
+                                            client.demand_shutdown();
+                                        }
+                                     }
+
                                     //     if let Some(client) = weak.upgrade() {
 
                                     // match client.as_full_client() {

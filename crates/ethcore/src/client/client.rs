@@ -3229,6 +3229,10 @@ impl super::traits::EngineClient for Client {
         self.importer.miner.queued_transactions(self)
     }
 
+    fn demand_shutdown(&self) {
+        self.shutdown.demand_shutdown();
+    }
+
     fn create_pending_block_at(
         &self,
         txns: Vec<SignedTransaction>,

@@ -73,9 +73,8 @@ impl ShutdownManager {
     }
 
     pub fn demand_shutdown(self: &Self) {
-        todo!();
-        //self.exit_mutex.lock().do_shutdown();
-        //exit_mutex.
-        // e.1.notify_all();
+
+        self.exit_mutex.0.lock().do_shutdown();
+        self.exit_mutex.1.notify_all();
     }
 }
