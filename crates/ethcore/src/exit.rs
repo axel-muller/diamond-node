@@ -12,6 +12,8 @@ pub struct ExitStatus {
 }
 
 impl ExitStatus {
+
+    /// new not panicking
     pub fn new() -> Self {
         ExitStatus {
             panicking: false,
@@ -19,6 +21,7 @@ impl ExitStatus {
         }
     }
 
+    /// new one that panics
     pub fn new_panicking() -> Self {
         ExitStatus {
             panicking: true,
@@ -26,6 +29,7 @@ impl ExitStatus {
         }
     }
 
+    /// regular exit wihout panic
     pub fn new_should_exit() -> Self {
         ExitStatus {
             panicking: false,
@@ -38,10 +42,12 @@ impl ExitStatus {
         self.should_exit = true;
     }
 
+    /// has someone requested a shutdown?
     pub fn should_exit(self: &Self) -> bool {
         return self.should_exit;
     }
 
+    /// has someone requested a panic?
     pub fn is_panicking(self: &Self) -> bool {
         return self.panicking;
     }
@@ -66,12 +72,14 @@ impl ShutdownManager {
         };
     }
 
+    /// creates a new shutdown manager, use ::null() if you do not wish to provide a mutex.
     pub fn new(mutex_original: &Arc<(Mutex<ExitStatus>, Condvar)>) -> Self {
         return ShutdownManager {
             exit_mutex: mutex_original.clone(),
         };
     }
 
+    /// demands a shutdown of the node software
     pub fn demand_shutdown(self: &Self) {
 
         self.exit_mutex.0.lock().do_shutdown();
