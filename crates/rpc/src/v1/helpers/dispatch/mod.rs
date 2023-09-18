@@ -393,6 +393,16 @@ where
     C: BlockChainClient,
     M: MinerService,
 {
+    // check out history for open ethereum legacy code.
+    // this is a dmd node specific implementation.
+
+    // client.priority_gas_price_corpus(sample_size, eip1559_transition)
+
+    //if the engine of the client defines a minimum gas price, we can return this here.
+    if let Some(gas_price) = client.minimum_gas_price() {
+        return gas_price;
+    }
+
     client
         .gas_price_corpus(100)
         .percentile(percentile)

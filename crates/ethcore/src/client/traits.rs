@@ -479,6 +479,9 @@ pub trait BlockChainClient:
         corpus.into()
     }
 
+    /// Some Engines might define their gas price on their own.
+    fn minimum_gas_price(&self) -> Option<U256>;
+
     /// Get the preferred chain ID to sign on
     fn signing_chain_id(&self) -> Option<u64>;
 
