@@ -478,7 +478,8 @@ impl HbbftState {
             ) {
                 Ok(synckeygen) => synckeygen,
                 Err(e) => {
-                    error!(target: "consensus", "Synckeygen failed with error: {:?}", e);
+                    let diff = parent_block_nr - posdao_epoch_start.low_u64();
+                    error!(target: "consensus", "Synckeygen failed. parent block: {} epoch_start: {}  diff {} with error: {:?}  ", parent_block_nr, posdao_epoch_start, diff, e);
                     return false;
                 }
             };
