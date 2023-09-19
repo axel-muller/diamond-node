@@ -310,6 +310,7 @@ impl IoHandler<()> for TransitionHandler {
 
                                     if let Some(ref weak) = *self.client.read() {
                                         if let Some(client) = weak.upgrade() {
+                                            info!(target: "engine", "demanding shutdown from hbbft engine.");
                                             client.demand_shutdown();
                                         }
                                     }
