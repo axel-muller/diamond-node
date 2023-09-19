@@ -12,7 +12,6 @@ pub struct ExitStatus {
 }
 
 impl ExitStatus {
-
     /// new not panicking
     pub fn new() -> Self {
         ExitStatus {
@@ -81,7 +80,6 @@ impl ShutdownManager {
 
     /// demands a shutdown of the node software
     pub fn demand_shutdown(self: &Self) {
-
         self.exit_mutex.0.lock().do_shutdown();
         self.exit_mutex.1.notify_all();
     }

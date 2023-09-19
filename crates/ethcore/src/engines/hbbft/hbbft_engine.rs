@@ -312,7 +312,7 @@ impl IoHandler<()> for TransitionHandler {
                                         if let Some(client) = weak.upgrade() {
                                             client.demand_shutdown();
                                         }
-                                     }
+                                    }
 
                                     //     if let Some(client) = weak.upgrade() {
 
