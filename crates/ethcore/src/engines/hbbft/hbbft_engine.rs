@@ -1108,7 +1108,6 @@ impl HoneyBadgerBFT {
 
     /// hbbft protects the start of the current posdao epoch start from being pruned.
     pub fn pruning_protection_block_number(&self) -> Option<u64> {
-
         // we try to get a read lock for 500 ms.
         // that is a very long duration, but the information is important.
         if let Some(hbbft_state_lock) = self.hbbft_state.try_read_for(Duration::from_millis(500)) {
