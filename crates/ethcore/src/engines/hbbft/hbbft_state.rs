@@ -284,10 +284,12 @@ impl HbbftState {
                 match honey_badger.handle_message(&sender_id, message) {
                     Ok(step) => return Ok(Some((step, network_info.clone()))),
                     Err(err) => {
-                        // TODO: Report consensus step errors
-                        // maybe we are not part of the HBBFT Set anymore ?
-                        // maybe the sender is not Part of the hbbft set ?
-                        // maybe we have the wrong hbbft for decryption ?
+                        // the sender is possible not in the hbbft set anymore
+                        // and can ignore this error and not process a step.
+                        let epoch = message_epoch;
+                        if epoch < self.current_posdao_epoch_start_block {
+                            return Ok(None);
+                        }
 
                         error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}", sender_id, message_epoch, err);
                         return Err(err);
