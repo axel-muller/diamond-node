@@ -108,6 +108,27 @@ impl PrometheusRegistry {
         );
         t
     }
+
+    pub fn register_version(&mut self) {
+        let sha3 = vergen::SHORT_SHA;
+        let version = sha3.bits();
+        self.register_gauge("version_sha3_bits", "version_sha3", version as i64);
+        self.register_gauge(
+            "version_semver_bits",
+            "Sementic Versioning bits",
+            vergen::SEMVER.bits() as i64,
+        );
+        self.register_gauge(
+            "version_commit_date",
+            "commit date",
+            vergen::COMMIT_DATE.bits() as i64,
+        );
+        self.register_gauge(
+            "version_vergen_target",
+            "vergen targets",
+            vergen::TARGET.bits() as i64,
+        );
+    }
 }
 
 /// Implements a prometheus metrics collector

@@ -4848,6 +4848,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "prometheus",
+ "vergen",
 ]
 
 [[package]]
