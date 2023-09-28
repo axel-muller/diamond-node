@@ -91,13 +91,19 @@ impl HbbftState {
         }
 
         let posdao_epoch_start = get_posdao_epoch_start(&*client, block_id).ok()?;
-        let synckeygen = initialize_synckeygen(
+        let synckeygen = match initialize_synckeygen(
             &*client,
             signer,
             BlockId::Number(posdao_epoch_start.low_u64()),
             ValidatorType::Current,
-        )
-        .ok()?;
+        ) {
+            Ok(synckey) => synckey,
+            Err(e) => {
+                error!(target: "engine", "error initializing synckeygen for block: {:?}: {:?}", block_id, e);
+                return None;
+            }
+        };
+
         assert!(synckeygen.is_ready());
 
         let (pks, sks) = synckeygen.generate().ok()?;
