@@ -23,7 +23,7 @@ use ethcore::{
     miner::Miner,
     spec::{Genesis, Spec},
     test_helpers,
-    verification::{queue::kind::blocks::Unverified, VerifierType},
+    verification::{queue::kind::blocks::Unverified, VerifierType}, exit::ShutdownManager,
 };
 use ethereum_types::{Address, H256, U256};
 use ethjson::{blockchain::BlockChain, spec::ForkSpec};
@@ -130,6 +130,7 @@ impl EthTester {
             test_helpers::new_db(),
             miner_service.clone(),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let sync_provider = sync_provider();
