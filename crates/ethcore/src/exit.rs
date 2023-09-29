@@ -1,3 +1,5 @@
+//! allows controlled shutdown of the node software.
+
 use std::sync::Arc;
 
 use parking_lot::{Condvar, Mutex};
