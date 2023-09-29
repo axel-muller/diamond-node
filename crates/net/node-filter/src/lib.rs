@@ -99,6 +99,7 @@ mod test {
     use super::NodeFilter;
     use ethcore::{
         client::{BlockChainClient, Client, ClientConfig},
+        exit::ShutdownManager,
         miner::Miner,
         spec::Spec,
         test_helpers,
@@ -127,6 +128,7 @@ mod test {
             client_db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let filter = NodeFilter::new(
