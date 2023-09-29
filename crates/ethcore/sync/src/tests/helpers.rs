@@ -28,7 +28,7 @@ use ethcore::{
     miner::Miner,
     snapshot::SnapshotService,
     spec::Spec,
-    test_helpers,
+    test_helpers, exit::ShutdownManager,
 };
 
 use ethereum_types::H256;
@@ -447,6 +447,7 @@ impl TestNet<EthPeer<EthcoreClient>> {
             test_helpers::new_db(),
             miner.clone(),
             channel.clone(),
+            ShutdownManager::null()
         )
         .unwrap();
 
