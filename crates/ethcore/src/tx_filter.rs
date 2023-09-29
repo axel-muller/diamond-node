@@ -213,6 +213,8 @@ impl TransactionFilter {
 
 #[cfg(test)]
 mod test {
+    use crate::exit::ShutdownManager;
+
     use super::TransactionFilter;
     use client::{BlockChainClient, BlockId, Client, ClientConfig};
     use crypto::publickey::{KeyPair, Secret};
@@ -242,6 +244,7 @@ mod test {
             db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let key1 = KeyPair::from_secret(
@@ -477,6 +480,7 @@ mod test {
             db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let key1 = KeyPair::from_secret(
@@ -545,6 +549,7 @@ mod test {
             db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let key1 = KeyPair::from_secret(
@@ -613,6 +618,7 @@ mod test {
             db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let key1 = KeyPair::from_secret(
@@ -684,6 +690,7 @@ mod test {
             db,
             Arc::new(Miner::new_for_tests(&spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let key1 = KeyPair::from_secret(
