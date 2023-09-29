@@ -25,10 +25,11 @@ use ethcore::{
         BlockChainClient, ChainMessageType, ChainNotify, Client as EthcoreClient, ClientConfig,
         ClientIoMessage, NewBlocks, TestBlockChainClient,
     },
+    exit::ShutdownManager,
     miner::Miner,
     snapshot::SnapshotService,
     spec::Spec,
-    test_helpers, exit::ShutdownManager,
+    test_helpers,
 };
 
 use ethereum_types::H256;
@@ -447,7 +448,7 @@ impl TestNet<EthPeer<EthcoreClient>> {
             test_helpers::new_db(),
             miner.clone(),
             channel.clone(),
-            ShutdownManager::null()
+            ShutdownManager::null(),
         )
         .unwrap();
 
