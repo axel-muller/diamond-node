@@ -20,10 +20,11 @@ use std::{env, sync::Arc};
 use accounts::AccountProvider;
 use ethcore::{
     client::{BlockChainClient, ChainInfo, Client, ClientConfig, EvmTestClient, ImportBlock},
+    exit::ShutdownManager,
     miner::Miner,
     spec::{Genesis, Spec},
     test_helpers,
-    verification::{queue::kind::blocks::Unverified, VerifierType}, exit::ShutdownManager,
+    verification::{queue::kind::blocks::Unverified, VerifierType},
 };
 use ethereum_types::{Address, H256, U256};
 use ethjson::{blockchain::BlockChain, spec::ForkSpec};
