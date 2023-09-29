@@ -34,6 +34,7 @@ use ethcore::{
         Balance, BlockChainClient, BlockChainReset, BlockId, DatabaseCompactionProfile,
         ImportExportBlocks, Mode, Nonce, VMType,
     },
+    exit::ShutdownManager,
     miner::Miner,
     verification::queue::VerifierSettings,
 };
@@ -212,6 +213,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
         // TODO [ToDr] don't use test miner here
         // (actually don't require miner at all)
         Arc::new(Miner::new_for_tests(&spec, None)),
+        ShutdownManager::null(),
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
@@ -277,6 +279,7 @@ fn start_client(
     cache_config: CacheConfig,
     require_fat_db: bool,
     max_round_blocks_to_import: usize,
+    shutdown: ShutdownManager,
 ) -> Result<ClientService, String> {
     // load spec file
     let spec = spec.spec(&dirs.cache)?;
@@ -347,6 +350,7 @@ fn start_client(
         // It's fine to use test version here,
         // since we don't care about miner parameters at all
         Arc::new(Miner::new_for_tests(&spec, None)),
+        shutdown,
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
@@ -367,6 +371,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
         cmd.cache_config,
         false,
         cmd.max_round_blocks_to_import,
+        ShutdownManager::null(),
     )?;
     let client = service.client();
 
@@ -396,6 +401,7 @@ fn execute_export_state(cmd: ExportState) -> Result<(), String> {
         cmd.cache_config,
         true,
         cmd.max_round_blocks_to_import,
+        ShutdownManager::null(),
     )?;
 
     let client = service.client();
@@ -514,6 +520,7 @@ fn execute_reset(cmd: ResetBlockchain) -> Result<(), String> {
         cmd.cache_config,
         false,
         0,
+        ShutdownManager::null(),
     )?;
 
     let client = service.client();

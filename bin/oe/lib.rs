@@ -127,6 +127,7 @@ use crate::{
 use std::alloc::System;
 
 pub use self::{configuration::Configuration, run::RunningClient};
+pub use ethcore::exit::ShutdownManager;
 pub use ethcore_logger::{setup_log, Config as LoggerConfig, RotatingLogger};
 pub use parity_rpc::PubSubSession;
 
@@ -199,13 +200,17 @@ pub enum ExecutionAction {
     Running(RunningClient),
 }
 
-fn execute(command: Execute, logger: Arc<RotatingLogger>) -> Result<ExecutionAction, String> {
+fn execute(
+    command: Execute,
+    logger: Arc<RotatingLogger>,
+    shutdown: ShutdownManager,
+) -> Result<ExecutionAction, String> {
     #[cfg(feature = "deadlock_detection")]
     run_deadlock_detection_thread();
 
     match command.cmd {
         Cmd::Run(run_cmd) => {
-            let outcome = run::execute(run_cmd, logger)?;
+            let outcome = run::execute(run_cmd, logger, shutdown)?;
             Ok(ExecutionAction::Running(outcome))
         }
         Cmd::Version => Ok(ExecutionAction::Instant(Some(Args::print_version()))),
@@ -250,6 +255,10 @@ fn execute(command: Execute, logger: Arc<RotatingLogger>) -> Result<ExecutionAct
 ///
 /// On error, returns what to print on stderr.
 // FIXME: totally independent logging capability, see https://github.com/openethereum/openethereum/issues/10252
-pub fn start(conf: Configuration, logger: Arc<RotatingLogger>) -> Result<ExecutionAction, String> {
-    execute(conf.into_command()?, logger)
+pub fn start(
+    conf: Configuration,
+    logger: Arc<RotatingLogger>,
+    shutdown: ShutdownManager,
+) -> Result<ExecutionAction, String> {
+    execute(conf.into_command()?, logger, shutdown)
 }

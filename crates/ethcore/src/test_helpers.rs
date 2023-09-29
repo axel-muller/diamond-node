@@ -56,6 +56,8 @@ use state::*;
 use state_db::StateDB;
 use verification::queue::kind::blocks::Unverified;
 
+use crate::exit::ShutdownManager;
+
 /// Creates test block with corresponding header
 pub fn create_test_block(header: &Header) -> Bytes {
     let mut rlp = RlpStream::new_list(3);
@@ -164,6 +166,7 @@ where
         client_db,
         Arc::new(miner),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     let test_engine = &*test_spec.engine;
@@ -321,6 +324,7 @@ pub fn push_block_with_transactions(client: &Arc<Client>, transactions: &[Signed
     client.import_verified_blocks();
 }
 
+/// integrates blocks into the client
 pub fn push_block_with_transactions_and_author(
     client: &Arc<Client>,
     transactions: &[SignedTransaction],
@@ -370,6 +374,7 @@ pub fn get_test_client_with_blocks(blocks: Vec<Bytes>) -> Arc<Client> {
         client_db,
         Arc::new(Miner::new_for_tests(&test_spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
 

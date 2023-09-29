@@ -300,15 +300,21 @@ impl IoHandler<()> for TransitionHandler {
                                     //    info!(target: "engine", "Signal result: {signal_result}");
                                     // }
 
-                                    let child = Command::new("/bin/kill")
-                                        .arg(id.to_string())
-                                        .spawn()
-                                        .expect("failed to execute child");
+                                    //let child = Command::new("/bin/kill")
+                                    //    .arg(id.to_string())
+                                    //    .spawn()
+                                    //    .expect("failed to execute child");
 
-                                    let kill_id = child.id();
-                                    info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
+                                    //let kill_id = child.id();
+                                    //info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
 
-                                    // if let Some(ref weak) = *self.client.read() {
+                                    if let Some(ref weak) = *self.client.read() {
+                                        if let Some(client) = weak.upgrade() {
+                                            info!(target: "engine", "demanding shutdown from hbbft engine.");
+                                            client.demand_shutdown();
+                                        }
+                                    }
+
                                     //     if let Some(client) = weak.upgrade() {
 
                                     // match client.as_full_client() {
@@ -1097,6 +1103,20 @@ impl HoneyBadgerBFT {
             Some(full_client) => full_client.is_major_syncing(),
             // We only support full clients at this point.
             None => true,
+        }
+    }
+
+    /// hbbft protects the start of the current posdao epoch start from being pruned.
+    pub fn pruning_protection_block_number(&self) -> Option<u64> {
+        // we try to get a read lock for 500 ms.
+        // that is a very long duration, but the information is important.
+        if let Some(hbbft_state_lock) = self.hbbft_state.try_read_for(Duration::from_millis(500)) {
+            return Some(hbbft_state_lock.get_current_posdao_epoch_start_block());
+        } else {
+            // better a potential stage 3 verification error instead of a deadlock ?!
+            // https://github.com/DMDcoin/diamond-node/issues/68
+            warn!(target: "engine", "could not aquire read lock for retrieving the pruning_protection_block_number. Stage 3 verification error might follow up.");
+            return None;
         }
     }
 

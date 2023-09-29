@@ -284,10 +284,12 @@ impl HbbftState {
                 match honey_badger.handle_message(&sender_id, message) {
                     Ok(step) => return Ok(Some((step, network_info.clone()))),
                     Err(err) => {
-                        // TODO: Report consensus step errors
-                        // maybe we are not part of the HBBFT Set anymore ?
-                        // maybe the sender is not Part of the hbbft set ?
-                        // maybe we have the wrong hbbft for decryption ?
+                        // the sender is possible not in the hbbft set anymore
+                        // and can ignore this error and not process a step.
+                        let epoch = message_epoch;
+                        if epoch < self.current_posdao_epoch_start_block {
+                            return Ok(None);
+                        }
 
                         error!(target: "consensus", "Error on handling HoneyBadger message from {} in epoch {} error: {:?}", sender_id, message_epoch, err);
                         return Err(err);
@@ -336,7 +338,7 @@ impl HbbftState {
 
         if let Some(latest_block) = client.block_number(BlockId::Latest) {
             if honey_badger.epoch() != latest_block + 1 {
-                info!(target: "consensus", "Detected an attempt to send a hbbft contribution for block {} before the previous block was imported to the chain.", honey_badger.epoch());
+                debug!(target: "consensus", "Detected an attempt to send a hbbft contribution for block {} before the previous block was imported to the chain.", honey_badger.epoch());
                 return None;
             }
         }
@@ -478,7 +480,8 @@ impl HbbftState {
             ) {
                 Ok(synckeygen) => synckeygen,
                 Err(e) => {
-                    error!(target: "consensus", "Synckeygen failed with error: {:?}", e);
+                    let diff = parent_block_nr - posdao_epoch_start.low_u64();
+                    error!(target: "consensus", "Synckeygen failed. parent block: {} epoch_start: {}  diff {} with error: {:?}  ", parent_block_nr, posdao_epoch_start, diff, e);
                     return false;
                 }
             };

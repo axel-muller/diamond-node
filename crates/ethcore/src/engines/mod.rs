@@ -709,6 +709,12 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
     fn minimum_gas_price(&self) -> Option<U256> {
         None
     }
+
+    /// allows engines to define a block that should not get pruned in the DB.
+    /// This is useful for engines that need to keep a certain block in the DB.
+    fn pruning_protection_block_number(&self) -> Option<u64> {
+        None
+    }
 }
 
 // convenience wrappers for existing functions.

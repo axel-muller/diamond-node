@@ -669,6 +669,9 @@ pub trait EngineClient: Sync + Send + ChainInfo {
     /// Get raw block header data by block id.
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
 
+    /// demand a shutdown out of the nodesoftware.
+    fn demand_shutdown(&self);
+
     /// Get currently pending transactions
     fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>>;
 

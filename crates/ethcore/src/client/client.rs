@@ -107,6 +107,8 @@ use db::{keys::BlockDetails, Readable, Writable};
 pub use reth_util::queue::ExecutionQueue;
 pub use types::{block_status::BlockStatus, blockchain_info::BlockChainInfo};
 pub use verification::QueueInfo as BlockQueueInfo;
+
+use crate::exit::ShutdownManager;
 use_contract!(registry, "res/contracts/registrar.json");
 
 const ANCIENT_BLOCKS_QUEUE_SIZE: usize = 4096;
@@ -260,6 +262,8 @@ pub struct Client {
     reserved_peers_management: Mutex<Option<Box<dyn ReservedPeersManagement>>>,
 
     importer: Importer,
+
+    shutdown: ShutdownManager,
 }
 
 impl Importer {
@@ -946,6 +950,7 @@ impl Client {
         db: Arc<dyn BlockChainDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
+        shutdown: ShutdownManager,
     ) -> Result<Arc<Client>, ::error::Error> {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
@@ -1054,6 +1059,7 @@ impl Client {
             reserved_peers_management: Mutex::new(None),
             importer,
             config,
+            shutdown,
         });
 
         let exec_client = client.clone();
@@ -1307,7 +1313,7 @@ impl Client {
                 break;
             }
             match state_db.journal_db().earliest_era() {
-                Some(earliest_era) if earliest_era + self.history <= latest_era => {
+                Some(mut earliest_era) if earliest_era + self.history <= latest_era => {
                     let freeze_at = self.snapshotting_at.load(AtomicOrdering::SeqCst);
                     if freeze_at > 0 && freeze_at == earliest_era {
                         // Note: journal_db().mem_used() can be used for a more accurate memory
@@ -1316,6 +1322,14 @@ impl Client {
                         trace!(target: "pruning", "Pruning is paused at era {} (snapshot under way); earliest era={}, latest era={}, journal_size={} – Not pruning.",
 						       freeze_at, earliest_era, latest_era, state_db.journal_db().journal_size());
                         break;
+                    }
+
+                    // if the engine still needs that block, we are not going to prune it.
+                    if let Some(protected_block) = self.engine.pruning_protection_block_number() {
+                        if earliest_era < protected_block {
+                            info!(target: "pruning", "Detected attempt from pruning ancient block that is still required by the engine. protected block: {protected_block}, earliest_era: {earliest_era}");
+                            earliest_era = protected_block - 1;
+                        }
                     }
                     trace!(target: "client", "Pruning state for ancient era {}", earliest_era);
                     match chain.block_hash(earliest_era) {
@@ -3227,6 +3241,10 @@ impl super::traits::EngineClient for Client {
 
     fn queued_transactions(&self) -> Vec<Arc<VerifiedTransaction>> {
         self.importer.miner.queued_transactions(self)
+    }
+
+    fn demand_shutdown(&self) {
+        self.shutdown.demand_shutdown();
     }
 
     fn create_pending_block_at(

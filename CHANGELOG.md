@@ -1,3 +1,13 @@
+## Diamond Node Software 3.3.5-hbbft-0.9.1
+
+- [pruning protection for hbbft engine] https://github.com/DMDcoin/diamond-node/issues/6
+- [reported fault: UnknownSender] https://github.com/DMDcoin/diamond-node/issues/69
+
+## Diamond Node Software 3.3.5-hbbft-0.9.0
+
+- Start of Alpha 2 Testnet
+- Improved Stability
+- Feature preparation for Hbbft Block Reward support
 
 ## Diamond Node Software 3.3.5-hbbft-0.8.9
 
