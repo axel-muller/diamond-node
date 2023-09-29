@@ -51,6 +51,8 @@ use types::{
 };
 use verification::queue::kind::blocks::Unverified;
 
+use crate::exit::ShutdownManager;
+
 #[test]
 fn imports_from_empty() {
     let db = test_helpers::new_db();
@@ -62,6 +64,7 @@ fn imports_from_empty() {
         db,
         Arc::new(Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     client.import_verified_blocks();
@@ -80,6 +83,7 @@ fn should_return_registrar() {
         db,
         Arc::new(Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     let params = client.additional_params();
@@ -100,6 +104,7 @@ fn imports_good_block() {
         db,
         Arc::new(Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     let good_block = get_good_dummy_block();
@@ -127,6 +132,7 @@ fn query_none_block() {
         db,
         Arc::new(Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     let non_existant = client.block_header(BlockId::Number(188));
@@ -329,6 +335,7 @@ fn change_history_size() {
             db.clone(),
             Arc::new(Miner::new_for_tests(&test_spec, None)),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
 
@@ -361,6 +368,7 @@ fn change_history_size() {
         db,
         Arc::new(Miner::new_for_tests(&test_spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     assert_eq!(client.state().balance(&address).unwrap(), 100.into());
