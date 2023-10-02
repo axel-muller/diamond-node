@@ -20,6 +20,7 @@ use std::{env, sync::Arc};
 use accounts::AccountProvider;
 use ethcore::{
     client::{BlockChainClient, ChainInfo, Client, ClientConfig, EvmTestClient, ImportBlock},
+    exit::ShutdownManager,
     miner::Miner,
     spec::{Genesis, Spec},
     test_helpers,
@@ -130,6 +131,7 @@ impl EthTester {
             test_helpers::new_db(),
             miner_service.clone(),
             IoChannel::disconnected(),
+            ShutdownManager::null(),
         )
         .unwrap();
         let sync_provider = sync_provider();

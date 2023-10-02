@@ -38,6 +38,8 @@ use kvdb_rocksdb::DatabaseConfig;
 use parking_lot::Mutex;
 use verification::queue::kind::blocks::Unverified;
 
+use crate::exit::ShutdownManager;
+
 #[test]
 fn restored_is_equivalent() {
     let _ = ::env_logger::try_init();
@@ -69,6 +71,7 @@ fn restored_is_equivalent() {
         blockchain_db,
         Arc::new(::miner::Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
 
@@ -232,6 +235,7 @@ fn keep_ancient_blocks() {
         client_db,
         Arc::new(::miner::Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
 
@@ -318,6 +322,7 @@ fn recover_aborted_recovery() {
         client_db,
         Arc::new(::miner::Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
     let service_params = ServiceParams {

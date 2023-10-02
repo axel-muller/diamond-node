@@ -324,6 +324,7 @@ pub fn push_block_with_transactions(client: &Arc<Client>, transactions: &[Signed
     client.import_verified_blocks();
 }
 
+/// integrates blocks into the client
 pub fn push_block_with_transactions_and_author(
     client: &Arc<Client>,
     transactions: &[SignedTransaction],

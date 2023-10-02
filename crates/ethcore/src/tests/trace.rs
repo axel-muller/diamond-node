@@ -35,6 +35,8 @@ use types::{
 };
 use verification::queue::kind::blocks::Unverified;
 
+use crate::exit::ShutdownManager;
+
 #[test]
 fn can_trace_block_and_uncle_reward() {
     let db = test_helpers::new_db();
@@ -50,6 +52,7 @@ fn can_trace_block_and_uncle_reward() {
         db,
         Arc::new(Miner::new_for_tests(&spec, None)),
         IoChannel::disconnected(),
+        ShutdownManager::null(),
     )
     .unwrap();
 
