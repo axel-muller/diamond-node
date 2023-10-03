@@ -1111,6 +1111,11 @@ impl HoneyBadgerBFT {
         // we try to get a read lock for 500 ms.
         // that is a very long duration, but the information is important.
         if let Some(hbbft_state_lock) = self.hbbft_state.try_read_for(Duration::from_millis(500)) {
+            if let Some(last_epoch_start_block) =
+                hbbft_state_lock.get_last_posdao_epoch_start_block()
+            {
+                return Some(last_epoch_start_block);
+            }
             return Some(hbbft_state_lock.get_current_posdao_epoch_start_block());
         } else {
             // better a potential stage 3 verification error instead of a deadlock ?!

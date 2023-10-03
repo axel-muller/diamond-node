@@ -40,6 +40,7 @@ pub(crate) struct HbbftState {
     public_master_key: Option<PublicKey>,
     current_posdao_epoch: u64,
     current_posdao_epoch_start_block: u64,
+    last_posdao_epoch_start_block: Option<u64>,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
 }
 
@@ -51,6 +52,7 @@ impl HbbftState {
             public_master_key: None,
             current_posdao_epoch: 0,
             current_posdao_epoch_start_block: 0,
+            last_posdao_epoch_start_block: None,
             future_messages_cache: BTreeMap::new(),
         }
     }
@@ -115,6 +117,7 @@ impl HbbftState {
         self.honey_badger = None;
         // Set the current POSDAO epoch #
         self.current_posdao_epoch = target_posdao_epoch;
+        self.last_posdao_epoch_start_block = Some(self.current_posdao_epoch_start_block);
         self.current_posdao_epoch_start_block = posdao_epoch_start.as_u64();
 
         trace!(target: "engine", "Switched hbbft state to epoch {}.", self.current_posdao_epoch);
@@ -487,7 +490,7 @@ impl HbbftState {
                 Ok(synckeygen) => synckeygen,
                 Err(e) => {
                     let diff = parent_block_nr - posdao_epoch_start.low_u64();
-                    error!(target: "consensus", "Synckeygen failed. parent block: {} epoch_start: {}  diff {} with error: {:?}  ", parent_block_nr, posdao_epoch_start, diff, e);
+                    error!(target: "consensus", "Error: Synckeygen failed. parent block: {} epoch_start: {}  diff {} with error: {:?}. current posdao: {:?} target epoch  {:?}", parent_block_nr, posdao_epoch_start, diff, e, self.current_posdao_epoch, target_posdao_epoch);
                     return false;
                 }
             };
@@ -549,5 +552,9 @@ impl HbbftState {
 
     pub fn get_current_posdao_epoch_start_block(&self) -> u64 {
         self.current_posdao_epoch_start_block
+    }
+
+    pub fn get_last_posdao_epoch_start_block(&self) -> Option<u64> {
+        self.last_posdao_epoch_start_block
     }
 }
