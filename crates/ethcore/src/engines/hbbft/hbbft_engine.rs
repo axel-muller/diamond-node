@@ -357,7 +357,6 @@ impl IoHandler<()> for TransitionHandler {
                 trace!(target: "consensus", "All Operation that had to be done after syncing have been done now.");
             }
         } else if timer == ENGINE_VALIDATOR_CANDIDATE_ACTIONS {
-            warn!(target: "consensus", "do_validator_engine_actions");
             if let Err(err) = self.engine.do_validator_engine_actions() {
                 error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
             }
