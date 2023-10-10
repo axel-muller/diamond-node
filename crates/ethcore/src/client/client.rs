@@ -1313,7 +1313,7 @@ impl Client {
                 break;
             }
             match state_db.journal_db().earliest_era() {
-                Some(mut earliest_era) if earliest_era + self.history <= latest_era => {
+                Some(earliest_era) if earliest_era + self.history <= latest_era => {
                     let freeze_at = self.snapshotting_at.load(AtomicOrdering::SeqCst);
                     if freeze_at > 0 && freeze_at == earliest_era {
                         // Note: journal_db().mem_used() can be used for a more accurate memory
@@ -1328,7 +1328,8 @@ impl Client {
                     if let Some(protected_block) = self.engine.pruning_protection_block_number() {
                         if earliest_era < protected_block {
                             info!(target: "pruning", "Detected attempt from pruning ancient block that is still required by the engine. protected block: {protected_block}, earliest_era: {earliest_era}");
-                            earliest_era = protected_block - 1;
+                            //earliest_era = protected_block - 1;
+                            break;
                         }
                     }
                     trace!(target: "client", "Pruning state for ancient era {}", earliest_era);
