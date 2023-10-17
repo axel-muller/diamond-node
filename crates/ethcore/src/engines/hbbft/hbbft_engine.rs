@@ -357,7 +357,6 @@ impl IoHandler<()> for TransitionHandler {
                 trace!(target: "consensus", "All Operation that had to be done after syncing have been done now.");
             }
         } else if timer == ENGINE_VALIDATOR_CANDIDATE_ACTIONS {
-            warn!(target: "consensus", "do_validator_engine_actions");
             if let Err(err) = self.engine.do_validator_engine_actions() {
                 error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
             }
@@ -1106,20 +1105,6 @@ impl HoneyBadgerBFT {
         }
     }
 
-    /// hbbft protects the start of the current posdao epoch start from being pruned.
-    pub fn pruning_protection_block_number(&self) -> Option<u64> {
-        // we try to get a read lock for 500 ms.
-        // that is a very long duration, but the information is important.
-        if let Some(hbbft_state_lock) = self.hbbft_state.try_read_for(Duration::from_millis(500)) {
-            return Some(hbbft_state_lock.get_current_posdao_epoch_start_block());
-        } else {
-            // better a potential stage 3 verification error instead of a deadlock ?!
-            // https://github.com/DMDcoin/diamond-node/issues/68
-            warn!(target: "engine", "could not aquire read lock for retrieving the pruning_protection_block_number. Stage 3 verification error might follow up.");
-            return None;
-        }
-    }
-
     /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
     pub fn is_available(&self) -> Result<bool, Error> {
         match self.signer.read().as_ref() {
@@ -1601,6 +1586,25 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
+    }
+
+    /// hbbft protects the start of the current posdao epoch start from being pruned.
+    fn pruning_protection_block_number(&self) -> Option<u64> {
+        // we try to get a read lock for 500 ms.
+        // that is a very long duration, but the information is important.
+        if let Some(hbbft_state_lock) = self.hbbft_state.try_read_for(Duration::from_millis(500)) {
+            if let Some(last_epoch_start_block) =
+                hbbft_state_lock.get_last_posdao_epoch_start_block()
+            {
+                return Some(last_epoch_start_block);
+            }
+            return Some(hbbft_state_lock.get_current_posdao_epoch_start_block());
+        } else {
+            // better a potential stage 3 verification error instead of a deadlock ?!
+            // https://github.com/DMDcoin/diamond-node/issues/68
+            warn!(target: "engine", "could not aquire read lock for retrieving the pruning_protection_block_number. Stage 3 verification error might follow up.");
+            return None;
+        }
     }
 }
 

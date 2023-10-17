@@ -1,8 +1,12 @@
 [package]
 name = "parity-version"
 # NOTE: this value is used for OpenEthereum version string (via env CARGO_PKG_VERSION)
-version = "3.3.5-hbbft-0.9.1"
-authors = ["Parity Technologies <admin@parity.io>"]
+version = "3.3.5-hbbft-0.9.2"
+authors = [
+	"bit.diamonds developers",
+	"OpenEthereum developers",
+	"Parity Technologies <admin@parity.io>"
+]
 build = "build.rs"
 
 [package.metadata]

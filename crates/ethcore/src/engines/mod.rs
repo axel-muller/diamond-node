@@ -575,6 +575,12 @@ pub trait Engine<M: Machine>: Sync + Send {
         true
     }
 
+    /// allows engines to define a block that should not get pruned in the DB.
+    /// This is useful for engines that need to keep a certain block in the DB.
+    fn pruning_protection_block_number(&self) -> Option<u64> {
+        None
+    }
+
     /// Optional entry point for adding engine specific metrics.
     fn prometheus_metrics(&self, _registry: &mut stats::PrometheusRegistry) {}
 }
@@ -707,12 +713,6 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
     /// Some Engine might define the minimum gas price by themselve.
     /// (for example: contract)
     fn minimum_gas_price(&self) -> Option<U256> {
-        None
-    }
-
-    /// allows engines to define a block that should not get pruned in the DB.
-    /// This is useful for engines that need to keep a certain block in the DB.
-    fn pruning_protection_block_number(&self) -> Option<u64> {
         None
     }
 }

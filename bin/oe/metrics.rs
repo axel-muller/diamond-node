@@ -59,6 +59,8 @@ fn handle_request(
                 elapsed.as_millis() as i64,
             );
 
+            reg.register_version();
+
             let mut buffer = vec![];
             let encoder = prometheus::TextEncoder::new();
             let metric_families = reg.registry().gather();

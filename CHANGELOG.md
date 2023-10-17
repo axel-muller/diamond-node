@@ -1,6 +1,10 @@
+## Diamond Node Software 3.3.5-hbbft-0.9.2
+
+- [FIXED: pruning as root cause for stage 3 errors] https://github.com/DMDcoin/diamond-node/issues/68
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.1
 
-- [pruning protection for hbbft engine] https://github.com/DMDcoin/diamond-node/issues/6
+- [pruning protection for hbbft engine] https://github.com/DMDcoin/diamond-node/issues/62
 - [reported fault: UnknownSender] https://github.com/DMDcoin/diamond-node/issues/69
 
 ## Diamond Node Software 3.3.5-hbbft-0.9.0
