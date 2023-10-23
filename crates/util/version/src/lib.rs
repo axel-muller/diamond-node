@@ -82,7 +82,7 @@ pub fn version_data() -> Bytes {
             .parse::<u32>()
             .expect("Environment variables are known to be valid; qed");
     s.append(&v);
-    s.append(&"OpenEthereum");
+    s.append(&"diamond-node");
     s.append(&generated::rustc_version());
     s.append(&&Target::os()[0..2]);
     s.out()
