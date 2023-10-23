@@ -748,6 +748,10 @@ usage! {
             "--log-file=[FILENAME]",
             "Specify a filename into which logging should be appended.",
 
+            ARG arg_shutdown_on_missing_blockproduction: (Option<u64>) = Some(1800), or |c: &Config| c.misc.as_ref()?.shutdown_on_missing_blockproduction.clone(),
+            "--shutdown-on-missing-blockproduction=[STRING]",
+            "Shuts down if no block has been produced for N seconds. Defaults to 1800 (30 Minutes). Set to None to disable this feature",
+
         ["Footprint Options"]
             FLAG flag_scale_verifiers: (bool) = false, or |c: &Config| c.footprint.as_ref()?.scale_verifiers.clone(),
             "--scale-verifiers",
@@ -834,6 +838,7 @@ struct Config {
     misc: Option<Misc>,
     stratum: Option<Stratum>,
     metrics: Option<Metrics>,
+
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -1039,6 +1044,8 @@ struct Misc {
     color: Option<bool>,
     ports_shift: Option<u16>,
     unsafe_expose: Option<bool>,
+    /// seconds, until the system shuts down if no block has been produced. None disables this feature.
+    shutdown_on_missing_blockproduction: Option<u64>,
 }
 
 #[cfg(test)]
