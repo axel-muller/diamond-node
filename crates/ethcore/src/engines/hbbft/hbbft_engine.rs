@@ -95,6 +95,10 @@ pub struct HoneyBadgerBFT {
 struct TransitionHandler {
     client: Arc<RwLock<Option<Weak<dyn EngineClient>>>>,
     engine: Arc<HoneyBadgerBFT>,
+    /// the last known block for the auto shutdown on stuck node feature.
+    /// https://github.com/DMDcoin/diamond-node/issues/78
+    auto_shutdown_last_known_block_number: Mutex<u64>,
+    auto_shutdown_interval_config: Option<u64>,
 }
 
 const DEFAULT_DURATION: Duration = Duration::from_secs(1);
@@ -153,12 +157,16 @@ impl TransitionHandler {
 
 // Arbitrary identifier for the timer we register with the event handler.
 const ENGINE_TIMEOUT_TOKEN: TimerToken = 1;
-const ENGINE_SHUTDOWN_IF_UNAVAILABLE: TimerToken = 2;
+const ENGINE_SHUTDOWN: TimerToken = 2;
 // Some Operations should be executed if the chain is synced to the current tail.
 const ENGINE_DELAYED_UNITL_SYNCED_TOKEN: TimerToken = 3;
 // Some Operations have no urge on the timing, but are rather expensive.
 // those are handeled by this slow ticking timer.
 const ENGINE_VALIDATOR_CANDIDATE_ACTIONS: TimerToken = 4;
+
+// Timer token for shutdown-on-missing-block-import
+// https://github.com/DMDcoin/diamond-node/issues/78
+const ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT: TimerToken = 5;
 
 impl IoHandler<()> for TransitionHandler {
     fn initialize(&self, io: &IoContext<()>) {
@@ -168,7 +176,7 @@ impl IoHandler<()> for TransitionHandler {
                 |e| warn!(target: "consensus", "Failed to start consensus timer: {}.", e),
             );
 
-        io.register_timer(ENGINE_SHUTDOWN_IF_UNAVAILABLE, Duration::from_secs(1200))
+        io.register_timer(ENGINE_SHUTDOWN, Duration::from_secs(1200))
             .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT Shutdown Timer failed: {}.", e));
 
         // io.register_timer_once(ENGINE_DELAYED_UNITL_SYNCED_TOKEN, Duration::from_secs(10))
@@ -176,6 +184,15 @@ impl IoHandler<()> for TransitionHandler {
 
         io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
             .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
+
+        // if the auto_shutdown_last_known_block_number
+
+        if let Some(interval) = self.auto_shutdown_interval_config {
+            if interval > 0 {
+                io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
+                    .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
+            }
+        }
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
@@ -229,7 +246,7 @@ impl IoHandler<()> for TransitionHandler {
                 .unwrap_or_else(
                     |e| warn!(target: "consensus", "Failed to restart consensus step timer: {}.", e),
                 );
-        } else if timer == ENGINE_SHUTDOWN_IF_UNAVAILABLE {
+        } else if timer == ENGINE_SHUTDOWN {
             // we do not run this on the first occurence,
             // the first occurence could mean that the client is not fully set up
             // (e.g. it should sync, but it does not know it yet.)
@@ -279,34 +296,12 @@ impl IoHandler<()> for TransitionHandler {
                                             }
                                         }
                                     }
-                                    //TODO: implement shutdown.
-                                    // panic!("Shutdown hard. Todo: implement Soft Shutdown.");
-                                    //if let c = self.engine.client.read() {
-                                    //}
 
                                     let id: usize = std::process::id() as usize;
 
                                     let thread_id = std::thread::current().id();
 
-                                    //let child_id = std::process::en;
-
                                     info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
-
-                                    // Using libc resulted in errors.
-                                    // can't a process not send a signal to it's own ?!
-
-                                    // unsafe {
-                                    //    let signal_result = libc::signal(libc::SIGTERM, id);
-                                    //    info!(target: "engine", "Signal result: {signal_result}");
-                                    // }
-
-                                    //let child = Command::new("/bin/kill")
-                                    //    .arg(id.to_string())
-                                    //    .spawn()
-                                    //    .expect("failed to execute child");
-
-                                    //let kill_id = child.id();
-                                    //info!(target: "engine", "Signaling shutdown SENT to process ID: {id} with process: {kill_id} ");
 
                                     if let Some(ref weak) = *self.client.read() {
                                         if let Some(client) = weak.upgrade() {
@@ -314,25 +309,6 @@ impl IoHandler<()> for TransitionHandler {
                                             client.demand_shutdown();
                                         }
                                     }
-
-                                    //     if let Some(client) = weak.upgrade() {
-
-                                    // match client.as_full_client() {
-                                    //     Some(full_client) => {
-                                    //         //full_client.shutdown();
-                                    //     }
-                                    //     None => {
-
-                                    //     }
-                                    // }
-
-                                    // match client.as_full_client() {
-                                    //     Some(full_client) => full_client.is_major_syncing(),
-                                    //     // We only support full clients at this point.
-                                    //     None => true,
-                                    // }
-                                    //     }
-                                    // }
                                 }
                                 // if the node is available, everythign is fine!
                             }
@@ -359,6 +335,56 @@ impl IoHandler<()> for TransitionHandler {
         } else if timer == ENGINE_VALIDATOR_CANDIDATE_ACTIONS {
             if let Err(err) = self.engine.do_validator_engine_actions() {
                 error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
+            }
+        } else if timer == ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT {
+            // if auto shutdown at missing block production (or import) is configured.
+            // ... we need to check if enough time has passed since the last block was imported.
+            let current_block_number_option = if let Some(ref weak) = *self.client.read() {
+                if let Some(c) = weak.upgrade() {
+                    c.block_number(BlockId::Latest)
+
+                    // // let current_block =
+                    // if let Some(mut client_option) = self.engine.client.try_read_for(Duration::from_millis(250)) {
+                    //     if let Some(bla) = client_option.take() {
+
+                    //     }
+                    // } else {
+                    //     warn!(target: "consensus", "could not acquire client readlock within time to process ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT");
+                    //     return;
+                    // };
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            };
+
+            if let Some(current_block_number) = current_block_number_option {
+                if current_block_number == 0 {
+                    return;
+                }
+
+                let last_known_block_number: u64 =
+                    self.auto_shutdown_last_known_block_number.lock().clone();
+
+                if current_block_number == last_known_block_number {
+                    // lock the client and signal shutdown.
+                    warn!("shutdown-on-missing-block-import: Detected stalled block import. Demanding shut down of hbbft engine.");
+
+                    // if auto shutdown at missing block production (or import) is configured.
+                    // ... we need to check if enough time has passed since the last block was imported.
+                    if let Some(ref weak) = *self.client.read() {
+                        if let Some(c) = weak.upgrade() {
+                            c.demand_shutdown();
+                        } else {
+                            error!("shutdown-on-missing-block-import: Error during Shutdown: could not upgrade weak reference.");
+                        }
+                    } else {
+                        error!("shutdown-on-missing-block-import: Error during Shutdown: No client found.");
+                    }
+                } else {
+                    *self.auto_shutdown_last_known_block_number.lock() = current_block_number;
+                }
             }
         }
     }
@@ -401,6 +427,8 @@ impl HoneyBadgerBFT {
             let handler = TransitionHandler {
                 client: engine.client.clone(),
                 engine: engine.clone(),
+                auto_shutdown_last_known_block_number: Mutex::new(0),
+                auto_shutdown_interval_config: Some(1800),
             };
             engine
                 .transition_service
@@ -875,7 +903,7 @@ impl HoneyBadgerBFT {
         false
     }
 
-    // some actions are required for hbbft validator nodes.
+    // some actions are required for hbbft nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
     fn do_validator_engine_actions(&self) -> Result<(), String> {

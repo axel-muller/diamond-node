@@ -748,9 +748,9 @@ usage! {
             "--log-file=[FILENAME]",
             "Specify a filename into which logging should be appended.",
 
-            ARG arg_shutdown_on_missing_blockproduction: (Option<u64>) = Some(1800), or |c: &Config| c.misc.as_ref()?.shutdown_on_missing_blockproduction.clone(),
-            "--shutdown-on-missing-blockproduction=[STRING]",
-            "Shuts down if no block has been produced for N seconds. Defaults to 1800 (30 Minutes). Set to None to disable this feature",
+            ARG arg_shutdown_on_missing_block_import: (Option<u64>) = Some(1800), or |c: &Config| c.misc.as_ref()?.shutdown_on_missing_block_import.clone(),
+            "--shutdown-on-missing-block-import=[STRING]",
+            "Shuts down if no block has been imported for N seconds. Defaults to 1800 (30 Minutes). Set to None or 0 to disable this feature. This setting is only respected by the HBBFT Engine",
 
         ["Footprint Options"]
             FLAG flag_scale_verifiers: (bool) = false, or |c: &Config| c.footprint.as_ref()?.scale_verifiers.clone(),
@@ -838,7 +838,6 @@ struct Config {
     misc: Option<Misc>,
     stratum: Option<Stratum>,
     metrics: Option<Metrics>,
-
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -1045,7 +1044,7 @@ struct Misc {
     ports_shift: Option<u16>,
     unsafe_expose: Option<bool>,
     /// seconds, until the system shuts down if no block has been produced. None disables this feature.
-    shutdown_on_missing_blockproduction: Option<u64>,
+    shutdown_on_missing_block_import: Option<u64>,
 }
 
 #[cfg(test)]
@@ -1457,7 +1456,7 @@ mod tests {
                 arg_log_file: Some("/var/log/openethereum.log".into()),
                 flag_no_color: false,
                 flag_no_config: false,
-                arg_shutdown_on_missing_blockproduction: Some(1800),
+                arg_shutdown_on_missing_block_import: Some(1800),
             }
         );
     }
@@ -1648,7 +1647,7 @@ mod tests {
                     color: Some(true),
                     ports_shift: Some(0),
                     unsafe_expose: Some(false),
-                    shutdown_on_missing_blockproduction: None,
+                    shutdown_on_missing_block_import: None,
                 }),
                 stratum: None,
             }
