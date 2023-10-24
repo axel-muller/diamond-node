@@ -1457,6 +1457,7 @@ mod tests {
                 arg_log_file: Some("/var/log/openethereum.log".into()),
                 flag_no_color: false,
                 flag_no_config: false,
+                arg_shutdown_on_missing_blockproduction: Some(1800),
             }
         );
     }
@@ -1647,6 +1648,7 @@ mod tests {
                     color: Some(true),
                     ports_shift: Some(0),
                     unsafe_expose: Some(false),
+                    shutdown_on_missing_blockproduction: None,
                 }),
                 stratum: None,
             }
