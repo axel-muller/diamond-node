@@ -682,6 +682,11 @@ pub trait EngineClient: Sync + Send + ChainInfo {
         timestamp: u64,
         block_number: u64,
     ) -> Option<Header>;
+
+    /// Time in seconds until the Engine shuts down if no Block Import is performed.
+    fn config_shutdown_on_missing_block_import(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// Extended client interface for providing proofs of the state.

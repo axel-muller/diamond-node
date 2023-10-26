@@ -153,6 +153,19 @@ impl TransitionHandler {
         warn!(target: "consensus", "execute_delayed_unitl_synced_operations has been called");
         true
     }
+
+    fn get_shutdown_interval(&self) -> Option<u64> {
+
+        if let Some(ref weak) = *self.client.read() {
+            if let Some(c) = weak.upgrade() {
+                return c.config_shutdown_on_missing_block_import()
+            }
+            return None;
+        } else {
+            return None;
+        };
+    }
+
 }
 
 // Arbitrary identifier for the timer we register with the event handler.
@@ -184,11 +197,10 @@ impl IoHandler<()> for TransitionHandler {
 
         io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
             .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
-
-        // if the auto_shutdown_last_known_block_number
-
-        if let Some(interval) = self.auto_shutdown_interval_config {
+        
+        if let Some(interval) =  self.get_shutdown_interval() {
             if interval > 0 {
+
                 io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
                     .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
             }
@@ -342,16 +354,6 @@ impl IoHandler<()> for TransitionHandler {
             let current_block_number_option = if let Some(ref weak) = *self.client.read() {
                 if let Some(c) = weak.upgrade() {
                     c.block_number(BlockId::Latest)
-
-                    // // let current_block =
-                    // if let Some(mut client_option) = self.engine.client.try_read_for(Duration::from_millis(250)) {
-                    //     if let Some(bla) = client_option.take() {
-
-                    //     }
-                    // } else {
-                    //     warn!(target: "consensus", "could not acquire client readlock within time to process ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT");
-                    //     return;
-                    // };
                 } else {
                     return;
                 }

@@ -3248,6 +3248,10 @@ impl super::traits::EngineClient for Client {
         self.shutdown.demand_shutdown();
     }
 
+    fn config_shutdown_on_missing_block_import(&self) -> Option<u64> {
+        self.config.shutdown_on_missing_block_import
+    }
+
     fn create_pending_block_at(
         &self,
         txns: Vec<SignedTransaction>,
