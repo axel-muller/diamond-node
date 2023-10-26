@@ -155,17 +155,15 @@ impl TransitionHandler {
     }
 
     fn get_shutdown_interval(&self) -> Option<u64> {
-
         if let Some(ref weak) = *self.client.read() {
             if let Some(c) = weak.upgrade() {
-                return c.config_shutdown_on_missing_block_import()
+                return c.config_shutdown_on_missing_block_import();
             }
             return None;
         } else {
             return None;
         };
     }
-
 }
 
 // Arbitrary identifier for the timer we register with the event handler.
@@ -197,10 +195,9 @@ impl IoHandler<()> for TransitionHandler {
 
         io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
             .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
-        
-        if let Some(interval) =  self.get_shutdown_interval() {
-            if interval > 0 {
 
+        if let Some(interval) = self.get_shutdown_interval() {
+            if interval > 0 {
                 io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
                     .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
             }
