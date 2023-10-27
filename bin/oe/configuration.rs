@@ -1571,6 +1571,7 @@ mod tests {
             no_persistent_txqueue: false,
             max_round_blocks_to_import: 1,
             metrics_conf: MetricsConfiguration::default(),
+            shutdown_on_missing_block_import: None,
         };
         expected.secretstore_conf.enabled = cfg!(feature = "secretstore");
         expected.secretstore_conf.http_enabled = cfg!(feature = "secretstore");
