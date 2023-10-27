@@ -433,6 +433,7 @@ impl Configuration {
                 no_persistent_txqueue: self.args.flag_no_persistent_txqueue,
                 max_round_blocks_to_import: self.args.arg_max_round_blocks_to_import,
                 metrics_conf,
+                shutdown_on_missing_block_import: self.args.arg_shutdown_on_missing_block_import,
             };
             Cmd::Run(run_cmd)
         };

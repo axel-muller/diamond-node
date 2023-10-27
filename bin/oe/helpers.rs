@@ -263,6 +263,7 @@ pub fn to_client_config(
     pruning_memory: usize,
     check_seal: bool,
     max_round_blocks_to_import: usize,
+    shutdown_on_missing_block_import: Option<u64>,
 ) -> ClientConfig {
     let mut client_config = ClientConfig::default();
 
@@ -301,6 +302,7 @@ pub fn to_client_config(
     };
     client_config.spec_name = spec_name;
     client_config.max_round_blocks_to_import = max_round_blocks_to_import;
+    client_config.shutdown_on_missing_block_import = shutdown_on_missing_block_import;
     client_config
 }
 
