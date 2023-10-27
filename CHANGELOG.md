@@ -12,7 +12,6 @@ node.toml:
 shutdown_on_missing_block_import = 1800
 ```
 
-
 ## Diamond Node Software 3.3.5-hbbft-0.9.2
 
 - [FIXED: pruning as root cause for stage 3 errors] https://github.com/DMDcoin/diamond-node/issues/68
