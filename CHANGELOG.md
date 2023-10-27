@@ -1,3 +1,18 @@
+## Diamond Node Software 3.3.5-hbbft-0.9.3
+
+[Autoshutdown after a period without block creation] https://github.com/DMDcoin/diamond-node/issues/78
+
+to activate feature via CLI Arg:
+`--shutdown-on-missing-block-import=1800`
+
+or in node.toml
+node.toml:
+```
+[Misc]
+shutdown_on_missing_block_import = 1800
+```
+
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.2
 
 - [FIXED: pruning as root cause for stage 3 errors] https://github.com/DMDcoin/diamond-node/issues/68
