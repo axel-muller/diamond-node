@@ -2046,4 +2046,16 @@ mod tests {
             _ => panic!("Should be Cmd::Run"),
         }
     }
+
+    #[test]
+    fn should_parse_shutdown_on_missing_block_import() {
+        let args = vec!["openethereum", "--shutdown-on-missing-block-import=1234"];
+        let conf = Configuration::parse_cli(&args).unwrap();
+        match conf.into_command().unwrap().cmd {
+            Cmd::Run(c) => {
+                assert_eq!(c.shutdown_on_missing_block_import, Some(1234));
+            }
+            _ => panic!("Should be Cmd::Run"),
+        }
+    }
 }
