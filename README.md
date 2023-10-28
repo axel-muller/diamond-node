@@ -3,8 +3,6 @@
 Node client for the protocol version 4 of the bit.diamonds network.
 
 [![GPL licensed][license-badge]][license-url]
-[![Build Status][ci-badge]][ci-url]
-[![Discord chat][chat-badge]][chat-url]
 
 [license-badge]: https://img.shields.io/badge/license-GPL_v3-green.svg
 [license-url]: LICENSE
