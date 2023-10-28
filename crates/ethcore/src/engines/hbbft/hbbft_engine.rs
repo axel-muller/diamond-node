@@ -31,7 +31,7 @@ use std::{
     convert::TryFrom,
     ops::BitXor,
     sync::{atomic::AtomicBool, Arc, Weak},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use types::{
     header::{ExtendedHeader, Header},
@@ -96,7 +96,7 @@ struct TransitionHandler {
     /// the last known block for the auto shutdown on stuck node feature.
     /// https://github.com/DMDcoin/diamond-node/issues/78
     auto_shutdown_last_known_block_number: Mutex<u64>,
-    auto_shutdown_interval_config: Option<u64>,
+    auto_shutdown_last_known_block_import: Mutex<Instant>,
 }
 
 const DEFAULT_DURATION: Duration = Duration::from_secs(1);
@@ -151,19 +151,6 @@ impl TransitionHandler {
         warn!(target: "consensus", "execute_delayed_unitl_synced_operations has been called");
         true
     }
-
-    fn get_shutdown_interval(&self) -> Option<u64> {
-        if let Some(ref weak) = *self.client.read() {
-            if let Some(c) = weak.upgrade() {
-                return c.config_shutdown_on_missing_block_import();
-            }
-            warn!(target: "consensus", "shutdown-on-missing-block-import Could not upgrade weak reference to client.");
-            return None;
-        } else {
-            warn!(target: "consensus", "shutdown-on-missing-block-import Could not read client.");
-            return None;
-        };
-    }
 }
 
 // Arbitrary identifier for the timer we register with the event handler.
@@ -175,9 +162,90 @@ const ENGINE_DELAYED_UNITL_SYNCED_TOKEN: TimerToken = 3;
 // those are handeled by this slow ticking timer.
 const ENGINE_VALIDATOR_CANDIDATE_ACTIONS: TimerToken = 4;
 
-// Timer token for shutdown-on-missing-block-import
-// https://github.com/DMDcoin/diamond-node/issues/78
-const ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT: TimerToken = 5;
+impl TransitionHandler {
+    fn handle_shutdown_on_missing_block_import(
+        &self,
+        shutdown_on_missing_block_import_config_option: Option<u64>,
+    ) {
+        let mut shutdown_on_missing_block_import_config: u64 = 0;
+
+        if let Some(c) = shutdown_on_missing_block_import_config_option {
+            if c == 0 {
+                // if shutdown_on_missing_block_import is configured to 0, we do not have to do anything.
+                return;
+            }
+            shutdown_on_missing_block_import_config = c;
+        } else {
+            // if shutdown_on_missing_block_import is not configured at all, we do not have to do anything.
+            return;
+        }
+
+        // ... we need to check if enough time has passed since the last block was imported.
+        let current_block_number_option = if let Some(ref weak) = *self.client.read() {
+            if let Some(c) = weak.upgrade() {
+                c.block_number(BlockId::Latest)
+            } else {
+                warn!(target: "consensus", "shutdown-on-missing-block-import: Could not upgrade weak reference to client.");
+                return;
+            }
+        } else {
+            warn!(target: "consensus", "shutdown-on-missing-block-import: Could not read client.");
+            return;
+        };
+
+        let now = std::time::Instant::now();
+
+        if let Some(current_block_number) = current_block_number_option {
+            if current_block_number <= 1 {
+                // we do not do an auto shutdown for the first block.
+                // it is normal for a network to have no blocks at the beginning, until everything is settled.
+                return;
+            }
+
+            let last_known_block_number: u64 =
+                self.auto_shutdown_last_known_block_number.lock().clone();
+
+            if current_block_number == last_known_block_number {
+                // if the last known block number is the same as the current block number,
+                // we have not imported a new block since the last check.
+                // we need to check if enough time has passed since the last check.
+
+                let last_known_block_import =
+                    self.auto_shutdown_last_known_block_import.lock().clone();
+                let duration_since_last_block_import =
+                    now.duration_since(last_known_block_import).as_secs();
+
+                if duration_since_last_block_import < shutdown_on_missing_block_import_config {
+                    // if the time since the last block import is less than the configured interval,
+                    // we do not have to do anything.
+                    return;
+                }
+
+                // lock the client and signal shutdown.
+                warn!("shutdown-on-missing-block-import: Detected stalled block import. no import for {duration_since_last_block_import}. last known import: {:?} now: {:?} Demanding shut down of hbbft engine.", last_known_block_import, now);
+
+                // if auto shutdown at missing block production (or import) is configured.
+                // ... we need to check if enough time has passed since the last block was imported.
+                if let Some(ref weak) = *self.client.read() {
+                    if let Some(c) = weak.upgrade() {
+                        c.demand_shutdown();
+                    } else {
+                        error!("shutdown-on-missing-block-import: Error during Shutdown: could not upgrade weak reference.");
+                    }
+                } else {
+                    error!(
+                        "shutdown-on-missing-block-import: Error during Shutdown: No client found."
+                    );
+                }
+            } else {
+                *self.auto_shutdown_last_known_block_import.lock() = now;
+                *self.auto_shutdown_last_known_block_number.lock() = current_block_number;
+            }
+        } else {
+            warn!(target: "consensus", "shutdown-on-missing-block-import: Could not read current block number.");
+        }
+    }
+}
 
 impl IoHandler<()> for TransitionHandler {
     fn initialize(&self, io: &IoContext<()>) {
@@ -195,31 +263,27 @@ impl IoHandler<()> for TransitionHandler {
 
         io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
             .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
-
-        if let Some(interval) = self.get_shutdown_interval() {
-            if interval > 0 {
-                info!(target: "consensus", "setting up shutdown-on-missing-block-import timer with interval {interval}");
-                io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
-                    .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
-            }
-        } else {
-            info!(target: "consensus", "shutdown-on-missing-block-import is not configured.");
-        }
     }
 
     fn timeout(&self, io: &IoContext<()>, timer: TimerToken) {
         if timer == ENGINE_TIMEOUT_TOKEN {
+            let mut shutdown_on_missing_block_import_config: Option<u64> = None;
+
             // trace!(target: "consensus", "Honey Badger IoHandler timeout called");
             // The block may be complete, but not have been ready to seal - trigger a new seal attempt.
             // TODO: In theory, that should not happen. The seal is ready exactly when the sealing entry is `Complete`.
             if let Some(ref weak) = *self.client.read() {
                 if let Some(c) = weak.upgrade() {
                     c.update_sealing(ForceUpdateSealing::No);
+                    shutdown_on_missing_block_import_config =
+                        c.config_shutdown_on_missing_block_import();
                 }
             }
 
             // Periodically allow messages received for future epochs to be processed.
             self.engine.replay_cached_messages();
+
+            self.handle_shutdown_on_missing_block_import(shutdown_on_missing_block_import_config);
 
             // The client may not be registered yet on startup, we set the default duration.
             let mut timer_duration = DEFAULT_DURATION;
@@ -348,46 +412,6 @@ impl IoHandler<()> for TransitionHandler {
             if let Err(err) = self.engine.do_validator_engine_actions() {
                 error!(target: "consensus", "do_validator_engine_actions failed: {:?}", err);
             }
-        } else if timer == ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT {
-            // if auto shutdown at missing block production (or import) is configured.
-            // ... we need to check if enough time has passed since the last block was imported.
-            let current_block_number_option = if let Some(ref weak) = *self.client.read() {
-                if let Some(c) = weak.upgrade() {
-                    c.block_number(BlockId::Latest)
-                } else {
-                    return;
-                }
-            } else {
-                return;
-            };
-
-            if let Some(current_block_number) = current_block_number_option {
-                if current_block_number == 0 {
-                    return;
-                }
-
-                let last_known_block_number: u64 =
-                    self.auto_shutdown_last_known_block_number.lock().clone();
-
-                if current_block_number == last_known_block_number {
-                    // lock the client and signal shutdown.
-                    warn!("shutdown-on-missing-block-import: Detected stalled block import. Demanding shut down of hbbft engine.");
-
-                    // if auto shutdown at missing block production (or import) is configured.
-                    // ... we need to check if enough time has passed since the last block was imported.
-                    if let Some(ref weak) = *self.client.read() {
-                        if let Some(c) = weak.upgrade() {
-                            c.demand_shutdown();
-                        } else {
-                            error!("shutdown-on-missing-block-import: Error during Shutdown: could not upgrade weak reference.");
-                        }
-                    } else {
-                        error!("shutdown-on-missing-block-import: Error during Shutdown: No client found.");
-                    }
-                } else {
-                    *self.auto_shutdown_last_known_block_number.lock() = current_block_number;
-                }
-            }
         }
     }
 }
@@ -430,7 +454,7 @@ impl HoneyBadgerBFT {
                 client: engine.client.clone(),
                 engine: engine.clone(),
                 auto_shutdown_last_known_block_number: Mutex::new(0),
-                auto_shutdown_interval_config: Some(1800),
+                auto_shutdown_last_known_block_import: Mutex::new(Instant::now()),
             };
             engine
                 .transition_service
