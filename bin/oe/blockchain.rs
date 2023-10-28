@@ -193,6 +193,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
         cmd.pruning_memory,
         cmd.check_seal,
         12,
+        None,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
@@ -279,6 +280,7 @@ fn start_client(
     cache_config: CacheConfig,
     require_fat_db: bool,
     max_round_blocks_to_import: usize,
+    shutdown_on_missing_block_import: Option<u64>,
     shutdown: ShutdownManager,
 ) -> Result<ClientService, String> {
     // load spec file
@@ -333,6 +335,7 @@ fn start_client(
         pruning_memory,
         true,
         max_round_blocks_to_import,
+        shutdown_on_missing_block_import,
     );
 
     let restoration_db_handler = db::restoration_db_handler(&client_path, &client_config);
@@ -371,6 +374,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
         cmd.cache_config,
         false,
         cmd.max_round_blocks_to_import,
+        None,
         ShutdownManager::null(),
     )?;
     let client = service.client();
@@ -401,6 +405,7 @@ fn execute_export_state(cmd: ExportState) -> Result<(), String> {
         cmd.cache_config,
         true,
         cmd.max_round_blocks_to_import,
+        None,
         ShutdownManager::null(),
     )?;
 
@@ -520,6 +525,7 @@ fn execute_reset(cmd: ResetBlockchain) -> Result<(), String> {
         cmd.cache_config,
         false,
         0,
+        None,
         ShutdownManager::null(),
     )?;
 

@@ -433,6 +433,7 @@ impl Configuration {
                 no_persistent_txqueue: self.args.flag_no_persistent_txqueue,
                 max_round_blocks_to_import: self.args.arg_max_round_blocks_to_import,
                 metrics_conf,
+                shutdown_on_missing_block_import: self.args.arg_shutdown_on_missing_block_import,
             };
             Cmd::Run(run_cmd)
         };
@@ -1570,6 +1571,7 @@ mod tests {
             no_persistent_txqueue: false,
             max_round_blocks_to_import: 1,
             metrics_conf: MetricsConfiguration::default(),
+            shutdown_on_missing_block_import: None,
         };
         expected.secretstore_conf.enabled = cfg!(feature = "secretstore");
         expected.secretstore_conf.http_enabled = cfg!(feature = "secretstore");
@@ -2040,6 +2042,18 @@ mod tests {
             Cmd::Run(c) => {
                 assert_eq!(c.net_conf.min_peers, 500);
                 assert_eq!(c.net_conf.max_peers, 500);
+            }
+            _ => panic!("Should be Cmd::Run"),
+        }
+    }
+
+    #[test]
+    fn should_parse_shutdown_on_missing_block_import() {
+        let args = vec!["openethereum", "--shutdown-on-missing-block-import=1234"];
+        let conf = Configuration::parse_cli(&args).unwrap();
+        match conf.into_command().unwrap().cmd {
+            Cmd::Run(c) => {
+                assert_eq!(c.shutdown_on_missing_block_import, Some(1234));
             }
             _ => panic!("Should be Cmd::Run"),
         }

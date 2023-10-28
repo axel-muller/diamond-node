@@ -113,6 +113,7 @@ pub struct RunCmd {
     pub no_persistent_txqueue: bool,
     pub max_round_blocks_to_import: usize,
     pub metrics_conf: MetricsConfiguration,
+    pub shutdown_on_missing_block_import: Option<u64>,
 }
 
 // node info fetcher for the local store.
@@ -353,6 +354,7 @@ pub fn execute(
         cmd.pruning_memory,
         cmd.check_seal,
         cmd.max_round_blocks_to_import,
+        cmd.shutdown_on_missing_block_import,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
