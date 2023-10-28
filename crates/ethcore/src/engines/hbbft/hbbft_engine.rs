@@ -60,8 +60,6 @@ use engines::hbbft::{
 };
 use std::{ops::Deref, sync::atomic::Ordering};
 
-use std::process::Command;
-
 type TargetedMessage = hbbft::TargetedMessage<Message, NodeId>;
 
 /// A message sent between validators that is part of Honey Badger BFT or the block sealing process.
