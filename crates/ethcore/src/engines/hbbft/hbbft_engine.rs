@@ -196,6 +196,7 @@ impl IoHandler<()> for TransitionHandler {
 
         if let Some(interval) = self.get_shutdown_interval() {
             if interval > 0 {
+                info!(target: "consensus", "setting up shutdown-on-missing-block-import timer with interval {interval}");
                 io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
                     .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
             }
