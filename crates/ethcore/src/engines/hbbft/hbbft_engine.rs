@@ -157,8 +157,10 @@ impl TransitionHandler {
             if let Some(c) = weak.upgrade() {
                 return c.config_shutdown_on_missing_block_import();
             }
+            warn!(target: "consensus", "shutdown-on-missing-block-import Could not upgrade weak reference to client.");
             return None;
         } else {
+            warn!(target: "consensus", "shutdown-on-missing-block-import Could not read client.");
             return None;
         };
     }
