@@ -1327,8 +1327,7 @@ impl Client {
                     // if the engine still needs that block, we are not going to prune it.
                     if let Some(protected_block) = self.engine.pruning_protection_block_number() {
                         if earliest_era > protected_block {
-                            info!(target: "pruning", "Detected attempt from pruning ancient block that is still required by the engine. protected block: {protected_block}, earliest_era: {earliest_era}");
-                            //earliest_era = protected_block - 1;
+                            debug!(target: "pruning", "Detected attempt from pruning ancient block that is still required by the engine. protected block: {protected_block}, earliest_era: {earliest_era}");
                             break;
                         }
                     }
