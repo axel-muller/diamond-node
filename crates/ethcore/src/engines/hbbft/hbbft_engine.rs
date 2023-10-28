@@ -200,6 +200,8 @@ impl IoHandler<()> for TransitionHandler {
                 io.register_timer(ENGINE_SHUTDOWN_ON_MISSING_BLOCK_IMPORT, Duration::from_secs(interval))
                     .unwrap_or_else(|e| warn!(target: "consensus", "HBBFT shutdown-on-missing-block-import failed: {}.", e));
             }
+        } else {
+            info!(target: "consensus", "shutdown-on-missing-block-import is not configured.");
         }
     }
 
