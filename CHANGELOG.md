@@ -1,6 +1,8 @@
 ## Diamond Node Software 3.3.5-hbbft-0.9.3
 
-[Autoshutdown after a period without block creation] https://github.com/DMDcoin/diamond-node/issues/78
+[Autoshutdown after a period without block import] https://github.com/DMDcoin/diamond-node/issues/78
+
+Those examples show how to confige the node to activate this feature, restarting the node if no block import has been detected for 1800 seconds (30 minutes)
 
 to activate feature via CLI Arg:
 `--shutdown-on-missing-block-import=1800`
