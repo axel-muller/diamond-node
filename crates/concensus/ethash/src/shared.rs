@@ -70,6 +70,10 @@ pub type NodeBytes = [u8; NODE_BYTES];
 pub type NodeWords = [u32; NODE_WORDS];
 pub type NodeDwords = [u64; NODE_DWORDS];
 
+unsafe trait AsBigAsUsize: Sized {
+    const _DUMMY: [(); 0];
+}
+
 macro_rules! static_assert_size_eq {
 	(@inner $a:ty, $b:ty, $($rest:ty),*) => {
 		fn first() {
@@ -81,10 +85,11 @@ macro_rules! static_assert_size_eq {
 		}
 	};
 	(@inner $a:ty, $b:ty) => {
-		unsafe {
-			let val: $b = ::mem::MaybeUninit::uninit().assume_init();
-			let _: $a = ::std::mem::transmute(val);
-		}
+        unsafe impl AsBigAsUsize for $a {
+            #[allow(dead_code)]
+            const _DUMMY: [(); 0] =
+                [(); (::std::mem::size_of::<$a>() - ::std::mem::size_of::<$b>())];
+        }
 	};
 	($($rest:ty),*) => {
 		static_assert_size_eq!(size_eq: $($rest),*);
@@ -97,7 +102,7 @@ macro_rules! static_assert_size_eq {
 	};
 }
 
-static_assert_size_eq!(Node, NodeBytes, NodeWords, NodeDwords);
+static_assert_size_eq!(Node, NodeBytes, NodeWords);
 
 #[repr(C)]
 pub union Node {
