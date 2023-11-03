@@ -167,7 +167,7 @@ impl TransitionHandler {
         &self,
         shutdown_on_missing_block_import_config_option: Option<u64>,
     ) {
-        let mut shutdown_on_missing_block_import_config: u64 = 0;
+        let shutdown_on_missing_block_import_config: u64;
 
         if let Some(c) = shutdown_on_missing_block_import_config_option {
             if c == 0 {

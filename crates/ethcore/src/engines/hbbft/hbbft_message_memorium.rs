@@ -1,3 +1,6 @@
+// Temporarily deactivated warnings, remove after implementation is complete.
+#![allow(warnings)]
+
 use bytes::ToPretty;
 //use hbbft::honey_badger::{self, MessageContent};
 use hbbft::honey_badger::{self};
