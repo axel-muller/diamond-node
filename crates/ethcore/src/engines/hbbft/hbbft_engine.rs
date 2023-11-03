@@ -374,9 +374,7 @@ impl IoHandler<()> for TransitionHandler {
                                     }
 
                                     let id: usize = std::process::id() as usize;
-
                                     let thread_id = std::thread::current().id();
-
                                     info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
 
                                     if let Some(ref weak) = *self.client.read() {
