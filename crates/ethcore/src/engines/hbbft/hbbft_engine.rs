@@ -1153,7 +1153,7 @@ impl HoneyBadgerBFT {
 
     fn is_syncing(&self, client: &Arc<dyn EngineClient>) -> bool {
         match client.as_full_client() {
-            Some(full_client) => full_client.is_major_syncing(),
+            Some(full_client) => full_client.is_syncing(),
             // We only support full clients at this point.
             None => true,
         }

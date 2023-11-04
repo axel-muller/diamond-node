@@ -215,6 +215,10 @@ pub trait EngineInfo {
 
 /// Provides information about the chain sync state.
 pub trait ChainSyncing: Send + Sync {
+
+    /// are we syncing?
+    fn is_syncing(&self) -> bool;
+
     /// are we in the middle of a major sync?
     fn is_major_syncing(&self) -> bool;
 }
@@ -524,8 +528,11 @@ pub trait BlockChainClient:
     /// Used by engines to queue transactions without causing deadlocks due to re-entrant calls.
     fn transact_silently(&self, tx_request: TransactionRequest) -> Result<(), transaction::Error>;
 
-    /// Returns true if the chain is currently syncing.
+    /// Returns true if the chain is currently syncing in major states.
     fn is_major_syncing(&self) -> bool;
+
+    // Returns true if the chain is currently syncing.
+    fn is_syncing(&self) -> bool;
 
     /// Returns the next nonce for the given address, taking the transaction queue into account.
     fn next_nonce(&self, address: &Address) -> U256;
