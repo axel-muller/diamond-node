@@ -1114,6 +1114,10 @@ impl BlockChainClient for TestBlockChainClient {
         false
     }
 
+    fn is_syncing(&self) -> bool {
+        false
+    }
+
     fn next_nonce(&self, address: &Address) -> U256 {
         self.miner.next_nonce(self, address)
     }

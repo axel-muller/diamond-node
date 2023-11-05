@@ -3663,8 +3663,11 @@ impl PrometheusMetrics for Client {
         );
 
         // 0 or 1 if we are major syncing.
-        r.register_gauge("is_major_syncing", "syncing, boolean", self.is_major_syncing() as i64);
-
+        r.register_gauge(
+            "is_major_syncing",
+            "syncing, boolean",
+            self.is_major_syncing() as i64,
+        );
 
         r.register_gauge("is_syncing", "syncing, boolean", self.is_syncing() as i64);
 

@@ -164,11 +164,10 @@ impl ChainSyncing for SyncProviderWrapper {
 
     /// are we syncing in any means ?
     fn is_syncing(&self) -> bool {
-
         match self.sync_provider.upgrade() {
             Some(sync_arc) => {
                 return sync_arc.status().state != SyncState::Idle;
-            },
+            }
             // We also indicate the "syncing" state when the SyncProvider has already been destroyed.
             None => true,
         }

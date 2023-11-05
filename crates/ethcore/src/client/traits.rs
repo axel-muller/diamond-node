@@ -215,7 +215,6 @@ pub trait EngineInfo {
 
 /// Provides information about the chain sync state.
 pub trait ChainSyncing: Send + Sync {
-
     /// are we syncing?
     fn is_syncing(&self) -> bool;
 

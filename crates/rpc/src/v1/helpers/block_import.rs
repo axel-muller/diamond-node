@@ -26,7 +26,6 @@ pub fn is_major_importing_or_waiting(
     queue_info: BlockQueueInfo,
     waiting_is_syncing_state: bool,
 ) -> bool {
-
     let is_syncing_state = sync_state.map_or(false, |s| match s {
         SyncState::Idle | SyncState::NewBlocks => false,
         SyncState::WaitingPeers if !waiting_is_syncing_state => false,
