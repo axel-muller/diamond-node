@@ -59,6 +59,7 @@ use node_filter::NodeFilter;
 use parity_rpc::{informant, is_major_importing, NetworkSettings};
 use parity_runtime::Runtime;
 use parity_version::version;
+use sync::SyncState;
 
 // How often we attempt to take a snapshot: only snapshot on blocknumbers that are multiples of this.
 const SNAPSHOT_PERIOD: u64 = 20000;
@@ -156,6 +157,17 @@ impl ChainSyncing for SyncProviderWrapper {
                 }
                 None => true,
             },
+            // We also indicate the "syncing" state when the SyncProvider has already been destroyed.
+            None => true,
+        }
+    }
+
+    /// are we syncing in any means ?
+    fn is_syncing(&self) -> bool {
+        match self.sync_provider.upgrade() {
+            Some(sync_arc) => {
+                return sync_arc.status().state != SyncState::Idle;
+            }
             // We also indicate the "syncing" state when the SyncProvider has already been destroyed.
             None => true,
         }
