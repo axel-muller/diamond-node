@@ -1061,14 +1061,14 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // num_good_messages: u64,
 
         r.register_gauge_with_label(
-            format!("last_message_faulty").as_str(),
+            format!("last_message_good").as_str(),
             format!("block number").as_str(),
             label.as_str(),
-            self.last_message_faulty as i64,
+            self.last_message_good as i64,
         );
 
         r.register_gauge_with_label(
-            format!("last_message_good").as_str(),
+            format!("last_message_faulty").as_str(),
             format!("block number").as_str(),
             label.as_str(),
             self.last_message_faulty as i64,
