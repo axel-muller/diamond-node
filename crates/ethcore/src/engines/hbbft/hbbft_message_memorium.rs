@@ -989,7 +989,7 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         let node_id = self.get_node_id().0 .0;
 
         let label = std::format!(
-            "n{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+            "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
             node_id[0],
             node_id[1],
             node_id[2],
