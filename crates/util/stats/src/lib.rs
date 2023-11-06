@@ -72,27 +72,9 @@ impl PrometheusRegistry {
 
     /// Adds a new prometheus gauge with a label
     pub fn register_gauge_with_label(&mut self, name: &str, help: &str, label: &str, value: i64) {
-        //let label_formated = format!("{}{}", name, label);
-        // let label_formated = format!("{}{}", self.prefix, name);
-        let mut opts = prometheus::Opts::new(name, help);
-
+        let opts = prometheus::Opts::new(name, help).const_label("other_node", label);
         // add labels here .
-        opts.variable_labels.push(label.to_string());
-
-        //prometheus::push_metrics()
-
-        //let mut labels = HashMap::new();
-        // labels.insert(label, value.to_string());
-
-        // Custom metrics, to be collected by a dedicated registry.
-
-        // registry.register(Box::new(CUSTOM_COUNTER.clone())).unwrap();
-
-        // self.registry.
-
-        //     CUSTOM_COUNTER.inc_by(42);
-        //     assert_eq!(CUSTOM_COUNTER.get(), 42);
-        // }
+        //opts.variable_labels.push(label.to_string());
 
         match prometheus::IntGauge::with_opts(opts) {
             Ok(g) => {
