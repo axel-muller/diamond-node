@@ -530,7 +530,7 @@ pub trait BlockChainClient:
     /// Returns true if the chain is currently syncing in major states.
     fn is_major_syncing(&self) -> bool;
 
-    // Returns true if the chain is currently syncing.
+    /// Returns true if the chain is currently syncing.
     fn is_syncing(&self) -> bool;
 
     /// Returns the next nonce for the given address, taking the transaction queue into account.
