@@ -988,7 +988,7 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
 
         let node_id = self.get_node_id().0 .0;
 
-        let label = std::format!(
+        let other_node = std::format!(
             "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
             node_id[0],
             node_id[1],
@@ -1001,31 +1001,31 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         );
 
         //r.register_gauge_with_label(name, help, label, value)
-        r.register_gauge_with_label(
-            format!("cumulative_lateness").as_str(),
-            format!("cumulative lateness").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "cumulative_lateness",
+            "cumulative lateness",
+            other_node.as_str(),
             self.cumulative_lateness as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("sealing_blocks_good").as_str(),
-            format!("good sealed block messages").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_good",
+            "good sealed block messages",
+            other_node.as_str(),
             self.sealing_blocks_good.len() as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("sealing_blocks_late").as_str(),
-            format!("late sealed blocks").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_late",
+            "late sealed blocks",
+            other_node.as_str(),
             self.sealing_blocks_late.len() as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("sealing_blocks_bad").as_str(),
-            format!("bad block seals").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_bad",
+            "bad block seals",
+            other_node.as_str(),
             self.sealing_blocks_bad.len() as i64,
         );
 
@@ -1033,24 +1033,24 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // last_late_sealing_message: u64,
         // last_error_sealing_message: u64,
 
-        r.register_gauge_with_label(
-            format!("last_good_sealing_message").as_str(),
-            format!("block number").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "last_good_sealing_message",
+            "block number",
+            other_node.as_str(),
             self.last_good_sealing_message as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("last_late_sealing_message").as_str(),
-            format!("block number").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "last_late_sealing_message",
+            "block number",
+            other_node.as_str(),
             self.last_late_sealing_message as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("last_error_sealing_message").as_str(),
-            format!("block number").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "last_error_sealing_message",
+            "block number",
+            other_node.as_str(),
             self.last_error_sealing_message as i64,
         );
 
@@ -1060,17 +1060,17 @@ impl PrometheusMetrics for NodeStakingEpochHistory {
         // num_faulty_messages: u64,
         // num_good_messages: u64,
 
-        r.register_gauge_with_label(
-            format!("last_message_good").as_str(),
-            format!("block number").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "last_message_good",
+            "block number",
+            other_node.as_str(),
             self.last_message_good as i64,
         );
 
-        r.register_gauge_with_label(
-            format!("last_message_faulty").as_str(),
-            format!("block number").as_str(),
-            label.as_str(),
+        r.register_gauge_with_other_node_label(
+            "last_message_faulty",
+            "block number",
+            other_node.as_str(),
             self.last_message_faulty as i64,
         );
     }
