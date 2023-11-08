@@ -333,6 +333,9 @@ pub(crate) struct StakingEpochHistory {
     staking_epoch: u64,
     staking_epoch_start_block: u64,
     staking_epoch_end_block: u64,
+    
+    /// highest block number that was processed for this epoch.
+    /// used to calculate the real lateness of Nodes.
     highest_block_num: u64,
 
     // stored the node staking epoch history.
@@ -1115,7 +1118,7 @@ impl PrometheusMetrics for StakingEpochHistory {
         );
 
         for epoch_history in self.node_staking_epoch_histories.iter() {
-            epoch_history.prometheus_metrics(r);
+            epoch_history.prometheus_metrics(r, self.highest_block_num);
         }
     }
 }
