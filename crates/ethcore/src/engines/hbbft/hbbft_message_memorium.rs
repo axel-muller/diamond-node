@@ -244,7 +244,7 @@ impl NodeStakingEpochHistory {
         // we can calculate it by applying the sum formula to all missing blocks.
         let non_tracked_cumulative_lateness =
             if self.last_good_sealing_message < known_highest_block + 1 {
-                let difference = self.last_good_sealing_message - known_highest_block - 1;
+                let difference = known_highest_block - self.last_good_sealing_message - 1;
                 (difference * (difference + 1)) / 2
             } else {
                 0
@@ -333,7 +333,7 @@ pub(crate) struct StakingEpochHistory {
     staking_epoch: u64,
     staking_epoch_start_block: u64,
     staking_epoch_end_block: u64,
-    
+
     /// highest block number that was processed for this epoch.
     /// used to calculate the real lateness of Nodes.
     highest_block_num: u64,
