@@ -203,6 +203,128 @@ impl NodeStakingEpochHistory {
 
         return format!("{staking_epoch},{node_id},{total_sealing_messages},{total_good_sealing_messages},{total_late_sealing_messages},{total_error_sealing_messages},{last_good_sealing_message},{last_late_sealing_message},{last_error_sealing_message},{cumulative_lateness},{total_good_messages},{total_faulty_messages},{last_message_good},{last_message_faulty}\n");
     }
+
+    // prometheus metrics
+
+    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry, known_highest_block: u64) {
+        // one problem that occurs here is that we have a dynamic name of the gauges.
+        // that could lead to troubles later in the UI, because we would have to adapt the UI to the dynamic names.
+        // a solution could be to give every node a number from 0 to n (n=25 for DMD), and supply the name as a text value,
+        // so we still can figure out the node id, but the name of the gauge keeps static.
+
+        //let metric: Metric = Metric::new();
+        //r.registry().register(c)
+
+        //let label = self.get_node_id().0.to_hex();
+
+        let node_id = self.get_node_id().0 .0;
+
+        let other_node = std::format!(
+            "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+            node_id[0],
+            node_id[1],
+            node_id[2],
+            node_id[3],
+            node_id[4],
+            node_id[5],
+            node_id[6],
+            node_id[7]
+        );
+
+        //r.register_gauge_with_label(name, help, label, value)
+        r.register_gauge_with_other_node_label(
+            "cumulative_lateness_raw",
+            "cumulative lateness, raw value without lateness from missing seals",
+            other_node.as_str(),
+            self.cumulative_lateness as i64,
+        );
+
+        // if the node has not send an sealing message,
+        // it's cumulative lateness is not tracked.
+        // we can calculate it by applying the sum formula to all missing blocks.
+        let non_tracked_cumulative_lateness =
+            if self.last_good_sealing_message < known_highest_block + 1 {
+                let difference = self.last_good_sealing_message - known_highest_block - 1;
+                (difference * (difference + 1)) / 2
+            } else {
+                0
+            };
+
+        let cumulative_lateness =
+            self.cumulative_lateness + (known_highest_block - self.last_good_sealing_message);
+        r.register_gauge_with_other_node_label(
+            "cumulative_lateness",
+            "cumulative lateness, including missing seals from that node.",
+            other_node.as_str(),
+            (self.cumulative_lateness + non_tracked_cumulative_lateness) as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_good",
+            "good sealed block messages",
+            other_node.as_str(),
+            self.sealing_blocks_good.len() as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_late",
+            "late sealed blocks",
+            other_node.as_str(),
+            self.sealing_blocks_late.len() as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "sealing_blocks_bad",
+            "bad block seals",
+            other_node.as_str(),
+            self.sealing_blocks_bad.len() as i64,
+        );
+
+        // last_good_sealing_message: u64,
+        // last_late_sealing_message: u64,
+        // last_error_sealing_message: u64,
+
+        r.register_gauge_with_other_node_label(
+            "last_good_sealing_message",
+            "block number",
+            other_node.as_str(),
+            self.last_good_sealing_message as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "last_late_sealing_message",
+            "block number",
+            other_node.as_str(),
+            self.last_late_sealing_message as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "last_error_sealing_message",
+            "block number",
+            other_node.as_str(),
+            self.last_error_sealing_message as i64,
+        );
+
+        // last_message_faulty: u64,
+        // last_message_good: u64,
+
+        // num_faulty_messages: u64,
+        // num_good_messages: u64,
+
+        r.register_gauge_with_other_node_label(
+            "last_message_good",
+            "block number",
+            other_node.as_str(),
+            self.last_message_good as i64,
+        );
+
+        r.register_gauge_with_other_node_label(
+            "last_message_faulty",
+            "block number",
+            other_node.as_str(),
+            self.last_message_faulty as i64,
+        );
+    }
 }
 
 /// holds up the history of all nodes for a staking epoch history.
@@ -211,6 +333,7 @@ pub(crate) struct StakingEpochHistory {
     staking_epoch: u64,
     staking_epoch_start_block: u64,
     staking_epoch_end_block: u64,
+    highest_block_num: u64,
 
     // stored the node staking epoch history.
     // since 25 is the exected maximum, a Vec has about the same perforamnce than a HashMap.
@@ -229,6 +352,7 @@ impl StakingEpochHistory {
             staking_epoch,
             staking_epoch_start_block,
             staking_epoch_end_block,
+            highest_block_num: staking_epoch_start_block,
             node_staking_epoch_histories: Vec::new(),
             exported: false,
         }
@@ -253,6 +377,9 @@ impl StakingEpochHistory {
     }
 
     pub fn on_seal_good(&mut self, event: &SealEventGood) {
+        if event.block_num > self.highest_block_num {
+            self.highest_block_num = event.block_num;
+        }
         let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
         node_staking_epoch_history.add_good_seal_event(event);
         self.exported = false;
@@ -971,108 +1098,6 @@ impl PrometheusMetrics for HbbftMessageDispatcher {
         } else {
             error!(target: "hbbft_message_memorium", "could not get read lock on memorium for prometheus metrics");
         }
-    }
-}
-
-impl PrometheusMetrics for NodeStakingEpochHistory {
-    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
-        // one problem that occurs here is that we have a dynamic name of the gauges.
-        // that could lead to troubles later in the UI, because we would have to adapt the UI to the dynamic names.
-        // a solution could be to give every node a number from 0 to n (n=25 for DMD), and supply the name as a text value,
-        // so we still can figure out the node id, but the name of the gauge keeps static.
-
-        //let metric: Metric = Metric::new();
-        //r.registry().register(c)
-
-        //let label = self.get_node_id().0.to_hex();
-
-        let node_id = self.get_node_id().0 .0;
-
-        let other_node = std::format!(
-            "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
-            node_id[0],
-            node_id[1],
-            node_id[2],
-            node_id[3],
-            node_id[4],
-            node_id[5],
-            node_id[6],
-            node_id[7]
-        );
-
-        //r.register_gauge_with_label(name, help, label, value)
-        r.register_gauge_with_other_node_label(
-            "cumulative_lateness",
-            "cumulative lateness",
-            other_node.as_str(),
-            self.cumulative_lateness as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "sealing_blocks_good",
-            "good sealed block messages",
-            other_node.as_str(),
-            self.sealing_blocks_good.len() as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "sealing_blocks_late",
-            "late sealed blocks",
-            other_node.as_str(),
-            self.sealing_blocks_late.len() as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "sealing_blocks_bad",
-            "bad block seals",
-            other_node.as_str(),
-            self.sealing_blocks_bad.len() as i64,
-        );
-
-        // last_good_sealing_message: u64,
-        // last_late_sealing_message: u64,
-        // last_error_sealing_message: u64,
-
-        r.register_gauge_with_other_node_label(
-            "last_good_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_good_sealing_message as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "last_late_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_late_sealing_message as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "last_error_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_error_sealing_message as i64,
-        );
-
-        // last_message_faulty: u64,
-        // last_message_good: u64,
-
-        // num_faulty_messages: u64,
-        // num_good_messages: u64,
-
-        r.register_gauge_with_other_node_label(
-            "last_message_good",
-            "block number",
-            other_node.as_str(),
-            self.last_message_good as i64,
-        );
-
-        r.register_gauge_with_other_node_label(
-            "last_message_faulty",
-            "block number",
-            other_node.as_str(),
-            self.last_message_faulty as i64,
-        );
     }
 }
 
