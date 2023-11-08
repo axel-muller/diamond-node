@@ -206,7 +206,12 @@ impl NodeStakingEpochHistory {
 
     // prometheus metrics
 
-    fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry, known_highest_block: u64) {
+    fn prometheus_metrics(
+        &self,
+        r: &mut stats::PrometheusRegistry,
+        known_highest_block: u64,
+        epoch_start_block: u64,
+    ) {
         // one problem that occurs here is that we have a dynamic name of the gauges.
         // that could lead to troubles later in the UI, because we would have to adapt the UI to the dynamic names.
         // a solution could be to give every node a number from 0 to n (n=25 for DMD), and supply the name as a text value,
@@ -241,14 +246,18 @@ impl NodeStakingEpochHistory {
 
         // if the node has not send an sealing message,
         // it's cumulative lateness is not tracked.
+
+        // we begin counting from the first block of the epoch.
+        let last_good_sealing_message = u64::max(self.last_good_sealing_message, epoch_start_block);
+
         // we can calculate it by applying the sum formula to all missing blocks.
-        let non_tracked_cumulative_lateness =
-            if self.last_good_sealing_message < known_highest_block + 1 {
-                let difference = known_highest_block - self.last_good_sealing_message - 1;
-                (difference * (difference + 1)) / 2
-            } else {
-                0
-            };
+        let non_tracked_cumulative_lateness = if last_good_sealing_message + 1 < known_highest_block
+        {
+            let difference = known_highest_block - (last_good_sealing_message + 1);
+            (difference * (difference + 1)) / 2
+        } else {
+            0
+        };
 
         let cumulative_lateness =
             self.cumulative_lateness + (known_highest_block - self.last_good_sealing_message);
@@ -1118,7 +1127,11 @@ impl PrometheusMetrics for StakingEpochHistory {
         );
 
         for epoch_history in self.node_staking_epoch_histories.iter() {
-            epoch_history.prometheus_metrics(r, self.highest_block_num);
+            epoch_history.prometheus_metrics(
+                r,
+                self.highest_block_num,
+                self.staking_epoch_start_block,
+            );
         }
     }
 }
