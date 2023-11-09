@@ -302,26 +302,32 @@ impl NodeStakingEpochHistory {
         // last_late_sealing_message: u64,
         // last_error_sealing_message: u64,
 
-        r.register_gauge_with_other_node_label(
-            "last_good_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_good_sealing_message as i64,
-        );
+        if self.last_good_sealing_message > 0 {
+            r.register_gauge_with_other_node_label(
+                "last_good_sealing_message",
+                "block number",
+                other_node.as_str(),
+                self.last_good_sealing_message as i64,
+            );
+        }
 
-        r.register_gauge_with_other_node_label(
-            "last_late_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_late_sealing_message as i64,
-        );
+        if self.last_late_sealing_message > 0 {
+            r.register_gauge_with_other_node_label(
+                "last_late_sealing_message",
+                "block number",
+                other_node.as_str(),
+                self.last_late_sealing_message as i64,
+            );
+        }
 
-        r.register_gauge_with_other_node_label(
-            "last_error_sealing_message",
-            "block number",
-            other_node.as_str(),
-            self.last_error_sealing_message as i64,
-        );
+        if self.last_error_sealing_message > 0 {
+            r.register_gauge_with_other_node_label(
+                "last_error_sealing_message",
+                "block number",
+                other_node.as_str(),
+                self.last_error_sealing_message as i64,
+            );
+        }
 
         // last_message_faulty: u64,
         // last_message_good: u64,
@@ -329,19 +335,23 @@ impl NodeStakingEpochHistory {
         // num_faulty_messages: u64,
         // num_good_messages: u64,
 
-        r.register_gauge_with_other_node_label(
-            "last_message_good",
-            "block number",
-            other_node.as_str(),
-            self.last_message_good as i64,
-        );
+        if self.last_message_good > 0 {
+            r.register_gauge_with_other_node_label(
+                "last_message_good",
+                "block number",
+                other_node.as_str(),
+                self.last_message_good as i64,
+            );
+        }
 
-        r.register_gauge_with_other_node_label(
-            "last_message_faulty",
-            "block number",
-            other_node.as_str(),
-            self.last_message_faulty as i64,
-        );
+        if self.last_message_faulty > 0 {
+            r.register_gauge_with_other_node_label(
+                "last_message_faulty",
+                "block number",
+                other_node.as_str(),
+                self.last_message_faulty as i64,
+            );
+        }
     }
 }
 
@@ -987,7 +997,6 @@ impl HbbftMessageMemorium {
         }
 
         // good seals
-
         if let Some(good_seal) = self.dispatched_seal_event_good.front() {
             // rust borrow system forced me into this useless clone...
             debug!(target: "hbbft_message_memorium", "work: good Seal!");
@@ -1000,7 +1009,6 @@ impl HbbftMessageMemorium {
         }
 
         // late seals
-
         if let Some(late_seal) = self.dispatched_seal_event_late.front() {
             // rust borrow system forced me into this useless clone...
             if self.on_seal_late(&late_seal.clone()) {
