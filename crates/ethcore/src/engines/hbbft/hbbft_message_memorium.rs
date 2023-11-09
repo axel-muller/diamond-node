@@ -152,9 +152,9 @@ impl NodeStakingEpochHistory {
         let last_message_good = self.last_message_good;
 
         if block_num > last_message_good {
-            self.last_message_faulty = block_num;
+            self.last_message_good = block_num;
         } else {
-            warn!(target: "hbbft_message_memorium", "add_message_event_good: event.block_num {block_num} <= last_message_faulty {last_message_good}");
+            warn!(target: "hbbft_message_memorium", "add_message_event_good: event.block_num {block_num} <= last_message_good {last_message_good}");
         }
         self.num_good_messages += 1;
     }
