@@ -97,10 +97,9 @@ impl NodeStakingEpochHistory {
 
     /// protocols a good seal event.
     pub fn add_seal_event_late(&mut self, event: &SealEventLate) {
-
         // by definition a "good sealing" is always on the latest block.
         let block_num = event.block_num;
-        
+
         if block_num < self.last_late_sealing_message {
             warn!(target: "hbbft_message_memorium", "out of order seal events: add_late_seal_event: event.block_num {block_num} <= self.last_late_sealing_message {}", self.last_late_sealing_message);
             return;
@@ -108,7 +107,9 @@ impl NodeStakingEpochHistory {
 
         // add cumulative lateness, for all blocks between the last tracked block
         // and the current block.
-        if self.last_late_sealing_message > 0 && self.last_late_sealing_message < event.block_num - 1 {
+        if self.last_late_sealing_message > 0
+            && self.last_late_sealing_message < event.block_num - 1
+        {
             let difference = event.block_num - 1 - self.last_late_sealing_message;
             self.cumulative_lateness += (difference * (difference + 1)) / 2;
         }
@@ -116,8 +117,6 @@ impl NodeStakingEpochHistory {
         self.last_late_sealing_message = event.block_num;
         self.cumulative_lateness += event.get_lateness();
         self.sealing_blocks_late.push(event.block_num);
-
-
     }
 
     pub(crate) fn add_bad_seal_event(&mut self, event: &SealEventBad) {
@@ -1157,8 +1156,4 @@ impl PrometheusMetrics for HbbftMessageMemorium {
 }
 
 #[cfg(test)]
-mod tests {
-
-
-    
-}
+mod tests {}
