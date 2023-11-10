@@ -26,6 +26,10 @@ impl ChainSyncing for SyncProviderWrapper {
     fn is_major_syncing(&self) -> bool {
         false
     }
+
+    fn is_syncing(&self) -> bool {
+        false
+    }
 }
 
 pub fn hbbft_client() -> std::sync::Arc<Client> {
