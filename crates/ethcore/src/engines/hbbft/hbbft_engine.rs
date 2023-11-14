@@ -1286,6 +1286,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         &self.machine
     }
 
+    fn minimum_gas_price(&self) -> Option<U256> {
+        self.current_minimum_gas_price.lock().clone()
+    }
+
     fn fork_choice(&self, new: &ExtendedHeader, current: &ExtendedHeader) -> ForkChoice {
         crate::engines::total_difficulty_fork_choice(new, current)
     }
