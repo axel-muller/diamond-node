@@ -1,3 +1,8 @@
+## Diamond Node Software 3.3.5-hbbft-0.9.4
+
+- [Fixed: is major syncing information is wrong.] (https://github.com/DMDcoin/diamond-node/issues/73)
+- [Improvements for HBBFT Message Tracking] (https://github.com/DMDcoin/openethereum-3.x/issues/17)
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.3
 
 [Autoshutdown after a period without block import] https://github.com/DMDcoin/diamond-node/issues/78

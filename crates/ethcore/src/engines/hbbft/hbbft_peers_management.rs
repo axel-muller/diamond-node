@@ -318,7 +318,7 @@ impl HbbftPeersManagement {
         let mut guard = client
             .reserved_peers_management()
             .try_lock_for(Duration::from_millis(100))
-            .ok_or("Error".to_string())?;
+            .ok_or("Could not acquire reserved peers management within 100ms".to_string())?;
 
         if let Some(reserved_peers_management) = guard.as_deref_mut() {
             let mut kept_peers = Vec::<ValidatorConnectionData>::new();

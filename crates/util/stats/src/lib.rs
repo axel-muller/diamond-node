@@ -70,19 +70,34 @@ impl PrometheusRegistry {
             .expect("prometheus identifiers must be are unique");
     }
 
-    /// Adds a new prometheus gauge with a label
-    pub fn register_gauge_with_label(&mut self, name: &str, help: &str, label: &str, value: i64) {
-        let label_formated = format!("{}{}", name, label);
-        // let label_formated = format!("{}{}", self.prefix, name);
-        let opts = prometheus::Opts::new(label_formated, help);
+    /// Adds a new prometheus gauge with a "other_node" label.
+    /// Designed for tracking communication partner values.
+    pub fn register_gauge_with_other_node_label(
+        &mut self,
+        name: &str,
+        help: &str,
+        other_node: &str,
+        value: i64,
+    ) {
+        self.register_gauge_with_label(name, help, "other_node", other_node, value);
+    }
 
+    /// Adds a new prometheus gauge with a label
+    pub fn register_gauge_with_label(
+        &mut self,
+        name: &str,
+        help: &str,
+        label: &str,
+        label_value: &str,
+        value: i64,
+    ) {
+        let opts = prometheus::Opts::new(name, help).const_label(label, label_value);
         // add labels here .
-        //&&opts.variable_labels.push(label.to_string());
+        //opts.variable_labels.push(label.to_string());
 
         match prometheus::IntGauge::with_opts(opts) {
             Ok(g) => {
                 g.set(value);
-
                 self.registry
                     .register(Box::new(g))
                     .expect("prometheus identifiers must be are unique");

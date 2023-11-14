@@ -2886,6 +2886,16 @@ impl BlockChainClient for Client {
         }
     }
 
+    fn is_syncing(&self) -> bool {
+        // so far we know, this lock cannot result into a deadlock.
+        match &*self.sync_provider.lock() {
+            Some(sync_provider) => sync_provider.is_syncing(),
+            // We also indicate the "syncing" state when the SyncProvider has not been set,
+            // which usually only happens when the client is not fully configured yet.
+            None => true,
+        }
+    }
+
     fn next_nonce(&self, address: &Address) -> U256 {
         self.importer.miner.next_nonce(self, address)
     }
@@ -3652,9 +3662,14 @@ impl PrometheusMetrics for Client {
             chain.best_block_number as i64,
         );
 
-        let is_syncing_val: i64 = self.is_major_syncing() as i64;
-        // 0 or 1 if we are syncing.
-        r.register_gauge("is_major_syncing", "syncing, boolean", is_syncing_val);
+        // 0 or 1 if we are major syncing.
+        r.register_gauge(
+            "is_major_syncing",
+            "syncing, boolean",
+            self.is_major_syncing() as i64,
+        );
+
+        r.register_gauge("is_syncing", "syncing, boolean", self.is_syncing() as i64);
 
         // prunning info
         let prunning = self.pruning_info();
