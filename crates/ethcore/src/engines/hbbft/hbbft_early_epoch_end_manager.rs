@@ -98,6 +98,11 @@ impl EarlyEpochEndManager {
             return;
         }
 
+        if full_client.is_syncing() {
+            // if we are syncing, we wont do any blaming.
+            return;
+        }
+
         let treshold: u64 = 10;
 
         if self.start_block + treshold < block_num {
