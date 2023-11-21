@@ -222,7 +222,10 @@ impl NodeStakingEpochHistory {
     }
 
     pub fn get_sealing_message(&self) -> u64 {
-        u64::max(self.last_late_sealing_message, self.last_good_sealing_message)
+        u64::max(
+            self.last_late_sealing_message,
+            self.last_good_sealing_message,
+        )
     }
 
     pub fn get_last_late_sealing_message(&self) -> u64 {
@@ -464,7 +467,6 @@ impl StakingEpochHistory {
             }
         };
     }
-
 
     pub fn on_seal_good(&mut self, event: &SealEventGood) {
         let staking_epoch_start_block = self.staking_epoch_start_block;
@@ -938,19 +940,18 @@ impl HbbftMessageMemorium {
         }
     }
 
-    pub fn get_validator_data(&self, block_num: u64, node_id: &NodeId) -> Option<&Vec<NodeStakingEpochHistory>>{
-
+    pub fn get_validator_data(
+        &self,
+        block_num: u64,
+        node_id: &NodeId,
+    ) -> Option<&Vec<NodeStakingEpochHistory>> {
         if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
-            return Some(&epoch_history.node_staking_epoch_histories)
+            return Some(&epoch_history.node_staking_epoch_histories);
         }
         None
-   }
-
-    pub fn get_validator_last_late_block(&self, hbbft_epoch_number: u64) {
-
-
-
     }
+
+    pub fn get_validator_last_late_block(&self, hbbft_epoch_number: u64) {}
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
@@ -989,9 +990,7 @@ impl HbbftMessageMemorium {
         }
     }
 
-
     pub fn get_staking_epoch_history(&self, block_num: u64) -> Option<&StakingEpochHistory> {
-        
         //let histories = &mut self.staking_epoch_history;
 
         // self.staking_epoch_history.get_mut(index)
@@ -1007,8 +1006,10 @@ impl HbbftMessageMemorium {
         None
     }
 
-    fn get_staking_epoch_history_mut(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-        
+    fn get_staking_epoch_history_mut(
+        &mut self,
+        block_num: u64,
+    ) -> Option<&mut StakingEpochHistory> {
         //let histories = &mut self.staking_epoch_history;
 
         // self.staking_epoch_history.get_mut(index)
@@ -1020,7 +1021,6 @@ impl HbbftMessageMemorium {
                 return Some(&mut self.staking_epoch_history[i]);
             }
         }
-    
 
         // if we have not found a staking epoch, we add it if possible.
         // this can happen during timings, where new messages get's process,
