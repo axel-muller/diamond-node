@@ -1,4 +1,4 @@
-use super::block_reward_hbbft::BlockRewardContract;
+use super::{block_reward_hbbft::BlockRewardContract, hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager};
 use crate::{
     client::BlockChainClient,
     engines::hbbft::{
@@ -88,6 +88,7 @@ pub struct HoneyBadgerBFT {
     has_connected_to_validator_set: AtomicBool,
     peers_management: Mutex<HbbftPeersManagement>,
     current_minimum_gas_price: Mutex<Option<U256>>,
+    early_epoch_manager: Mutex<Option<HbbftEarlyEpochEndManager>>,
 }
 
 struct TransitionHandler {
@@ -445,6 +446,7 @@ impl HoneyBadgerBFT {
             has_connected_to_validator_set: AtomicBool::new(false),
             peers_management: Mutex::new(HbbftPeersManagement::new()),
             current_minimum_gas_price: Mutex::new(None),
+            early_epoch_manager: Mutex::new(None),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {

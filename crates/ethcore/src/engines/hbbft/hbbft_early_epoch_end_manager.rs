@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId};
 
-pub(crate) struct EarlyEpochEndManager {
+pub(crate) struct HbbftEarlyEpochEndManager {
     /// The current epoch number.
     current_tracked_epoch_number: u64,
 
@@ -22,7 +22,7 @@ pub(crate) struct EarlyEpochEndManager {
     flagged_validators: Vec<NodeId>,
 }
 
-impl EarlyEpochEndManager {
+impl HbbftEarlyEpochEndManager {
     /// creates a new EarlyEpochEndManager,
     /// if conditions are matching to create one.
     /// It is expected that this function is only called if the node is a validator.
@@ -32,7 +32,7 @@ impl EarlyEpochEndManager {
         client: &dyn BlockChainClient,
         epoch_number: u64,
         epoch_start_block: u64,
-    ) -> Option<EarlyEpochEndManager> {
+    ) -> Option<HbbftEarlyEpochEndManager> {
         if client.is_syncing() {
             // if we are syncing, we do not need to create an early epoch end manager yet.
             // if we are syncing as a validator, and it is really this epoch,
@@ -130,5 +130,18 @@ impl EarlyEpochEndManager {
         // note: We do not take care if hbbft message memorium might not have processed some of the messages yet,
         // since it is not important to do the decision based on the latest data, since the decide method will be called
         // again.
+    }
+}
+
+
+
+/// testing early epoch stop manager.
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_early_epoch_end() {
+
+        // should 
     }
 }
