@@ -18,7 +18,8 @@ pub(crate) struct HbbftEarlyEpochEndManager {
     /// public keys of all validators for this epoch.
     validators: Vec<NodeId>,
 
-    /// current flagged validators
+    /// current flagged validators, unordered list - no performance issue, since this can
+    /// only grow up to 7 elements for a usual set of 25 nodes.
     flagged_validators: Vec<NodeId>,
 }
 
@@ -70,7 +71,9 @@ impl HbbftEarlyEpochEndManager {
     }
 
     /// retrieves the information from smart contracts which validators are currently flagged.
-    fn get_current_flagged_validators_from_contracts() -> Vec<NodeId> {
+    fn get_current_flagged_validators_from_contracts(
+        full_client: &dyn BlockChainClient,
+    ) -> Vec<NodeId> {
         // todo: call smart contract.
         return Vec::new();
     }
@@ -93,7 +96,21 @@ impl HbbftEarlyEpochEndManager {
 
         // todo: send transaction to smart contract about missing validator.
 
-        warn!(target: "engine", "early-epoch-end: notify about missing validator: {:?}", validator);
+        self.flagged_validators.push(validator.clone());
+        warn!(target: "engine", "TODO: early-epoch-end: notify about missing validator: {:?}", validator);
+    }
+
+    fn notify_about_validator_reconnect(
+        &mut self,
+        validator: &NodeId,
+        full_client: &dyn BlockChainClient,
+    ) {
+        if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
+            self.flagged_validators.remove(index);
+            warn!(target: "engine", "TODO: early-epoch-end: notify about reconnected validator: {:?}", validator);
+        } else {
+            error!(target: "engine", " Could not find reconnected validator in flagged validators.");
+        }
     }
 
     /// decides on the memorium data if we should update to contract data.
@@ -122,6 +139,9 @@ impl HbbftEarlyEpochEndManager {
             return;
         }
 
+        let current_flagged_validators =
+            Self::get_current_flagged_validators_from_contracts(full_client);
+
         //full_client.best_block_header()
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
@@ -130,7 +150,19 @@ impl HbbftEarlyEpochEndManager {
                     let last_sealing_message = node_history.get_sealing_message();
 
                     if last_sealing_message < block_num - treshold {
-                        self.notify_about_missing_validator(&validator, full_client);
+                        // we do not have to send notification, if we already did so.
+
+                        if !current_flagged_validators.contains(validator) {
+                            // this function will also add the validator to the list of flagged validators.
+                            self.notify_about_missing_validator(&validator, full_client);
+                        }
+                    } else {
+                        // this validator is OK.
+                        // maybe it was flagged and we need to unflag it ?
+
+                        if current_flagged_validators.contains(validator) {
+                            self.notify_about_validator_reconnect(&validator, full_client);
+                        }
                     }
                 }
                 // todo: if the systems switched from block based measurement to time based measurement.

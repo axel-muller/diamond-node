@@ -981,7 +981,7 @@ impl HoneyBadgerBFT {
                     let epoch_num = 0;
                     let block_num = 0;
 
-                    // this is currently the only location where we lock early epoch manager - 
+                    // this is currently the only location where we lock early epoch manager -
                     // so this should never cause a deadlock, and we do not have to try_lock_for
                     let mut lock_guard = self.early_epoch_manager.lock();
 
@@ -1002,16 +1002,14 @@ impl HoneyBadgerBFT {
                             let epoch_start_block = 0;
 
                             // let ealry_epoch_manager
-                            *lock_guard =
-                                HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
-                                    allowed_devp2p_warmup_time,
-                                    block_chain_client,
-                                    epoch_num,
-                                    epoch_start_block,
-                                );
-                            
-                            if let Some(manager) = lock_guard.as_mut() {
+                            *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
+                                allowed_devp2p_warmup_time,
+                                block_chain_client,
+                                epoch_num,
+                                epoch_start_block,
+                            );
 
+                            if let Some(manager) = lock_guard.as_mut() {
                                 manager.decide(&memorium, block_num, block_chain_client);
                             }
                         }
