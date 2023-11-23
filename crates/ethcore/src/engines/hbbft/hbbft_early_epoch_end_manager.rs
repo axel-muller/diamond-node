@@ -81,12 +81,23 @@ impl HbbftEarlyEpochEndManager {
         full_client: &dyn BlockChainClient,
     ) /* -> result of contract call errr */
     {
+        // let mining_address = match self.signer.read().as_ref() {
+        //     Some(signer) => signer.address(),
+        //     None => {
+        //         // we do not have a signer on Full and RPC nodes.
+        //         // here is a possible performance improvement:
+        //         // this won't change during the lifetime of the application ?!
+        //         return Ok(());
+        //     }
+        // };
+
         // todo: send transaction to smart contract about missing validator.
 
         warn!(target: "engine", "early-epoch-end: notify about missing validator: {:?}", validator);
     }
 
     /// decides on the memorium data if we should update to contract data.
+    /// end executes them.
     pub fn decide(
         &mut self,
         memorium: &HbbftMessageMemorium,
@@ -133,8 +144,6 @@ impl HbbftEarlyEpochEndManager {
     }
 }
 
-
-
 /// testing early epoch stop manager.
 #[cfg(test)]
 mod tests {
@@ -142,6 +151,6 @@ mod tests {
     #[test]
     fn test_early_epoch_end() {
 
-        // should 
+        // should
     }
 }
