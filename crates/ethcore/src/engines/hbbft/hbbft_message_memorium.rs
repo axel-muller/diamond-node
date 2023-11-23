@@ -719,6 +719,10 @@ impl HbbftMessageDispatcher {
             .write()
             .report_new_epoch(staking_epoch, staking_epoch_start_block);
     }
+
+    pub fn get_memorium(&self) -> &std::sync::Arc<RwLock<HbbftMessageMemorium>> {
+        return &self.memorial;
+    }
 }
 
 pub(crate) struct HbbftMessageMemorium {
