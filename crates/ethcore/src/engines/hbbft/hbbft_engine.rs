@@ -932,6 +932,61 @@ impl HoneyBadgerBFT {
         false
     }
 
+    fn handle_early_epoch_end(
+        &self,
+        block_chain_client: &dyn BlockChainClient,
+        mining_address: Address,
+    ) {
+        if let Some(memorium) = self
+            .hbbft_message_dispatcher
+            .get_memorium()
+            .try_read_for(Duration::from_millis(300))
+        {
+            // this is currently the only location where we lock early epoch manager -
+            // so this should never cause a deadlock, and we do not have to try_lock_for
+            let mut lock_guard = self.early_epoch_manager.lock();
+
+            match lock_guard.as_mut() {
+                Some(ealry_epoch_end_manager) => {
+                    ealry_epoch_end_manager.decide(&memorium, block_chain_client);
+                }
+                None => {
+
+                    // todo: acquire allowed devp2p warmup time from contracts ?!
+                    let allowed_devp2p_warmup_time = Duration::from_secs(120);
+
+                    let hbbft_state = if let Some(s) =
+                        self.hbbft_state.try_read_for(Duration::from_millis(300))
+                    {
+                        s
+                    } else {
+                        warn!(target: "engine", "early-epoch-end: could not acquire read lock for hbbft state.");
+                        return;
+                    };
+
+                    let epoch_num = hbbft_state.get_current_posdao_epoch();
+                    let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
+
+                    // we got everything we need from hbbft_state - drop lock ASAP.
+                    std::mem::drop(hbbft_state);
+
+                    *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
+                        allowed_devp2p_warmup_time,
+                        block_chain_client,
+                        epoch_num,
+                        epoch_start_block,
+                    );
+
+                    if let Some(manager) = lock_guard.as_mut() {
+                        manager.decide(&memorium, block_chain_client);
+                    }
+                }
+            }
+        } else {
+            warn!(target: "engine", "could not acquire read lock for memorium to decide on ealry_epoch_end_manager in do_validator_engine_actions.");
+        }
+    }
+
     // some actions are required for hbbft nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
@@ -966,57 +1021,14 @@ impl HoneyBadgerBFT {
                     }
                 };
 
+                self.handle_early_epoch_end(block_chain_client, mining_address);
+
                 let should_handle_availability_announcements =
                     self.should_handle_availability_announcements();
                 let should_handle_internet_address_announcements =
                     self.should_handle_internet_address_announcements(block_chain_client);
 
                 let should_connect_to_validator_set = self.should_connect_to_validator_set();
-
-                if let Some(memorium) = self
-                    .hbbft_message_dispatcher
-                    .get_memorium()
-                    .try_read_for(Duration::from_millis(300))
-                {
-                    let epoch_num = 0;
-                    let block_num = 0;
-
-                    // this is currently the only location where we lock early epoch manager -
-                    // so this should never cause a deadlock, and we do not have to try_lock_for
-                    let mut lock_guard = self.early_epoch_manager.lock();
-
-                    match lock_guard.as_mut() {
-                        Some(ealry_epoch_end_manager) => {
-                            ealry_epoch_end_manager.decide(
-                                &memorium,
-                                block_num,
-                                block_chain_client,
-                            );
-                        }
-                        None => {
-                            warn!(target: "engine", "no Early Epoch END Manager configured found yet.");
-
-                            let allowed_devp2p_warmup_time = Duration::from_secs(120);
-
-                            // todo: get epoch start block
-                            let epoch_start_block = 0;
-
-                            // let ealry_epoch_manager
-                            *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
-                                allowed_devp2p_warmup_time,
-                                block_chain_client,
-                                epoch_num,
-                                epoch_start_block,
-                            );
-
-                            if let Some(manager) = lock_guard.as_mut() {
-                                manager.decide(&memorium, block_num, block_chain_client);
-                            }
-                        }
-                    }
-                } else {
-                    warn!(target: "engine", "could not acquire read lock for memorium to decide on ealry_epoch_end_manager in do_validator_engine_actions.");
-                }
 
                 // if we do not have to do anything, we can return early.
                 if !(should_handle_availability_announcements

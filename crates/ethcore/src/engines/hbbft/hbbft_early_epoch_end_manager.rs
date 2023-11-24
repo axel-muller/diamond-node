@@ -1,3 +1,5 @@
+use types::ids::BlockId;
+
 use crate::client::BlockChainClient;
 use std::time::{Duration, Instant};
 
@@ -118,7 +120,6 @@ impl HbbftEarlyEpochEndManager {
     pub fn decide(
         &mut self,
         memorium: &HbbftMessageMemorium,
-        block_num: u64,
         full_client: &dyn BlockChainClient,
     ) {
         // if devp2p warmup time is not over yet, we do not have to do anything.
@@ -130,6 +131,16 @@ impl HbbftEarlyEpochEndManager {
             // if we are syncing, we wont do any blaming.
             return;
         }
+
+        //full_client.
+        
+
+        let block_num = if let Some(block) = full_client.block(BlockId::Latest) { 
+            block.number()
+        } else {
+            error!(target:"engine", "could not retrieve latest block.");
+            return;
+        };
 
         let treshold: u64 = 10;
 
