@@ -932,6 +932,8 @@ impl HoneyBadgerBFT {
         false
     }
 
+    /// early epoch ends
+    /// https://github.com/DMDcoin/diamond-node/issues/87
     fn handle_early_epoch_end(
         &self,
         block_chain_client: &dyn BlockChainClient,
