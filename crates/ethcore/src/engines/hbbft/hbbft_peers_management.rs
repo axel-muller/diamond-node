@@ -158,10 +158,10 @@ impl HbbftPeersManagement {
     // a current validator.
     pub fn connect_to_current_validators(
         &mut self,
-        network_info: &NetworkInfo<NodeId>,
+        validator_set: &Vec<NodeId>,
         client_arc: &Arc<dyn EngineClient>,
     ) {
-        warn!(target: "Engine", "adding current validators as reserved peers: {}", network_info.validator_set().all_ids().count());
+        info!(target: "Engine", "adding current validators as reserved peers: {}", validator_set.len());
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
@@ -181,8 +181,6 @@ impl HbbftPeersManagement {
             return;
         }
 
-        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
-
         // let mut validators_to_remove: BTreeSet<String> =  BTreeSet::new();
 
         let mut validators_to_remove: BTreeSet<Address> = self
@@ -194,7 +192,7 @@ impl HbbftPeersManagement {
         // validators_to_remove
         let mut current_validator_connections: Vec<ValidatorConnectionData> = Vec::new();
 
-        for node in ids.iter() {
+        for node in validator_set.iter() {
             let address = public_key_to_address(&node.0);
 
             if address == self.own_validator_address {

@@ -12,6 +12,7 @@ use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
+    time::Duration,
 };
 use types::{header::Header, ids::BlockId};
 
@@ -24,6 +25,7 @@ use super::{
         validator_set::ValidatorType,
     },
     contribution::Contribution,
+    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
     hbbft_peers_management::HbbftPeersManagement,
     NodeId,
 };
@@ -73,6 +75,7 @@ impl HbbftState {
         client: Arc<dyn EngineClient>,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
         peers_management_mutex: &Mutex<HbbftPeersManagement>,
+        early_epoch_end_manager_mutex: &Mutex<Option<HbbftEarlyEpochEndManager>>,
         current_minimum_gas_price: &Mutex<Option<U256>>,
         block_id: BlockId,
         force: bool,
@@ -159,7 +162,7 @@ impl HbbftState {
         if let Some(mut peers_management) =
             peers_management_mutex.try_lock_for(std::time::Duration::from_millis(250))
         {
-            peers_management.connect_to_current_validators(&network_info, &client);
+            peers_management.connect_to_current_validators(&self.get_validator_set(), &client);
         } else {
             // maybe we should work with signals that signals that connect_to_current_validators should happen
             // instead of trying to achieve a lock here.
@@ -168,6 +171,19 @@ impl HbbftState {
             // and we are find.
             // if both nodes cannot acquire the lock, then we are busted.
             warn!(target: "engine", "could not acquire to connect to current validators on switching to new validator set for staking epoch {}.", self.current_posdao_epoch);
+        }
+
+        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+
+        if let Some(full_client) = client.as_full_client() {
+            *early_epoch_end_manager_mutex.lock() =
+                HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
+                    allowed_devp2p_warmup_time,
+                    full_client,
+                    self.current_posdao_epoch,
+                    self.current_posdao_epoch_start_block,
+                    self.get_validator_set(),
+                );
         }
 
         Some(())
@@ -542,8 +558,21 @@ impl HbbftState {
         self.network_info.clone()
     }
 
-    pub fn get_current_network_info(&self) -> Option<NetworkInfo<NodeId>> {
-        return self.network_info.clone();
+    // pub fn get_current_network_info(&self) -> &Option<NetworkInfo<NodeId>> {
+    //     return &self.network_info;
+    // }
+
+    pub fn get_validator_set(&self) -> Vec<NodeId> {
+        if let Some(network_info) = &self.network_info {
+            let result: Vec<NodeId> = network_info
+                .validator_set()
+                .all_ids()
+                .map(|n| n.clone())
+                .collect();
+            return result;
+        }
+
+        return Vec::new();
     }
 
     pub fn get_current_posdao_epoch(&self) -> u64 {

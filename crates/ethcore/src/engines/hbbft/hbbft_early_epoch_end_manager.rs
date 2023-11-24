@@ -36,6 +36,7 @@ impl HbbftEarlyEpochEndManager {
         client: &dyn BlockChainClient,
         epoch_number: u64,
         epoch_start_block: u64,
+        validator_set: Vec<NodeId>,
     ) -> Option<HbbftEarlyEpochEndManager> {
         if client.is_syncing() {
             // if we are syncing, we do not need to create an early epoch end manager yet.
@@ -58,7 +59,7 @@ impl HbbftEarlyEpochEndManager {
             start_time: Instant::now(),
             start_block: epoch_start_block,
             allowed_devp2p_warmup_time,
-            validators: Vec::new(),
+            validators: validator_set,
             flagged_validators: Self::get_current_flagged_validators_from_contracts(client),
         };
 
@@ -135,8 +136,6 @@ impl HbbftEarlyEpochEndManager {
             // if we are syncing, we wont do any blaming.
             return;
         }
-
-        //full_client.
 
         let block_num = if let Some(block) = full_client.block(BlockId::Latest) {
             block.number()

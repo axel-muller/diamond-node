@@ -952,7 +952,7 @@ impl HoneyBadgerBFT {
 
         let epoch_num = hbbft_state.get_current_posdao_epoch();
         let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
-
+        let validator_set = hbbft_state.get_validator_set();
         // we got everything we need from hbbft_state - drop lock ASAP.
         std::mem::drop(hbbft_state);
 
@@ -966,8 +966,9 @@ impl HoneyBadgerBFT {
             let mut lock_guard = self.early_epoch_manager.lock();
 
             match lock_guard.as_mut() {
-                Some(ealry_epoch_end_manager) => {
-                    ealry_epoch_end_manager.decide(&memorium, block_chain_client, mining_address);
+                Some(early_epoch_end_manager) => {
+                    // should we check here if the epoch number has changed ?
+                    early_epoch_end_manager.decide(&memorium, block_chain_client, mining_address);
                 }
                 None => {
                     *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
@@ -975,6 +976,7 @@ impl HoneyBadgerBFT {
                         block_chain_client,
                         epoch_num,
                         epoch_start_block,
+                        validator_set,
                     );
 
                     if let Some(manager) = lock_guard.as_mut() {
@@ -1093,8 +1095,11 @@ impl HoneyBadgerBFT {
                 }
 
                 if should_connect_to_validator_set {
-                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() {
-                        hbbft_state.get_current_network_info()
+                    // we
+                    let network_info_o = if let Some(hbbft_state) =
+                        self.hbbft_state.try_read_for(Duration::from_millis(50))
+                    {
+                        Some(hbbft_state.get_validator_set())
                     } else {
                         None
                     };
@@ -1414,6 +1419,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
@@ -1455,6 +1461,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
@@ -1676,6 +1683,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client.clone(),
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Hash(block_hash.clone()),
                 false,
