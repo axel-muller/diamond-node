@@ -66,14 +66,6 @@ impl HbbftEarlyEpochEndManager {
         return Some(result);
     }
 
-    /// notifies about a new epoch.
-    /// This (re)inits the Manager, no early epoch end happened.
-    pub fn notify_new_epoch(&mut self, epoch: u64, validators: Vec<NodeId>) {
-        self.current_tracked_epoch_number = epoch;
-        self.validators = validators;
-        self.start_time = Instant::now();
-    }
-
     /// retrieves the information from smart contracts which validators are currently flagged.
     fn get_current_flagged_validators_from_contracts(
         full_client: &dyn BlockChainClient,
