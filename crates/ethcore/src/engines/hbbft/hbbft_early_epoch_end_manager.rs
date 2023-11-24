@@ -1,3 +1,4 @@
+use ethereum_types::Address;
 use types::ids::BlockId;
 
 use crate::client::BlockChainClient;
@@ -84,6 +85,7 @@ impl HbbftEarlyEpochEndManager {
         &mut self,
         validator: &NodeId,
         full_client: &dyn BlockChainClient,
+        mining_address: &Address,
     ) /* -> result of contract call errr */
     {
         // let mining_address = match self.signer.read().as_ref() {
@@ -106,6 +108,7 @@ impl HbbftEarlyEpochEndManager {
         &mut self,
         validator: &NodeId,
         full_client: &dyn BlockChainClient,
+        mining_address: &Address,
     ) {
         if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
             self.flagged_validators.remove(index);
@@ -121,6 +124,7 @@ impl HbbftEarlyEpochEndManager {
         &mut self,
         memorium: &HbbftMessageMemorium,
         full_client: &dyn BlockChainClient,
+        mining_address: &Address,
     ) {
         // if devp2p warmup time is not over yet, we do not have to do anything.
         if self.start_time.elapsed() < self.allowed_devp2p_warmup_time {
@@ -133,9 +137,8 @@ impl HbbftEarlyEpochEndManager {
         }
 
         //full_client.
-        
 
-        let block_num = if let Some(block) = full_client.block(BlockId::Latest) { 
+        let block_num = if let Some(block) = full_client.block(BlockId::Latest) {
             block.number()
         } else {
             error!(target:"engine", "could not retrieve latest block.");
@@ -162,14 +165,22 @@ impl HbbftEarlyEpochEndManager {
 
                         if !self.flagged_validators.contains(validator) {
                             // this function will also add the validator to the list of flagged validators.
-                            self.notify_about_missing_validator(&validator, full_client);
+                            self.notify_about_missing_validator(
+                                &validator,
+                                full_client,
+                                mining_address,
+                            );
                         }
                     } else {
                         // this validator is OK.
                         // maybe it was flagged and we need to unflag it ?
 
                         if self.flagged_validators.contains(validator) {
-                            self.notify_about_validator_reconnect(&validator, full_client);
+                            self.notify_about_validator_reconnect(
+                                &validator,
+                                full_client,
+                                mining_address,
+                            );
                         }
                     }
                 }

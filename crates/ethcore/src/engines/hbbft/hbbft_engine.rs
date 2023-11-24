@@ -935,8 +935,25 @@ impl HoneyBadgerBFT {
     fn handle_early_epoch_end(
         &self,
         block_chain_client: &dyn BlockChainClient,
-        mining_address: Address,
+        mining_address: &Address,
     ) {
+        // todo: acquire allowed devp2p warmup time from contracts ?!
+        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+
+        let hbbft_state = if let Some(s) = self.hbbft_state.try_read_for(Duration::from_millis(300))
+        {
+            s
+        } else {
+            warn!(target: "engine", "early-epoch-end: could not acquire read lock for hbbft state.");
+            return;
+        };
+
+        let epoch_num = hbbft_state.get_current_posdao_epoch();
+        let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
+
+        // we got everything we need from hbbft_state - drop lock ASAP.
+        std::mem::drop(hbbft_state);
+
         if let Some(memorium) = self
             .hbbft_message_dispatcher
             .get_memorium()
@@ -948,28 +965,9 @@ impl HoneyBadgerBFT {
 
             match lock_guard.as_mut() {
                 Some(ealry_epoch_end_manager) => {
-                    ealry_epoch_end_manager.decide(&memorium, block_chain_client);
+                    ealry_epoch_end_manager.decide(&memorium, block_chain_client, mining_address);
                 }
                 None => {
-
-                    // todo: acquire allowed devp2p warmup time from contracts ?!
-                    let allowed_devp2p_warmup_time = Duration::from_secs(120);
-
-                    let hbbft_state = if let Some(s) =
-                        self.hbbft_state.try_read_for(Duration::from_millis(300))
-                    {
-                        s
-                    } else {
-                        warn!(target: "engine", "early-epoch-end: could not acquire read lock for hbbft state.");
-                        return;
-                    };
-
-                    let epoch_num = hbbft_state.get_current_posdao_epoch();
-                    let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
-
-                    // we got everything we need from hbbft_state - drop lock ASAP.
-                    std::mem::drop(hbbft_state);
-
                     *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
                         allowed_devp2p_warmup_time,
                         block_chain_client,
@@ -978,7 +976,7 @@ impl HoneyBadgerBFT {
                     );
 
                     if let Some(manager) = lock_guard.as_mut() {
-                        manager.decide(&memorium, block_chain_client);
+                        manager.decide(&memorium, block_chain_client, mining_address);
                     }
                 }
             }
@@ -1021,7 +1019,7 @@ impl HoneyBadgerBFT {
                     }
                 };
 
-                self.handle_early_epoch_end(block_chain_client, mining_address);
+                self.handle_early_epoch_end(block_chain_client, &mining_address);
 
                 let should_handle_availability_announcements =
                     self.should_handle_availability_announcements();
