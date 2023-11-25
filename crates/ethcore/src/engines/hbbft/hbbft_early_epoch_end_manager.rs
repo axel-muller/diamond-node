@@ -148,6 +148,7 @@ impl HbbftEarlyEpochEndManager {
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
             for validator in &self.validators.clone() {
+                // we need to exclude ourself.
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
                     let last_sealing_message = node_history.get_sealing_message();
 
@@ -173,6 +174,16 @@ impl HbbftEarlyEpochEndManager {
                                 mining_address,
                             );
                         }
+                    }
+                } else {
+                    // we do not have any history for this node.
+                    if !self.flagged_validators.contains(validator) {
+                        // this function will also add the validator to the list of flagged validators.
+                        self.notify_about_missing_validator(
+                            &validator,
+                            full_client,
+                            mining_address,
+                        );
                     }
                 }
                 // todo: if the systems switched from block based measurement to time based measurement.
