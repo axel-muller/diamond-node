@@ -954,8 +954,7 @@ impl HoneyBadgerBFT {
         let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
         let mut validator_set = hbbft_state.get_validator_set();
         // todo: remove own node from validator set.
-        
-        
+
         // we got everything we need from hbbft_state - drop lock ASAP.
         std::mem::drop(hbbft_state);
 

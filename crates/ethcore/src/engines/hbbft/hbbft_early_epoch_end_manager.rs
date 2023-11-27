@@ -1,7 +1,7 @@
 use ethereum_types::Address;
 use types::ids::BlockId;
 
-use crate::client::BlockChainClient;
+use crate::{client::BlockChainClient, ethereum::public_key_to_address::public_key_to_address};
 use std::time::{Duration, Instant};
 
 use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId};
@@ -148,6 +148,12 @@ impl HbbftEarlyEpochEndManager {
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
             for validator in &self.validators.clone() {
+                let validator_eth_address = public_key_to_address(&validator.0);
+                // we do not have to check ourself.
+                if validator_eth_address == *mining_address {
+                    continue;
+                }
+
                 // we need to exclude ourself.
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
                     let last_sealing_message = node_history.get_sealing_message();
