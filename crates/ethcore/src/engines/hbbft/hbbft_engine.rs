@@ -1713,18 +1713,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
-    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
-        self.hbbft_message_dispatcher.prometheus_metrics(registry);
-        if let Some(early_epoch_manager_option) = self
-            .early_epoch_manager
-            .try_lock_for(Duration::from_millis(250))
-        {
-            if let Some(early_epoch_manager) = early_epoch_manager_option.as_ref() {
-                early_epoch_manager.prometheus_metrics(registry);
-            }
-        }
-    }
-
     /// hbbft protects the start of the current posdao epoch start from being pruned.
     fn pruning_protection_block_number(&self) -> Option<u64> {
         // we try to get a read lock for 500 ms.
@@ -1741,6 +1729,21 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             // https://github.com/DMDcoin/diamond-node/issues/68
             warn!(target: "engine", "could not aquire read lock for retrieving the pruning_protection_block_number. Stage 3 verification error might follow up.");
             return None;
+        }
+    }
+}
+
+impl PrometheusMetrics for HoneyBadgerBFT {
+
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        self.hbbft_message_dispatcher.prometheus_metrics(registry);
+        if let Some(early_epoch_manager_option) = self
+            .early_epoch_manager
+            .try_lock_for(Duration::from_millis(250))
+        {
+            if let Some(early_epoch_manager) = early_epoch_manager_option.as_ref() {
+                early_epoch_manager.prometheus_metrics(registry);
+            }
         }
     }
 }
