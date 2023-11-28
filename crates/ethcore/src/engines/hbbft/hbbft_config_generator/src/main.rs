@@ -46,7 +46,7 @@ impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        let port = 31300usize + self.idx;
+        let port = 30300usize + self.idx;
         format!("enode://{:x}@{}:{}", self.public, self.ip, port)
     }
 }
