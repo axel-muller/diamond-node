@@ -1,4 +1,5 @@
 use ethereum_types::Address;
+use stats::PrometheusMetrics;
 use types::ids::BlockId;
 
 use crate::{client::BlockChainClient, ethereum::public_key_to_address::public_key_to_address};
@@ -203,6 +204,26 @@ impl HbbftEarlyEpochEndManager {
     }
 }
 
+impl PrometheusMetrics for HbbftEarlyEpochEndManager {
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        registry.register_gauge(
+            "early_epoch_end_flagged_validators",
+            "number of validators flagged for missing communication",
+            self.flagged_validators.len() as i64,
+        );
+
+        for v in self.validators.iter() {
+            let is_flagged = self.flagged_validators.contains(v);
+            let label_value = v.as_8_byte_string();
+            registry.register_gauge_with_other_node_label(
+                "early_epoch_end_flag",
+                "node has flagged other_node [0-1]",
+                label_value.as_str(),
+                is_flagged as i64,
+            );
+        }
+    }
+}
 /// testing early epoch stop manager.
 #[cfg(test)]
 mod tests {
