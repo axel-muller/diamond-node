@@ -112,9 +112,9 @@ fn to_toml(
     base_metrics_port: Option<u16>,
     metrics_interface: Option<&str>,
 ) -> Value {
-    let base_port = 31300i64;
-    let base_rpc_port = 18540i64;
-    let base_ws_port = 19540i64;
+    let base_port = 30300i64;
+    let base_rpc_port = 8540i64;
+    let base_ws_port = 9540i64;
 
     let mut parity = Map::new();
     match config_type {
