@@ -1715,6 +1715,14 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
+        if let Some(early_epoch_manager_option) = self
+            .early_epoch_manager
+            .try_lock_for(Duration::from_millis(250))
+        {
+            if let Some(early_epoch_manager) = early_epoch_manager_option.as_ref() {
+                early_epoch_manager.prometheus_metrics(registry);
+            }
+        }
     }
 
     /// hbbft protects the start of the current posdao epoch start from being pruned.
