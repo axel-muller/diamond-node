@@ -1734,7 +1734,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 }
 
 impl PrometheusMetrics for HoneyBadgerBFT {
-
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
         if let Some(early_epoch_manager_option) = self

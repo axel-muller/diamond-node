@@ -207,7 +207,13 @@ impl HbbftEarlyEpochEndManager {
 impl PrometheusMetrics for HbbftEarlyEpochEndManager {
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         registry.register_gauge(
-            "early_epoch_end_flagged_validators",
+            "early_epoch_end_staking_epoch",
+            "staking epoch information for early epoch end manager",
+            self.current_tracked_epoch_number as i64,
+        );
+
+        registry.register_gauge(
+            "early_epoch_end_num_flagged_validators",
             "number of validators flagged for missing communication",
             self.flagged_validators.len() as i64,
         );
