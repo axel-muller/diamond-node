@@ -1731,9 +1731,9 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             return None;
         }
     }
-}
 
-impl PrometheusMetrics for HoneyBadgerBFT {
+    // note: this is by design not part of the PrometheusMetrics trait,
+    // it is part of the Engine trait and does nothing by default.
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
         if let Some(early_epoch_manager_option) = self
