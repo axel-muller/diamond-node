@@ -182,9 +182,10 @@ impl NodeStakingEpochHistory {
 
         if block_num > last_message_faulty {
             self.last_message_faulty = block_num;
-        } else {
-            warn!(target: "hbbft_message_memorium", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
-        }
+        } // else {
+          // this log entry is trigering often, probably there are more than 1 good messages able per block.// this log entry is trigering often, probably there are more than 1 good messages able per block.
+          // warn!(target: "hbbft_message_memorium", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
+          // }
         self.num_faulty_messages += 1;
     }
 
@@ -195,9 +196,10 @@ impl NodeStakingEpochHistory {
 
         if block_num > last_message_good {
             self.last_message_good = block_num;
-        } else {
-            warn!(target: "hbbft_message_memorium", "add_message_event_good: event.block_num {block_num} <= last_message_good {last_message_good}");
-        }
+        } // else {
+          // this log entry is trigering often, probably there are more than 1 good messages able per block.
+          // warn!(target: "hbbft_message_memorium", "add_message_event_good: ! event.block_num {block_num} > last_message_good {last_message_good}");
+          // }
         self.num_good_messages += 1;
     }
 
@@ -1242,6 +1244,17 @@ impl PrometheusMetrics for StakingEpochHistory {
 impl PrometheusMetrics for HbbftMessageMemorium {
     fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
         //let epoch_history_len = self.staking_epoch_history.len() as i64;
+
+        // r.register_gauge(
+        //     "HbbftMessageMemorium_dispatched_message_event_faulty",
+        //     "dispatched_message_event_faulty",
+        //     self.dispatched_message_event_faulty.len() as i64,
+        // );
+        // r.register_gauge(
+        //     "HbbftMessageMemorium_dispatched_message_event_good",
+        //     "dispatched_message_event_good",
+        //     self.dispatched_message_event_good.len() as i64,
+        // );
 
         if let Some(history) = self.staking_epoch_history.iter().last() {
             history.prometheus_metrics(r);
