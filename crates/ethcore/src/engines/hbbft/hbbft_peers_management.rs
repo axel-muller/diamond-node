@@ -245,10 +245,10 @@ impl HbbftPeersManagement {
         self.connected_current_validators = current_validator_connections;
     }
 
-    // if we drop out as a current validator,
-    // as well a pending validator, we should drop
-    // all reserved connections.
-    // in later addition, we will keep the Partner Node Connections here. (upcomming feature)
+    /// if we drop out as a current validator,
+    /// as well a pending validator, we should drop
+    /// all reserved connections.
+    /// in later addition, we will keep the Partner Node Connections here. (upcomming feature)
     pub fn disconnect_all_validators(&mut self, client_arc: &Arc<dyn EngineClient>) {
         // we safely can disconnect even in situation where we are syncing.
 
