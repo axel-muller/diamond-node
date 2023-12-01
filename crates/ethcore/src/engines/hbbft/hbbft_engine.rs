@@ -979,6 +979,7 @@ impl HoneyBadgerBFT {
                         epoch_num,
                         epoch_start_block,
                         validator_set,
+                        mining_address,
                     );
 
                     if let Some(manager) = lock_guard.as_mut() {

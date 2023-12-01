@@ -38,6 +38,7 @@ impl HbbftEarlyEpochEndManager {
         epoch_number: u64,
         epoch_start_block: u64,
         validator_set: Vec<NodeId>,
+        signing_address: &Address,
     ) -> Option<HbbftEarlyEpochEndManager> {
         if client.is_syncing() {
             // if we are syncing, we do not need to create an early epoch end manager yet.
@@ -51,6 +52,12 @@ impl HbbftEarlyEpochEndManager {
             return None;
         }
 
+        let validators: Vec<NodeId> = validator_set
+            .iter()
+            .filter(|n| public_key_to_address(&n.0) != *signing_address)
+            .cloned()
+            .collect();
+
         // figure out if we have to retrieve the data from the smart contracts.
         // if the epoch start did just happen,
         // we do not have to retrieve the data from the smart contracts.
@@ -60,7 +67,7 @@ impl HbbftEarlyEpochEndManager {
             start_time: Instant::now(),
             start_block: epoch_start_block,
             allowed_devp2p_warmup_time,
-            validators: validator_set,
+            validators: validators,
             flagged_validators: Self::get_current_flagged_validators_from_contracts(client),
         };
 
@@ -149,12 +156,6 @@ impl HbbftEarlyEpochEndManager {
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
             for validator in &self.validators.clone() {
-                let validator_eth_address = public_key_to_address(&validator.0);
-                // we do not have to check ourself.
-                if validator_eth_address == *mining_address {
-                    continue;
-                }
-
                 // we need to exclude ourself.
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
                     let last_sealing_message = node_history.get_sealing_message();

@@ -176,6 +176,13 @@ impl HbbftState {
         let allowed_devp2p_warmup_time = Duration::from_secs(120);
 
         if let Some(full_client) = client.as_full_client() {
+            let signing_address = if let Some(s) = signer.read().as_ref() {
+                s.address()
+            } else {
+                error!(target: "engine", "early epoch manager: signer is not set!");
+                ethereum_types::Address::zero()
+            };
+
             *early_epoch_end_manager_mutex.lock() =
                 HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
                     allowed_devp2p_warmup_time,
@@ -183,6 +190,7 @@ impl HbbftState {
                     self.current_posdao_epoch,
                     self.current_posdao_epoch_start_block,
                     self.get_validator_set(),
+                    &signing_address,
                 );
         }
 
