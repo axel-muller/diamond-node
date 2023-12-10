@@ -62,14 +62,18 @@ impl HbbftEarlyEpochEndManager {
         // if the epoch start did just happen,
         // we do not have to retrieve the data from the smart contracts.
 
+        let now = Instant::now();
+
         let result = Self {
             current_tracked_epoch_number: epoch_number,
-            start_time: Instant::now(),
+            start_time: now,
             start_block: epoch_start_block,
             allowed_devp2p_warmup_time,
             validators: validators,
             flagged_validators: Self::get_current_flagged_validators_from_contracts(client),
         };
+
+        info!(target: "engine", "early-epoch-end: HbbftEarlyEpochEndManager created. start_time {now:?}, start_block: {epoch_start_block}");
 
         return Some(result);
     }
