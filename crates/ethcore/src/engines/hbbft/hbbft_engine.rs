@@ -1432,7 +1432,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
                     // we got all infos from the state, we can drop the lock.
                     std::mem::drop(state);
-                    warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
+                    info!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
                     self.hbbft_message_dispatcher
                         .report_new_epoch(posdao_epoch, epoch_start_block);
                 }
