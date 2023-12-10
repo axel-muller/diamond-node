@@ -133,11 +133,14 @@ impl HbbftEarlyEpochEndManager {
     ) {
         // if devp2p warmup time is not over yet, we do not have to do anything.
         if self.start_time.elapsed() < self.allowed_devp2p_warmup_time {
+            debug!(target: "engine", "early-epoch-end: no decision: Devp2p warmup time");
+        } else {
             return;
         }
 
         if full_client.is_syncing() {
             // if we are syncing, we wont do any blaming.
+            debug!(target: "engine", "early-epoch-end: no decision: syncing");
             return;
         }
 
@@ -153,6 +156,7 @@ impl HbbftEarlyEpochEndManager {
         if self.start_block + treshold < block_num {
             // not enought blocks have passed this epoch,
             // to judge other nodes.
+            debug!(target: "engine", "early-epoch-end: no decision: not enough blocks.");
             return;
         }
 
@@ -166,7 +170,6 @@ impl HbbftEarlyEpochEndManager {
 
                     if last_sealing_message < block_num - treshold {
                         // we do not have to send notification, if we already did so.
-
                         if !self.flagged_validators.contains(validator) {
                             // this function will also add the validator to the list of flagged validators.
                             self.notify_about_missing_validator(
@@ -188,6 +191,7 @@ impl HbbftEarlyEpochEndManager {
                         }
                     }
                 } else {
+                    debug!(target: "engine", "early-epoch-end: no history info for validator {validator}");
                     // we do not have any history for this node.
                     if !self.flagged_validators.contains(validator) {
                         // this function will also add the validator to the list of flagged validators.
