@@ -952,8 +952,7 @@ impl HoneyBadgerBFT {
 
         let epoch_num = hbbft_state.get_current_posdao_epoch();
         let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
-        let mut validator_set = hbbft_state.get_validator_set();
-        // todo: remove own node from validator set.
+        let validator_set = hbbft_state.get_validator_set();
 
         // we got everything we need from hbbft_state - drop lock ASAP.
         std::mem::drop(hbbft_state);
@@ -988,7 +987,7 @@ impl HoneyBadgerBFT {
                 }
             }
         } else {
-            warn!(target: "engine", "could not acquire read lock for memorium to decide on ealry_epoch_end_manager in do_validator_engine_actions.");
+            warn!(target: "engine", "early-epoch-end: could not acquire read lock for memorium to decide on ealry_epoch_end_manager in do_validator_engine_actions.");
         }
     }
 
@@ -1014,7 +1013,7 @@ impl HoneyBadgerBFT {
                         // here is a possible performance improvement:
                         // this won't change during the lifetime of the application ?!
                         return Ok(());
-                    }
+                    }   
                 };
 
                 let engine_client = client_arc.deref();
