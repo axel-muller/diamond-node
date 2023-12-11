@@ -207,7 +207,7 @@ impl KeygenTransactionSender {
 							    Some(ack) => ack,
 							    None => {
 							        trace!(target:"engine", "could not retrieve part for {}", *v);
-							        return Err(CallError::ReturnValueInvalid);
+							        return Ok(());
 							    }
 							}
 					}
