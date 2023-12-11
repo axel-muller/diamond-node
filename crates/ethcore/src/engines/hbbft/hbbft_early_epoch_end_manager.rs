@@ -134,7 +134,6 @@ impl HbbftEarlyEpochEndManager {
         // if devp2p warmup time is not over yet, we do not have to do anything.
         if self.start_time.elapsed() < self.allowed_devp2p_warmup_time {
             debug!(target: "engine", "early-epoch-end: no decision: Devp2p warmup time");
-        } else {
             return;
         }
 
