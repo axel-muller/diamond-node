@@ -3,3 +3,4 @@ pub mod permission;
 pub mod random_hbbft;
 pub mod staking;
 pub mod validator_set;
+pub mod connectivity_tracker_hbbft;
