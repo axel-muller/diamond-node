@@ -152,7 +152,7 @@ impl HbbftEarlyEpochEndManager {
 
         let treshold: u64 = 10;
 
-        if self.start_block + treshold < block_num {
+        if block_num < self.start_block + treshold {
             // not enought blocks have passed this epoch,
             // to judge other nodes.
             debug!(target: "engine", "early-epoch-end: no decision: not enough blocks.");
