@@ -146,7 +146,7 @@ impl HbbftEarlyEpochEndManager {
         let block_num = if let Some(block) = full_client.block(BlockId::Latest) {
             block.number()
         } else {
-            error!(target:"engine", "could not retrieve latest block.");
+            error!(target:"engine", "early-epoch-end: could not retrieve latest block.");
             return;
         };
 
