@@ -187,6 +187,7 @@ impl HbbftState {
                 HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
                     allowed_devp2p_warmup_time,
                     full_client,
+                    client.as_ref(),
                     self.current_posdao_epoch,
                     self.current_posdao_epoch_start_block,
                     self.get_validator_set(),

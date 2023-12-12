@@ -937,6 +937,7 @@ impl HoneyBadgerBFT {
     fn handle_early_epoch_end(
         &self,
         block_chain_client: &dyn BlockChainClient,
+        engine_client: &dyn EngineClient,
         mining_address: &Address,
     ) {
         // todo: acquire allowed devp2p warmup time from contracts ?!
@@ -975,6 +976,7 @@ impl HoneyBadgerBFT {
                     *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
                         allowed_devp2p_warmup_time,
                         block_chain_client,
+                        engine_client,
                         epoch_num,
                         epoch_start_block,
                         validator_set,
@@ -1025,7 +1027,7 @@ impl HoneyBadgerBFT {
                     }
                 };
 
-                self.handle_early_epoch_end(block_chain_client, &mining_address);
+                self.handle_early_epoch_end(block_chain_client, engine_client, &mining_address);
 
                 let should_handle_availability_announcements =
                     self.should_handle_availability_announcements();
