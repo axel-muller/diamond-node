@@ -77,3 +77,35 @@ pub fn report_missing_connectivity(
     
 }
 
+
+pub fn report_reconnect(
+    client: &dyn EngineClient,
+    full_client: &dyn BlockChainClient,
+    reconnected_validator: &Address,
+    signing_address: &Address,
+) -> bool  {
+    
+    let (block_number, block_hash) = get_block_data(client);
+    if block_number == 0 {
+        return false;
+    }
+
+    let send_data = connectivity_tracker_hbbft_contract::functions::report_reconnect::call(
+        *reconnected_validator,
+        block_number,
+        block_hash
+    );
+
+    let nonce = full_client.next_nonce(signing_address);
+
+    let transaction = TransactionRequest::call(*CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS, send_data.0)
+    .gas(U256::from(200_000))
+    .nonce(nonce);
+
+    info!(target:"consensus", "early-epoch-end: sending report_missing_connectivity for with nonce: {nonce}, missing: {:?} ", reconnected_validator);
+    if let Err(e) = full_client.transact_silently(transaction) {
+        warn!(target:"consensus", "early-epoch-end: could not report_missing_connectivity {e:?}");
+        return false;
+    }
+    return true;
+}

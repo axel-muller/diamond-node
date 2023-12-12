@@ -5,7 +5,7 @@ use types::ids::BlockId;
 use crate::{client::{BlockChainClient, EngineClient}, ethereum::public_key_to_address::public_key_to_address, engines::hbbft::contracts::connectivity_tracker_hbbft::report_missing_connectivity};
 use std::{time::{Duration, Instant}, collections::BTreeMap};
 
-use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId, contracts::connectivity_tracker_hbbft::get_current_flagged_validators_from_contract};
+use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId, contracts::connectivity_tracker_hbbft::{get_current_flagged_validators_from_contract, report_reconnect}};
 
 pub(crate) struct HbbftEarlyEpochEndManager {
     /// The current epoch number.
@@ -156,12 +156,23 @@ impl HbbftEarlyEpochEndManager {
         &mut self,
         validator: &NodeId,
         full_client: &dyn BlockChainClient,
+        engine_client: &dyn EngineClient
     ) {
-        if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
-            self.flagged_validators.remove(index);
-            warn!(target: "engine", "TODO: early-epoch-end: notify about reconnected validator: {:?}", validator);
+
+        let index = if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
+            index
         } else {
-            error!(target: "engine", " Could not find reconnected validator in flagged validators.");
+            error!(target: "engine", "early-epoch-end: notify_about_validator_reconnect Could not find reconnected validator in flagged validators.");
+            return;
+        };
+
+        if let Some(validator_address) = self.node_id_to_address.get(validator) {
+            if report_reconnect(engine_client, full_client, validator_address, &self.signing_address) {
+                self.flagged_validators.remove(index);
+            }
+        } else {
+            warn!("Could not find validator_address for node id in cache: {validator:?}");
+            return;
         }
     }
 
@@ -227,6 +238,7 @@ impl HbbftEarlyEpochEndManager {
                             self.notify_about_validator_reconnect(
                                 &validator,
                                 full_client,
+                                client
                             );
                         }
                     }
