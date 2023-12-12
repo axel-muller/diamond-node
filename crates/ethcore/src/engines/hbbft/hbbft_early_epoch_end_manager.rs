@@ -2,10 +2,23 @@ use ethereum_types::Address;
 use stats::PrometheusMetrics;
 use types::ids::BlockId;
 
-use crate::{client::{BlockChainClient, EngineClient}, ethereum::public_key_to_address::public_key_to_address, engines::hbbft::contracts::connectivity_tracker_hbbft::report_missing_connectivity};
-use std::{time::{Duration, Instant}, collections::BTreeMap};
+use crate::{
+    client::{BlockChainClient, EngineClient},
+    engines::hbbft::contracts::connectivity_tracker_hbbft::report_missing_connectivity,
+    ethereum::public_key_to_address::public_key_to_address,
+};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, Instant},
+};
 
-use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId, contracts::connectivity_tracker_hbbft::{get_current_flagged_validators_from_contract, report_reconnect}};
+use super::{
+    contracts::connectivity_tracker_hbbft::{
+        get_current_flagged_validators_from_contract, report_reconnect,
+    },
+    hbbft_message_memorium::HbbftMessageMemorium,
+    NodeId,
+};
 
 pub(crate) struct HbbftEarlyEpochEndManager {
     /// The current epoch number.
@@ -26,13 +39,11 @@ pub(crate) struct HbbftEarlyEpochEndManager {
     /// only grow up to 7 elements for a usual set of 25 nodes.
     flagged_validators: Vec<NodeId>,
 
-
     node_id_to_address: BTreeMap<NodeId, Address>,
-
 
     address_to_node_id: BTreeMap<Address, NodeId>,
 
-    signing_address: Address
+    signing_address: Address,
 }
 
 impl HbbftEarlyEpochEndManager {
@@ -49,7 +60,6 @@ impl HbbftEarlyEpochEndManager {
         validator_set: Vec<NodeId>,
         signing_address: &Address,
     ) -> Option<HbbftEarlyEpochEndManager> {
-
         if client.is_syncing() {
             // if we are syncing, we do not need to create an early epoch end manager yet.
             // if we are syncing as a validator, and it is really this epoch,
@@ -62,13 +72,12 @@ impl HbbftEarlyEpochEndManager {
             return None;
         }
 
-        let mut node_id_to_address:  BTreeMap<NodeId, Address> = BTreeMap::new();
+        let mut node_id_to_address: BTreeMap<NodeId, Address> = BTreeMap::new();
         let mut address_to_node_id: BTreeMap<Address, NodeId> = BTreeMap::new();
 
         let mut validators: Vec<NodeId> = Vec::new();
 
         for validator in validator_set.iter() {
-
             let address = public_key_to_address(&validator.0);
             node_id_to_address.insert(validator.clone(), address);
             address_to_node_id.insert(address, validator.clone());
@@ -78,7 +87,7 @@ impl HbbftEarlyEpochEndManager {
             }
 
             validators.push(validator.clone());
-        };
+        }
 
         // figure out if we have to retrieve the data from the smart contracts.
         // if the epoch start did just happen,
@@ -91,7 +100,11 @@ impl HbbftEarlyEpochEndManager {
             start_block: epoch_start_block,
             allowed_devp2p_warmup_time,
             validators: validators,
-            flagged_validators: Self::get_current_flagged_validators_from_contracts(engine_client, BlockId::Latest, &address_to_node_id),
+            flagged_validators: Self::get_current_flagged_validators_from_contracts(
+                engine_client,
+                BlockId::Latest,
+                &address_to_node_id,
+            ),
             node_id_to_address,
             address_to_node_id,
             signing_address: signing_address.clone(),
@@ -106,16 +119,16 @@ impl HbbftEarlyEpochEndManager {
     fn get_current_flagged_validators_from_contracts(
         client: &dyn EngineClient,
         block_id: BlockId,
-        address_to_node_id: &BTreeMap<Address, NodeId>
+        address_to_node_id: &BTreeMap<Address, NodeId>,
     ) -> Vec<NodeId> {
         // todo: call smart contract.
 
         match get_current_flagged_validators_from_contract(client, block_id) {
             Ok(v) => {
-                let mut result : Vec<NodeId> = Vec::new();
+                let mut result: Vec<NodeId> = Vec::new();
 
                 for a in v.iter() {
-                    if let Some(node_id) =  address_to_node_id.get(a) {
+                    if let Some(node_id) = address_to_node_id.get(a) {
                         result.push(node_id.clone());
                     } else {
                         error!(target: "engine","early-epoch-end: could not find validator in address cache: {a:?}");
@@ -124,42 +137,43 @@ impl HbbftEarlyEpochEndManager {
 
                 return result;
                 // address_to_node_id.get(key)
-            },
+            }
             Err(e) => {
                 error!(target: "engine","early-epoch-end: could not get_current_flagged_validators_from_contracts {e:?}" );
                 Vec::new()
-            },
+            }
         }
-
-        
     }
 
     fn notify_about_missing_validator(
         &mut self,
         validator: &NodeId,
         client: &dyn EngineClient,
-        full_client: &dyn BlockChainClient)
-    {
-
+        full_client: &dyn BlockChainClient,
+    ) {
         if let Some(validator_address) = self.node_id_to_address.get(validator) {
-            if report_missing_connectivity(client, full_client, validator_address, &self.signing_address) {
+            if report_missing_connectivity(
+                client,
+                full_client,
+                validator_address,
+                &self.signing_address,
+            ) {
                 self.flagged_validators.push(validator.clone());
             }
         } else {
             warn!("Could not find validator_address for node id in cache: {validator:?}");
             return;
         }
-        
     }
 
     fn notify_about_validator_reconnect(
         &mut self,
         validator: &NodeId,
         full_client: &dyn BlockChainClient,
-        engine_client: &dyn EngineClient
+        engine_client: &dyn EngineClient,
     ) {
-
-        let index = if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
+        let index = if let Some(index) = self.flagged_validators.iter().position(|x| x == validator)
+        {
             index
         } else {
             error!(target: "engine", "early-epoch-end: notify_about_validator_reconnect Could not find reconnected validator in flagged validators.");
@@ -167,7 +181,12 @@ impl HbbftEarlyEpochEndManager {
         };
 
         if let Some(validator_address) = self.node_id_to_address.get(validator) {
-            if report_reconnect(engine_client, full_client, validator_address, &self.signing_address) {
+            if report_reconnect(
+                engine_client,
+                full_client,
+                validator_address,
+                &self.signing_address,
+            ) {
                 self.flagged_validators.remove(index);
             }
         } else {
@@ -224,22 +243,14 @@ impl HbbftEarlyEpochEndManager {
                         // we do not have to send notification, if we already did so.
                         if !self.flagged_validators.contains(validator) {
                             // this function will also add the validator to the list of flagged validators.
-                            self.notify_about_missing_validator(
-                                &validator,
-                                client,
-                                full_client
-                            );
+                            self.notify_about_missing_validator(&validator, client, full_client);
                         }
                     } else {
                         // this validator is OK.
                         // maybe it was flagged and we need to unflag it ?
 
                         if self.flagged_validators.contains(validator) {
-                            self.notify_about_validator_reconnect(
-                                &validator,
-                                full_client,
-                                client
-                            );
+                            self.notify_about_validator_reconnect(&validator, full_client, client);
                         }
                     }
                 } else {
@@ -247,11 +258,7 @@ impl HbbftEarlyEpochEndManager {
                     // we do not have any history for this node.
                     if !self.flagged_validators.contains(validator) {
                         // this function will also add the validator to the list of flagged validators.
-                        self.notify_about_missing_validator(
-                            &validator,
-                            client,
-                            full_client
-                        );
+                        self.notify_about_missing_validator(&validator, client, full_client);
                     }
                 }
                 // todo: if the systems switched from block based measurement to time based measurement.

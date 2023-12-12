@@ -1015,7 +1015,7 @@ impl HoneyBadgerBFT {
                         // here is a possible performance improvement:
                         // this won't change during the lifetime of the application ?!
                         return Ok(());
-                    }   
+                    }
                 };
 
                 let engine_client = client_arc.deref();
