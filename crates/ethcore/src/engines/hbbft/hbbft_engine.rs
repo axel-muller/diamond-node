@@ -970,7 +970,7 @@ impl HoneyBadgerBFT {
             match lock_guard.as_mut() {
                 Some(early_epoch_end_manager) => {
                     // should we check here if the epoch number has changed ?
-                    early_epoch_end_manager.decide(&memorium, block_chain_client, mining_address);
+                    early_epoch_end_manager.decide(&memorium, block_chain_client, engine_client);
                 }
                 None => {
                     *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
@@ -984,7 +984,7 @@ impl HoneyBadgerBFT {
                     );
 
                     if let Some(manager) = lock_guard.as_mut() {
-                        manager.decide(&memorium, block_chain_client, mining_address);
+                        manager.decide(&memorium, block_chain_client, engine_client);
                     }
                 }
             }

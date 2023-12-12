@@ -2,7 +2,7 @@ use ethereum_types::Address;
 use stats::PrometheusMetrics;
 use types::ids::BlockId;
 
-use crate::{client::{BlockChainClient, EngineClient}, ethereum::public_key_to_address::public_key_to_address};
+use crate::{client::{BlockChainClient, EngineClient}, ethereum::public_key_to_address::public_key_to_address, engines::hbbft::contracts::connectivity_tracker_hbbft::report_missing_connectivity};
 use std::{time::{Duration, Instant}, collections::BTreeMap};
 
 use super::{hbbft_message_memorium::HbbftMessageMemorium, NodeId, contracts::connectivity_tracker_hbbft::get_current_flagged_validators_from_contract};
@@ -31,6 +31,8 @@ pub(crate) struct HbbftEarlyEpochEndManager {
 
 
     address_to_node_id: BTreeMap<Address, NodeId>,
+
+    signing_address: Address
 }
 
 impl HbbftEarlyEpochEndManager {
@@ -92,6 +94,7 @@ impl HbbftEarlyEpochEndManager {
             flagged_validators: Self::get_current_flagged_validators_from_contracts(engine_client, BlockId::Latest, &address_to_node_id),
             node_id_to_address,
             address_to_node_id,
+            signing_address: signing_address.clone(),
         };
 
         info!(target: "engine", "early-epoch-end: HbbftEarlyEpochEndManager created. start_time {now:?}, start_block: {epoch_start_block}");
@@ -134,31 +137,25 @@ impl HbbftEarlyEpochEndManager {
     fn notify_about_missing_validator(
         &mut self,
         validator: &NodeId,
-        full_client: &dyn BlockChainClient,
-        mining_address: &Address,
-    ) /* -> result of contract call errr */
+        client: &dyn EngineClient,
+        full_client: &dyn BlockChainClient)
     {
-        // let mining_address = match self.signer.read().as_ref() {
-        //     Some(signer) => signer.address(),
-        //     None => {
-        //         // we do not have a signer on Full and RPC nodes.
-        //         // here is a possible performance improvement:
-        //         // this won't change during the lifetime of the application ?!
-        //         return Ok(());
-        //     }
-        // };
 
-        // todo: send transaction to smart contract about missing validator.
-
-        self.flagged_validators.push(validator.clone());
-        warn!(target: "engine", "TODO: early-epoch-end: notify about missing validator: {:?}", validator);
+        if let Some(validator_address) = self.node_id_to_address.get(validator) {
+            if report_missing_connectivity(client, full_client, validator_address, &self.signing_address) {
+                self.flagged_validators.push(validator.clone());
+            }
+        } else {
+            warn!("Could not find validator_address for node id in cache: {validator:?}");
+            return;
+        }
+        
     }
 
     fn notify_about_validator_reconnect(
         &mut self,
         validator: &NodeId,
         full_client: &dyn BlockChainClient,
-        mining_address: &Address,
     ) {
         if let Some(index) = self.flagged_validators.iter().position(|x| x == validator) {
             self.flagged_validators.remove(index);
@@ -174,7 +171,7 @@ impl HbbftEarlyEpochEndManager {
         &mut self,
         memorium: &HbbftMessageMemorium,
         full_client: &dyn BlockChainClient,
-        mining_address: &Address,
+        client: &dyn EngineClient,
     ) {
         // if devp2p warmup time is not over yet, we do not have to do anything.
         if self.start_time.elapsed() < self.allowed_devp2p_warmup_time {
@@ -218,8 +215,8 @@ impl HbbftEarlyEpochEndManager {
                             // this function will also add the validator to the list of flagged validators.
                             self.notify_about_missing_validator(
                                 &validator,
-                                full_client,
-                                mining_address,
+                                client,
+                                full_client
                             );
                         }
                     } else {
@@ -230,7 +227,6 @@ impl HbbftEarlyEpochEndManager {
                             self.notify_about_validator_reconnect(
                                 &validator,
                                 full_client,
-                                mining_address,
                             );
                         }
                     }
@@ -241,8 +237,8 @@ impl HbbftEarlyEpochEndManager {
                         // this function will also add the validator to the list of flagged validators.
                         self.notify_about_missing_validator(
                             &validator,
-                            full_client,
-                            mining_address,
+                            client,
+                            full_client
                         );
                     }
                 }
