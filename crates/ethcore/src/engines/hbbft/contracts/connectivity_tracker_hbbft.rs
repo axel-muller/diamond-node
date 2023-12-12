@@ -1,4 +1,4 @@
-use ethereum_types::{Address, U256};
+use ethereum_types::{Address, U256, H256};
 use std::str::FromStr;
 use client::EngineClient;
 use types::ids::BlockId;
@@ -28,6 +28,22 @@ pub fn get_current_flagged_validators_from_contract(
 }
 
 
+fn get_block_data(client: &dyn EngineClient) -> (u64, H256) {
+
+    if let Some(block_number) = client.block_number(BlockId::Latest) {
+        if let Some(header) = client.block_header(BlockId::Number(block_number)) {
+            let hash = header.hash();
+            return (block_number, hash);
+        } else {
+            warn!(target:"engine", "could not get block number for block: {block_number}");
+            return (0, H256::zero());
+        }
+    } else {
+        warn!(target:"engine", "could not get latest block.");
+        return (0, H256::zero());
+    };
+}
+
 pub fn report_missing_connectivity(
     client: &dyn EngineClient,
     full_client: &dyn BlockChainClient,
@@ -35,19 +51,10 @@ pub fn report_missing_connectivity(
     signing_address: &Address,
 ) -> bool  {
 
-    let (block_number, block_hash) =
-    if let Some(block_number) = client.block_number(BlockId::Latest) {
-        if let Some(header) = client.block_header(BlockId::Number(block_number)) {
-            let hash = header.hash();
-            (block_number, hash)
-        } else {
-            warn!(target:"engine", "could not get block number for block: {block_number}");
-            return false;
-        }
-    } else {
-        warn!(target:"engine", "report_missing_connectivity: could not get latest block.");
+    let (block_number, block_hash) = get_block_data(client);
+    if block_number == 0 {
         return false;
-    };
+    }
 
     let send_data = connectivity_tracker_hbbft_contract::functions::report_missing_connectivity::call(
         *missing_validator,
@@ -69,3 +76,4 @@ pub fn report_missing_connectivity(
     return true;
     
 }
+
