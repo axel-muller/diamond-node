@@ -241,7 +241,7 @@ fn to_toml(
     let mut misc = Map::new();
     misc.insert(
         "logging".into(),
-        Value::String("txqueue=trace,consensus=trace,engine=trace".into()),
+        Value::String("txqueue=info,consensus=debug,engine=trace".into()),
     );
     misc.insert("log_file".into(), Value::String("parity.log".into()));
 
