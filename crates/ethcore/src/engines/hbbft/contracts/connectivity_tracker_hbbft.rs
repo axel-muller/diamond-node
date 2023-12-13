@@ -45,11 +45,11 @@ fn get_block_data(client: &dyn EngineClient) -> (u64, H256) {
             let hash = header.hash();
             return (block_number, hash);
         } else {
-            warn!(target:"engine", "could not get block number for block: {block_number}");
+            warn!(target:"engine", "early-epoch-end: could not get block number for block: {block_number}");
             return (0, H256::zero());
         }
     } else {
-        warn!(target:"engine", "could not get latest block.");
+        warn!(target:"engine", "early-epoch-end: could not get latest block.");
         return (0, H256::zero());
     };
 }
@@ -79,9 +79,9 @@ pub fn report_missing_connectivity(
             .gas(U256::from(200_000))
             .nonce(nonce);
 
-    info!(target:"consensus", "sending report_missing_connectivity for with nonce: {nonce}, missing: {:?} ", missing_validator);
+    info!(target:"engine", "early-epoch-end: sending report_missing_connectivity for with nonce: {nonce}, missing: {:?} ", missing_validator);
     if let Err(e) = full_client.transact_silently(transaction) {
-        warn!(target:"consensus", "could not report_missing_connectivity {e:?}");
+        warn!(target:"engine", "early-epoch-end: could not report_missing_connectivity {e:?}");
         return false;
     }
     return true;
