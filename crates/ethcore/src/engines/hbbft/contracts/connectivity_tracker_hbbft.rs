@@ -15,7 +15,7 @@ use_contract!(
 
 lazy_static! {
     static ref CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS: Address =
-        Address::from_str("0x1200000000000000000000000000000000000001").unwrap();
+        Address::from_str("1200000000000000000000000000000000000001").unwrap();
 }
 
 macro_rules! call_const_connectivity_tracker_hbbft {
