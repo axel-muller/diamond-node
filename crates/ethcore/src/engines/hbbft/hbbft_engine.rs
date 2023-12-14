@@ -943,6 +943,8 @@ impl HoneyBadgerBFT {
         // todo: acquire allowed devp2p warmup time from contracts ?!
         let allowed_devp2p_warmup_time = Duration::from_secs(120);
 
+        debug!(target: "engine", "early-epoch-end: handle_early_epoch_end.");
+
         let hbbft_state = if let Some(s) = self.hbbft_state.try_read_for(Duration::from_millis(300))
         {
             s
@@ -999,7 +1001,7 @@ impl HoneyBadgerBFT {
     fn do_validator_engine_actions(&self) -> Result<(), String> {
         // here we need to differentiate the different engine functions,
         // that requre different levels of access to the client.
-
+        debug!(target: "engine", "do_validator_engine_actions.");
         match self.client_arc() {
             Some(client_arc) => {
                 if self.is_syncing(&client_arc) {
@@ -1314,8 +1316,7 @@ impl HoneyBadgerBFT {
                                                 return Ok(stake_amount.ge(&min_stake));
                                             }
                                             Err(err) => {
-                                                warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
-                                                warn!(target: "consensus", "stake amount: {}", stake_amount);
+                                                error!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
                                             }
                                         }
                                     }
