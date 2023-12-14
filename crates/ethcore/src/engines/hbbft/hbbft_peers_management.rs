@@ -534,6 +534,7 @@ fn connect_to_validator_core(
     };
 
     if socket_addr.port() == 0 {
+        error!(target: "engine", "connect_to_validator_core: no port specified for Node ( Public (NodeId): {:?} , staking address: {}, socket_addr: {:?}", node_id, staking_address, socket_addr);
         // we interprate port 0 as NULL.
         return None;
     }
