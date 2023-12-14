@@ -369,7 +369,7 @@ impl HbbftPeersManagement {
         // we do not need to do a special handling for 0.0.0.0, because
         // our IP is always different to that.
 
-        warn!(target: "engine", "checking if internet address needs to be updated.");
+        trace!(target: "engine", "checking if internet address needs to be updated.");
 
         let current_endpoint = if let Some(peers_management) = block_chain_client
             .reserved_peers_management()
@@ -388,14 +388,14 @@ impl HbbftPeersManagement {
         };
         //let peers_management =
 
-        warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+        trace!(target: "engine", "current Endpoint: {:?}", current_endpoint);
 
         // todo: we can improve performance,
         // by assuming that we are the only one who writes the internet address.
         // so we have to query this data only once, and then we can cache it.
         match get_validator_internet_address(engine_client, &staking_address) {
             Ok(validator_internet_address) => {
-                warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                trace!(target: "engine", "stored validator address{:?}", validator_internet_address);
                 if validator_internet_address.eq(&current_endpoint) {
                     // if the current stored endpoint is the same as the current endpoint,
                     // we don't need to do anything.
