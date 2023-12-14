@@ -231,6 +231,8 @@ impl HbbftEarlyEpochEndManager {
             return;
         }
 
+        trace!(target: "engine", "checking epoch history for {}  validators", &self.validators.len());
+
         //full_client.best_block_header()
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
