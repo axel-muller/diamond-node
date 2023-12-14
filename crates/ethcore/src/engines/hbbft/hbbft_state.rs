@@ -445,13 +445,13 @@ impl HbbftState {
                     if tx.nonce() >= min_nonce {
                         transactions_subset.push(tx);
                     } else {
-                        info!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
+                        debug!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
                     }
                 }
             }
         }
 
-        info!(target: "consensus", "Block creation: Honeybadger epoch {}, Transactions subset target size: {}, actual size: {}, from available {}.", honey_badger.epoch(), transactions_subset_size, transactions_subset.len(), max_transactions_for_block.len());
+        trace!(target: "consensus", "Block creation: Honeybadger epoch {}, Transactions subset target size: {}, actual size: {}, from available {}.", honey_badger.epoch(), transactions_subset_size, transactions_subset.len(), max_transactions_for_block.len());
 
         let signed_transactions = transactions_subset
             .iter()
