@@ -35,6 +35,7 @@ extern crate parking_lot;
 #[cfg(feature = "price-info")]
 extern crate price_info;
 extern crate rlp;
+extern crate rustc_hex;
 extern crate txpool;
 
 #[macro_use]
@@ -52,8 +53,7 @@ extern crate trace_time;
 extern crate env_logger;
 #[cfg(test)]
 extern crate ethkey;
-#[cfg(test)]
-extern crate rustc_hex;
+
 
 pub mod external;
 #[cfg(feature = "price-info")]
