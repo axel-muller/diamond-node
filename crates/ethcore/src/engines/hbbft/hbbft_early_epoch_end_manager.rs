@@ -263,8 +263,11 @@ impl HbbftEarlyEpochEndManager {
                     }
                 } else {
                     debug!(target: "engine", "early-epoch-end: no history info for validator {validator}");
+
+                    let current_flagged = Self::get_current_flagged_validators_from_contracts(client, BlockId::Latest, &self.address_to_node_id);
+
                     // we do not have any history for this node.
-                    if !self.flagged_validators.contains(validator) {
+                    if !current_flagged.contains(validator) {
                         // this function will also add the validator to the list of flagged validators.
                         self.notify_about_missing_validator(&validator, client, full_client);
                     }
