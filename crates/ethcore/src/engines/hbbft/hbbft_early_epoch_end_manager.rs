@@ -209,10 +209,16 @@ impl HbbftEarlyEpochEndManager {
             return;
         }
 
-        if full_client.is_syncing() {
+        if full_client.is_major_syncing() {
             // if we are syncing, we wont do any blaming.
             debug!(target: "engine", "early-epoch-end: no decision: syncing");
             return;
+        }
+
+
+        if full_client.is_syncing() {
+            // if we are syncing, we wont do any blaming.
+            debug!(target: "engine", "early-epoch-end: detected attempt to break because of is_major_syncing() instead of is_synincg()no decision: syncing");
         }
 
         let block_num = if let Some(block) = full_client.block(BlockId::Latest) {
