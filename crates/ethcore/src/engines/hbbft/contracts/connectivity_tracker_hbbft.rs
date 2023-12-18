@@ -76,7 +76,7 @@ pub fn report_missing_connectivity(
 
     let transaction =
         TransactionRequest::call(*CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS, send_data.0)
-            .gas(U256::from(200_000))
+            .gas(U256::from(500_000))
             .gas_price(U256::from(10000000000u64))
             .nonce(nonce);
 
