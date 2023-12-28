@@ -241,7 +241,7 @@ fn to_toml(
     let mut misc = Map::new();
     misc.insert(
         "logging".into(),
-        Value::String("txqueue=info,consensus=debug,engine=trace".into()),
+        Value::String("txqueue=info,consensus=debug,engine=trace,tx_own=trace".into()),
     );
     misc.insert("log_file".into(), Value::String("diamond-node.log".into()));
 
