@@ -253,7 +253,7 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
 
         let data = match hash_structured_data(typed_data) {
             Ok(d) => d,
-            Err(err) => return Box::new(future::err(errors::invalid_call_data(err.kind()))),
+            Err(err) => return Box::new(future::err(errors::invalid_call_data(err))),
         };
         let dispatcher = self.dispatcher.clone();
         let accounts = Arc::new(dispatch::Signer::new(self.accounts.clone())) as _;

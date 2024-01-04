@@ -33,7 +33,7 @@ pub fn hash_message(version: EIP191Version, message: Value) -> Result<H256, Erro
             let typed_data =
                 from_value::<EIP712>(message).map_err(map_serde_err("StructuredData"))?;
 
-            hash_structured_data(typed_data).map_err(|err| errors::invalid_call_data(err.kind()))?
+            hash_structured_data(typed_data).map_err(|err| errors::invalid_call_data(err))?
         }
 
         EIP191Version::PresignedTransaction => {
