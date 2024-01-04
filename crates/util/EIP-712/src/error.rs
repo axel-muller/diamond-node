@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
-use validator::{ValidationErrors, ValidationErrorsKind};
 use thiserror::Error;
+use validator::{ValidationErrors, ValidationErrorsKind};
 
 pub(crate) type Result<T> = ::std::result::Result<T, ErrorKind>;
 
