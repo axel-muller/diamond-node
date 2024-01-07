@@ -436,7 +436,7 @@ impl HbbftState {
         // Now we can select the transactions to include in our contribution.
         let input_contribution = Contribution::new(&signed_transactions);
 
-        let mut rng = rand_065::thread_rng();
+        let mut rng = rand::thread_rng();
         let step = honey_badger.propose(&input_contribution, &mut rng);
         match step {
             Ok(step) => Some((step, network_info)),

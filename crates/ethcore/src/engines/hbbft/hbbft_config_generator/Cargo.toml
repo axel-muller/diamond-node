@@ -14,10 +14,10 @@ ethcore = { path = "../../../.." }
 ethereum-types = "0.9.2"
 ethkey = { path = "../../../../../accounts/ethkey" }
 ethstore = { path = "../../../../../accounts/ethstore"}
-hbbft = { git = "https://github.com/poanetwork/hbbft", rev = "4857b7f9c7a0f513caca97c308d352c6a77fe5c2" }
-hbbft_testing = { git = "https://github.com/poanetwork/hbbft" }
+hbbft = { git = "https://github.com/dforsten/hbbft", rev = "d25315eb1c3a8313db9d99d5d9ba021e0d74a52e" }
+hbbft_testing = { git = "https://github.com/dforsten/hbbft", rev = "d25315eb1c3a8313db9d99d5d9ba021e0d74a52e" }
 parity-crypto = { version = "0.6.2", features = ["publickey"] }
-rand = "0.6.5"
+rand = "0.7.3"
 rustc-hex = "2.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

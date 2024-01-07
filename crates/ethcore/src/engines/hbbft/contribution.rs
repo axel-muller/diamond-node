@@ -1,4 +1,4 @@
-use rand_065::{self, distributions::Standard, Rng};
+use rand::{self, distributions::Standard, Rng};
 use rlp::RlpStream;
 use std::time::UNIX_EPOCH;
 use types::transaction::SignedTransaction;
@@ -42,7 +42,7 @@ impl Contribution {
                 s.drain()
             })
             .collect();
-        let mut rng = rand_065::thread_rng();
+        let mut rng = rand::thread_rng();
 
         Contribution {
             transactions: ser_txns,

@@ -51,7 +51,7 @@ pub fn engine_signer_to_synckeygen<'a>(
             .expect("Signer's public key must be available!"),
         None => Public::from(H512::from_low_u64_be(0)),
     };
-    let mut rng = rand_065::thread_rng();
+    let mut rng = rand::thread_rng();
     let num_nodes = pub_keys.len();
     SyncKeyGen::new(public, wrapper, pub_keys, max_faulty(num_nodes), &mut rng)
 }
@@ -100,7 +100,7 @@ pub fn part_of_address(
         return Ok(None);
     }
     let deserialized_part: Part = bincode::deserialize(&serialized_part).unwrap();
-    let mut rng = rand_065::thread_rng();
+    let mut rng = rand::thread_rng();
     let outcome = skg
         .handle_part(vmap.get(&address).unwrap(), deserialized_part, &mut rng)
         .unwrap();
@@ -171,7 +171,7 @@ pub struct KeyPairWrapper {
 impl<'a> PublicKey for PublicWrapper {
     type Error = crypto::publickey::Error;
     type SecretKey = KeyPairWrapper;
-    fn encrypt<M: AsRef<[u8]>, R: rand_065::Rng>(
+    fn encrypt<M: AsRef<[u8]>, R: rand::Rng>(
         &self,
         msg: M,
         _rng: &mut R,
