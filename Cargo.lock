@@ -756,17 +756,6 @@ dependencies = [
 
 [[package]]
 name = "derivative"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c6d883546668a3e2011b6a716a7330b82eabb0151b138217f632c8243e17135"
-dependencies = [
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "syn 0.15.26",
-]
-
-[[package]]
-name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
@@ -1169,7 +1158,7 @@ dependencies = [
  "fetch",
  "globset",
  "hash-db 0.11.0",
- "hbbft 0.1.1 (git+https://github.com/surfingnerd/hbbft?rev=cf0c45aa669b9c10abab1a0f4f2b33595879b60b)",
+ "hbbft",
  "hbbft_testing",
  "hex-literal",
  "hex_fmt",
@@ -1774,6 +1763,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "ff"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4b967a3ee6ae993f0094174257d404a5818f58be79d67a1aea1ec8996d28906"
+dependencies = [
+ "byteorder",
+ "ff_derive",
+ "rand_core 0.5.1",
+]
+
+[[package]]
+name = "ff_derive"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3776aaf60a45037a9c3cabdd8542b38693acaa3e241ff957181b72579d29feb"
+dependencies = [
+ "num-bigint 0.2.3",
+ "num-integer",
+ "num-traits 0.2.15",
+ "proc-macro2 1.0.58",
+ "quote 1.0.27",
+ "syn 1.0.94",
+]
+
+[[package]]
 name = "fixed-hash"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1935,6 +1949,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "group"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f15be54742789e36f03307c8fdf0621201e1345e94f1387282024178b5e9ec8c"
+dependencies = [
+ "ff",
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+]
+
+[[package]]
 name = "h2"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2011,62 +2036,20 @@ dependencies = [
 [[package]]
 name = "hbbft"
 version = "0.1.1"
-source = "git+https://github.com/poanetwork/hbbft?rev=4857b7f9c7a0f513caca97c308d352c6a77fe5c2#4857b7f9c7a0f513caca97c308d352c6a77fe5c2"
+source = "git+https://github.com/dforsten/hbbft?rev=f1d4c1d6f0714b7f267f84aaafa54c8d572c63bd#f1d4c1d6f0714b7f267f84aaafa54c8d572c63bd"
 dependencies = [
  "bincode",
  "byteorder",
- "derivative 1.0.4",
+ "derivative",
  "env_logger 0.7.1",
- "failure",
  "hex_fmt",
  "init_with",
  "log",
- "rand 0.6.5",
+ "rand 0.7.3",
  "rand_derive",
- "reed-solomon-erasure 3.1.1",
+ "reed-solomon-erasure",
  "serde",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "hbbft"
-version = "0.1.1"
-source = "git+https://github.com/surfingnerd/hbbft?rev=cf0c45aa669b9c10abab1a0f4f2b33595879b60b#cf0c45aa669b9c10abab1a0f4f2b33595879b60b"
-dependencies = [
- "bincode",
- "byteorder",
- "derivative 2.2.0",
- "env_logger 0.7.1",
- "failure",
- "hex_fmt",
- "init_with",
- "log",
- "rand 0.6.5",
- "rand_derive",
- "reed-solomon-erasure 4.0.2",
- "serde",
- "threshold_crypto",
- "tiny-keccak 2.0.2",
-]
-
-[[package]]
-name = "hbbft"
-version = "0.1.1"
-source = "git+https://github.com/poanetwork/hbbft#d52be00d0e3a1e2872c8d42a076e0dc3cb86b175"
-dependencies = [
- "bincode",
- "byteorder",
- "derivative 2.2.0",
- "env_logger 0.7.1",
- "failure",
- "hex_fmt",
- "init_with",
- "log",
- "rand 0.6.5",
- "rand_derive",
- "reed-solomon-erasure 4.0.2",
- "serde",
+ "thiserror",
  "threshold_crypto",
  "tiny-keccak 2.0.2",
 ]
@@ -2081,10 +2064,10 @@ dependencies = [
  "ethereum-types 0.9.2",
  "ethkey",
  "ethstore",
- "hbbft 0.1.1 (git+https://github.com/poanetwork/hbbft?rev=4857b7f9c7a0f513caca97c308d352c6a77fe5c2)",
+ "hbbft",
  "hbbft_testing",
  "parity-crypto",
- "rand 0.6.5",
+ "rand 0.7.3",
  "rustc-hex 2.1.0",
  "serde",
  "serde_json",
@@ -2094,14 +2077,14 @@ dependencies = [
 [[package]]
 name = "hbbft_testing"
 version = "0.1.0"
-source = "git+https://github.com/poanetwork/hbbft#d52be00d0e3a1e2872c8d42a076e0dc3cb86b175"
+source = "git+https://github.com/dforsten/hbbft?rev=f1d4c1d6f0714b7f267f84aaafa54c8d572c63bd#f1d4c1d6f0714b7f267f84aaafa54c8d572c63bd"
 dependencies = [
- "failure",
- "hbbft 0.1.1 (git+https://github.com/poanetwork/hbbft)",
+ "hbbft",
  "integer-sqrt",
  "proptest",
- "rand 0.6.5",
- "rand_xorshift 0.1.1",
+ "rand 0.7.3",
+ "rand_xorshift 0.2.0",
+ "thiserror",
  "threshold_crypto",
 ]
 
@@ -3217,12 +3200,14 @@ dependencies = [
 
 [[package]]
 name = "pairing"
-version = "0.14.2"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ceda21136251c6d5a422d3d798d8ac22515a6e8d3521bb60c59a8349d36d0d57"
+checksum = "b8290dea210a712682cd65031dc2b34fd132cf2729def3df7ee08f0737ff5ed6"
 dependencies = [
  "byteorder",
- "rand 0.4.6",
+ "ff",
+ "group",
+ "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -3882,9 +3867,9 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "0.9.6"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01c477819b845fe023d33583ebf10c9f62518c8d79a0960ba5c36d6ac8a55a5b"
+checksum = "12e6c80c1139113c28ee4670dc50cc42915228b51f56a9e407f0ec60f966646f"
 dependencies = [
  "bit-set 0.5.2",
  "bitflags 1.2.1",
@@ -3892,9 +3877,9 @@ dependencies = [
  "lazy_static",
  "num-traits 0.2.15",
  "quick-error",
- "rand 0.6.5",
- "rand_chacha 0.1.1",
- "rand_xorshift 0.1.1",
+ "rand 0.7.3",
+ "rand_chacha 0.2.1",
+ "rand_xorshift 0.2.0",
  "regex-syntax",
  "rusty-fork",
  "tempfile",
@@ -4018,25 +4003,6 @@ dependencies = [
  "rand_chacha 0.2.1",
  "rand_core 0.5.1",
  "rand_hc 0.2.0",
-]
-
-[[package]]
-name = "rand04"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58595cc8bb12add45412667f9b422d5a9842d61d36e8607bc7c84ff738bf9263"
-dependencies = [
- "rand 0.4.6",
-]
-
-[[package]]
-name = "rand04_compat"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e4cc0eb4bbb0cbc6c2a8081aa11303b9520369eea474cf865f7b7e3f11b284b"
-dependencies = [
- "rand 0.6.5",
- "rand04",
 ]
 
 [[package]]
@@ -4252,18 +4218,6 @@ dependencies = [
 
 [[package]]
 name = "reed-solomon-erasure"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77cbbd4c02f53e345fe49e74255a1b10080731ffb2a03475e11df7fc8a043c37"
-dependencies = [
- "cc",
- "libc",
- "rayon",
- "smallvec 0.6.14",
-]
-
-[[package]]
-name = "reed-solomon-erasure"
 version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a415a013dd7c5d4221382329a5a3482566da675737494935cbbbcdec04662f9d"
@@ -4465,9 +4419,9 @@ dependencies = [
 
 [[package]]
 name = "rusty-fork"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dd93264e10c577503e926bd1430193eeb5d21b059148910082245309b424fae"
+checksum = "cb3dcc6e454c328bb824492db107ab7c0ae8fcffe4ad210136ef014458c1bc4f"
 dependencies = [
  "fnv",
  "quick-error",
@@ -4950,19 +4904,20 @@ dependencies = [
 
 [[package]]
 name = "threshold_crypto"
-version = "0.3.2"
-source = "git+https://github.com/poanetwork/threshold_crypto?rev=624eeee#624eeee7e4ac5e565abbe93a31580a8f806ee5c4"
+version = "0.4.0"
+source = "git+https://github.com/dforsten/threshold_crypto?rev=776dd301a82036abf6fca60d574197e93e15810e#776dd301a82036abf6fca60d574197e93e15810e"
 dependencies = [
  "byteorder",
- "failure",
+ "ff",
+ "group",
  "hex_fmt",
  "log",
  "pairing",
- "rand 0.6.5",
- "rand04_compat",
- "rand_chacha 0.1.1",
+ "rand 0.7.3",
+ "rand_chacha 0.2.1",
  "serde",
- "tiny-keccak 1.5.0",
+ "thiserror",
+ "tiny-keccak 2.0.2",
  "zeroize",
 ]
 
