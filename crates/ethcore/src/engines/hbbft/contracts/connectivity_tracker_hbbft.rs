@@ -63,9 +63,8 @@ pub fn get_current_flagged_validators_from_contract(
 
 fn get_block_data(client: &dyn EngineClient) -> (u64, H256) {
     if let Some(block_number) = client.block_number(BlockId::Latest) {
-        if let Some(header) = client.block_header(BlockId::Number(block_number)) {
-            let hash = header.hash();
-            return (block_number, hash);
+        if let Some(header) = client.block_header(BlockId::Number(block_number - 1)) {
+            return (header.number(), header.hash());
         } else {
             warn!(target:"engine", "early-epoch-end: could not get block number for block: {block_number}");
             return (0, H256::zero());
