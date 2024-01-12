@@ -24,6 +24,28 @@ macro_rules! call_const_connectivity_tracker_hbbft {
 	};
 }
 
+pub fn is_connectivity_loss_reported(
+    client: &dyn EngineClient,
+    block_id: BlockId,
+    reporter: &Address,
+    epoch: u64,
+    validator: &Address,
+) -> Result<bool, CallError> {
+    let c = BoundContract::bind(
+        client,
+        block_id,
+        *CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS,
+    );
+    return Ok(call_const_connectivity_tracker_hbbft!(
+        c,
+        is_reported,
+        epoch,
+        *validator,
+        *reporter
+    )?);
+}
+
+
 pub fn get_current_flagged_validators_from_contract(
     client: &dyn EngineClient,
     block_id: BlockId,

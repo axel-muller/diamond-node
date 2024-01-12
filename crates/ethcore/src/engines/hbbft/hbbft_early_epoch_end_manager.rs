@@ -14,7 +14,7 @@ use std::{
 
 use super::{
     contracts::connectivity_tracker_hbbft::{
-        get_current_flagged_validators_from_contract, report_reconnect,
+        report_reconnect, is_connectivity_loss_reported,
     },
     hbbft_message_memorium::HbbftMessageMemorium,
     NodeId,
@@ -94,17 +94,22 @@ impl HbbftEarlyEpochEndManager {
         // we do not have to retrieve the data from the smart contracts.
         let now = Instant::now();
 
+        let flagged_validators = Self::get_current_reported_validators_from_contracts(
+            engine_client,
+            BlockId::Latest,
+            &node_id_to_address,
+            &validators,
+            signing_address,
+            epoch_number,
+        );
+
         let result = Self {
             current_tracked_epoch_number: epoch_number,
             start_time: now,
             start_block: epoch_start_block,
             allowed_devp2p_warmup_time,
             validators: validators,
-            flagged_validators: Self::get_current_flagged_validators_from_contracts(
-                engine_client,
-                BlockId::Latest,
-                &address_to_node_id,
-            ),
+            flagged_validators: flagged_validators,
             node_id_to_address,
             address_to_node_id,
             signing_address: signing_address.clone(),
@@ -116,33 +121,60 @@ impl HbbftEarlyEpochEndManager {
     }
 
     /// retrieves the information from smart contracts which validators are currently flagged.
-    fn get_current_flagged_validators_from_contracts(
+    fn get_current_reported_validators_from_contracts(
         client: &dyn EngineClient,
         block_id: BlockId,
-        address_to_node_id: &BTreeMap<Address, NodeId>,
+        node_id_to_address: &BTreeMap<NodeId, Address>,
+        validators: &Vec<NodeId>,
+        signing_address: &Address,
+        epoch: u64,
     ) -> Vec<NodeId> {
-        // todo: call smart contract.
 
-        match get_current_flagged_validators_from_contract(client, block_id) {
-            Ok(v) => {
-                let mut result: Vec<NodeId> = Vec::new();
+        let mut result = Vec::<NodeId>::new();
 
-                for a in v.iter() {
-                    if let Some(node_id) = address_to_node_id.get(a) {
-                        result.push(node_id.clone());
-                    } else {
-                        error!(target: "engine","early-epoch-end: could not find validator in address cache: {a:?}");
-                    }
+        for validator in validators.iter() {
+
+            let validator_address = if let Some(a) = node_id_to_address.get(validator) {
+                a
+            } else {
+                error!(target: "engine", "early-epoch-end: could not find address for validator in node_id_to_address cache.");
+                continue;
+            };
+
+            if let Ok(reported) = is_connectivity_loss_reported(client, block_id, signing_address, epoch, validator_address) {
+                if reported {
+                    result.push(validator.clone());
                 }
-
-                return result;
-                // address_to_node_id.get(key)
-            }
-            Err(e) => {
-                error!(target: "engine","early-epoch-end: could not get_current_flagged_validators_from_contracts {e:?}" );
-                Vec::new()
+            } else {
+                error!(target: "engine", "early-epoch-end: could not get reported status for validator {validator:?}");
             }
         }
+
+        return result;
+        // match is_connectivity_loss_reported(client, block_id, signing_address, ) {
+
+        // }
+
+        // match get_current_flagged_validators_from_contract(client, block_id) {
+        //     Ok(v) => {
+        //         let mut result: Vec<NodeId> = Vec::new();
+
+        //         for a in v.iter() {
+        //             if let Some(node_id) = address_to_node_id.get(a) {
+        //                 result.push(node_id.clone());
+        //             } else {
+        //                 error!(target: "engine","early-epoch-end: could not find validator in address cache: {a:?}");
+        //             }
+        //         }
+
+        //         return result;
+        //         // address_to_node_id.get(key)
+        //     }
+        //     Err(e) => {
+        //         error!(target: "engine","early-epoch-end: could not get_current_flagged_validators_from_contracts {e:?}" );
+        //         Vec::new()
+        //     }
+        // }
     }
 
     fn notify_about_missing_validator(
@@ -195,6 +227,18 @@ impl HbbftEarlyEpochEndManager {
         }
     }
 
+    pub fn is_reported(&self, client: &dyn EngineClient, other_validator_address: &Address) -> bool {
+
+        let result = is_connectivity_loss_reported(client, BlockId::Latest, &self.signing_address, self.current_tracked_epoch_number, other_validator_address);
+
+        if let Ok(r) = result {
+            return r;
+        } else {
+            error!(target: "engine", "early-epoch-end: could not get reported status for validator {other_validator_address:?}");
+            return false;
+        }
+    }
+
     /// decides on the memorium data if we should update to contract data.
     /// end executes them.
     pub fn decide(
@@ -243,31 +287,42 @@ impl HbbftEarlyEpochEndManager {
         // get current state of missing validators from hbbftMemorium.
         if let Some(epoch_history) = memorium.get_staking_epoch_history(block_num) {
             for validator in &self.validators.clone() {
-                // we need to exclude ourself.
+                let validator_address = match self.node_id_to_address.get(validator) {
+                    Some(a) => a,
+                    None => {
+                        error!(target: "engine", "early-epoch-end: could not find validator_address for node id in cache: {validator:?}");
+                        continue;
+                    }
+                };
+                
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
                     let last_sealing_message = node_history.get_sealing_message();
 
                     if last_sealing_message < block_num - treshold {
                         // we do not have to send notification, if we already did so.
-                        if !self.flagged_validators.contains(validator) {
+
+                        if !self.is_reported(client, validator_address) {
                             // this function will also add the validator to the list of flagged validators.
                             self.notify_about_missing_validator(&validator, client, full_client);
                         }
+
                     } else {
                         // this validator is OK.
                         // maybe it was flagged and we need to unflag it ?
 
-                        if self.flagged_validators.contains(validator) {
+                        
+
+                        if self.is_reported(client, validator_address) {
                             self.notify_about_validator_reconnect(&validator, full_client, client);
                         }
                     }
                 } else {
+                    
                     debug!(target: "engine", "early-epoch-end: no history info for validator {validator}");
 
-                    let current_flagged = Self::get_current_flagged_validators_from_contracts(client, BlockId::Latest, &self.address_to_node_id);
 
                     // we do not have any history for this node.
-                    if !current_flagged.contains(validator) {
+                    if !self.is_reported(client, validator_address) {
                         // this function will also add the validator to the list of flagged validators.
                         self.notify_about_missing_validator(&validator, client, full_client);
                     }
@@ -275,7 +330,7 @@ impl HbbftEarlyEpochEndManager {
                 // todo: if the systems switched from block based measurement to time based measurement.
             }
         }
-        // nothing to do: no history yet.
+        // else: nothing to do: no history yet.
 
         // note: We do not take care if hbbft message memorium might not have processed some of the messages yet,
         // since it is not important to do the decision based on the latest data, since the decide method will be called
