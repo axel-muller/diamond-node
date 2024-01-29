@@ -1669,13 +1669,13 @@ mod tests {
         honey_badger::{HoneyBadger, HoneyBadgerBuilder},
         NetworkInfo,
     };
-    use rand_065;
+    use rand;
     use std::sync::Arc;
     use types::transaction::SignedTransaction;
 
     #[test]
     fn test_single_contribution() {
-        let mut rng = rand_065::thread_rng();
+        let mut rng = rand::thread_rng();
         let net_infos = NetworkInfo::generate_map(0..1usize, &mut rng)
             .expect("NetworkInfo generation is expected to always succeed");
 

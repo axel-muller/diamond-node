@@ -52,7 +52,6 @@ extern crate parity_util_mem;
 extern crate parking_lot;
 extern crate patricia_trie_ethereum as ethtrie;
 extern crate rand;
-extern crate rand_065;
 extern crate rayon;
 extern crate reth_util;
 extern crate rlp;

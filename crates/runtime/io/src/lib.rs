@@ -254,9 +254,7 @@ mod tests {
         struct MyHandler(atomic::AtomicBool);
 
         #[derive(Clone)]
-        struct MyMessage {
-            data: u32,
-        }
+        struct MyMessage {}
 
         impl IoHandler<MyMessage> for MyHandler {
             fn initialize(&self, io: &IoContext<MyMessage>) {
@@ -285,9 +283,7 @@ mod tests {
         struct MyHandler(atomic::AtomicUsize);
 
         #[derive(Clone)]
-        struct MyMessage {
-            data: u32,
-        }
+        struct MyMessage {}
 
         impl IoHandler<MyMessage> for MyHandler {
             fn initialize(&self, io: &IoContext<MyMessage>) {
