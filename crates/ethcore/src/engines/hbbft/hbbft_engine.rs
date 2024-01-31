@@ -1,4 +1,7 @@
-use super::block_reward_hbbft::BlockRewardContract;
+use super::{
+    block_reward_hbbft::BlockRewardContract,
+    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
+};
 use crate::{
     client::BlockChainClient,
     engines::hbbft::{
@@ -88,6 +91,7 @@ pub struct HoneyBadgerBFT {
     has_connected_to_validator_set: AtomicBool,
     peers_management: Mutex<HbbftPeersManagement>,
     current_minimum_gas_price: Mutex<Option<U256>>,
+    early_epoch_manager: Mutex<Option<HbbftEarlyEpochEndManager>>,
 }
 
 struct TransitionHandler {
@@ -445,6 +449,7 @@ impl HoneyBadgerBFT {
             has_connected_to_validator_set: AtomicBool::new(false),
             peers_management: Mutex::new(HbbftPeersManagement::new()),
             current_minimum_gas_price: Mutex::new(None),
+            early_epoch_manager: Mutex::new(None),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -927,13 +932,76 @@ impl HoneyBadgerBFT {
         false
     }
 
+    /// early epoch ends
+    /// https://github.com/DMDcoin/diamond-node/issues/87
+    fn handle_early_epoch_end(
+        &self,
+        block_chain_client: &dyn BlockChainClient,
+        engine_client: &dyn EngineClient,
+        mining_address: &Address,
+    ) {
+        // todo: acquire allowed devp2p warmup time from contracts ?!
+        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+
+        debug!(target: "engine", "early-epoch-end: handle_early_epoch_end.");
+
+        let hbbft_state = if let Some(s) = self.hbbft_state.try_read_for(Duration::from_millis(300))
+        {
+            s
+        } else {
+            warn!(target: "engine", "early-epoch-end: could not acquire read lock for hbbft state.");
+            return;
+        };
+
+        let epoch_num = hbbft_state.get_current_posdao_epoch();
+        let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
+        let validator_set = hbbft_state.get_validator_set();
+
+        // we got everything we need from hbbft_state - drop lock ASAP.
+        std::mem::drop(hbbft_state);
+
+        if let Some(memorium) = self
+            .hbbft_message_dispatcher
+            .get_memorium()
+            .try_read_for(Duration::from_millis(300))
+        {
+            // this is currently the only location where we lock early epoch manager -
+            // so this should never cause a deadlock, and we do not have to try_lock_for
+            let mut lock_guard = self.early_epoch_manager.lock();
+
+            match lock_guard.as_mut() {
+                Some(early_epoch_end_manager) => {
+                    // should we check here if the epoch number has changed ?
+                    early_epoch_end_manager.decide(&memorium, block_chain_client, engine_client);
+                }
+                None => {
+                    *lock_guard = HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
+                        allowed_devp2p_warmup_time,
+                        block_chain_client,
+                        engine_client,
+                        epoch_num,
+                        epoch_start_block,
+                        validator_set,
+                        mining_address,
+                    );
+
+                    if let Some(manager) = lock_guard.as_mut() {
+                        manager.decide(&memorium, block_chain_client, engine_client);
+                    }
+                }
+            }
+        } else {
+            warn!(target: "engine", "early-epoch-end: could not acquire read lock for memorium to decide on ealry_epoch_end_manager in do_validator_engine_actions.");
+        }
+    }
+
     // some actions are required for hbbft nodes.
     // this functions figures out what kind of actions are required and executes them.
     // this will lock the client and some deeper layers.
     fn do_validator_engine_actions(&self) -> Result<(), String> {
         // here we need to differentiate the different engine functions,
         // that requre different levels of access to the client.
-
+        debug!(target: "engine", "do_validator_engine_actions.");
         match self.client_arc() {
             Some(client_arc) => {
                 if self.is_syncing(&client_arc) {
@@ -961,6 +1029,8 @@ impl HoneyBadgerBFT {
                     }
                 };
 
+                self.handle_early_epoch_end(block_chain_client, engine_client, &mining_address);
+
                 let should_handle_availability_announcements =
                     self.should_handle_availability_announcements();
                 let should_handle_internet_address_announcements =
@@ -980,7 +1050,7 @@ impl HoneyBadgerBFT {
                 // staking by mining address could be cached.
                 // but it COULD also get changed in the contracts, during the time the node is running.
                 // most likely since a Node can get staked, and than it becomes a mining address.
-                // a good solution for this is not to do this that fequently.
+                // a good solution for this is not to do this expensive operation that fequently.
                 let staking_address = match staking_by_mining_address(
                     engine_client,
                     &mining_address,
@@ -1031,8 +1101,11 @@ impl HoneyBadgerBFT {
                 }
 
                 if should_connect_to_validator_set {
-                    let network_info_o = if let Some(hbbft_state) = self.hbbft_state.try_read() {
-                        hbbft_state.get_current_network_info()
+                    // we
+                    let network_info_o = if let Some(hbbft_state) =
+                        self.hbbft_state.try_read_for(Duration::from_millis(50))
+                    {
+                        Some(hbbft_state.get_validator_set())
                     } else {
                         None
                     };
@@ -1050,6 +1123,7 @@ impl HoneyBadgerBFT {
                         }
                     }
                 }
+
                 return Ok(());
             }
 
@@ -1242,8 +1316,7 @@ impl HoneyBadgerBFT {
                                                 return Ok(stake_amount.ge(&min_stake));
                                             }
                                             Err(err) => {
-                                                warn!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
-                                                warn!(target: "consensus", "stake amount: {}", stake_amount);
+                                                error!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
                                             }
                                         }
                                     }
@@ -1284,6 +1357,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
     fn machine(&self) -> &EthereumMachine {
         &self.machine
+    }
+
+    fn minimum_gas_price(&self) -> Option<U256> {
+        self.current_minimum_gas_price.lock().clone()
     }
 
     fn fork_choice(&self, new: &ExtendedHeader, current: &ExtendedHeader) -> ForkChoice {
@@ -1347,6 +1424,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
@@ -1356,7 +1434,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                     let epoch_start_block = state.get_current_posdao_epoch_start_block();
                     // we got all infos from the state, we can drop the lock.
                     std::mem::drop(state);
-                    warn!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
+                    info!(target: "engine", "report new epoch: {} at block: {}", posdao_epoch, epoch_start_block);
                     self.hbbft_message_dispatcher
                         .report_new_epoch(posdao_epoch, epoch_start_block);
                 }
@@ -1388,6 +1466,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client,
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Latest,
                 true,
@@ -1609,6 +1688,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 client.clone(),
                 &self.signer,
                 &self.peers_management,
+                &self.early_epoch_manager,
                 &self.current_minimum_gas_price,
                 BlockId::Hash(block_hash.clone()),
                 false,
@@ -1636,10 +1716,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
         }
     }
 
-    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
-        self.hbbft_message_dispatcher.prometheus_metrics(registry);
-    }
-
     /// hbbft protects the start of the current posdao epoch start from being pruned.
     fn pruning_protection_block_number(&self) -> Option<u64> {
         // we try to get a read lock for 500 ms.
@@ -1656,6 +1732,20 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             // https://github.com/DMDcoin/diamond-node/issues/68
             warn!(target: "engine", "could not aquire read lock for retrieving the pruning_protection_block_number. Stage 3 verification error might follow up.");
             return None;
+        }
+    }
+
+    // note: this is by design not part of the PrometheusMetrics trait,
+    // it is part of the Engine trait and does nothing by default.
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        self.hbbft_message_dispatcher.prometheus_metrics(registry);
+        if let Some(early_epoch_manager_option) = self
+            .early_epoch_manager
+            .try_lock_for(Duration::from_millis(250))
+        {
+            if let Some(early_epoch_manager) = early_epoch_manager_option.as_ref() {
+                early_epoch_manager.prometheus_metrics(registry);
+            }
         }
     }
 }

@@ -46,7 +46,7 @@ impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        let port = 31300usize + self.idx;
+        let port = 30300usize + self.idx;
         format!("enode://{:x}@{}:{}", self.public, self.ip, port)
     }
 }
@@ -112,9 +112,9 @@ fn to_toml(
     base_metrics_port: Option<u16>,
     metrics_interface: Option<&str>,
 ) -> Value {
-    let base_port = 31300i64;
-    let base_rpc_port = 18540i64;
-    let base_ws_port = 19540i64;
+    let base_port = 30300i64;
+    let base_rpc_port = 8540i64;
+    let base_ws_port = 9540i64;
 
     let mut parity = Map::new();
     match config_type {
@@ -239,11 +239,14 @@ fn to_toml(
     }
 
     let mut misc = Map::new();
+    
+    // example for a more verbose logging.
+    // Value::String("txqueue=trace,consensus=debug,engine=trace,own_tx=trace,miner=trace,tx_filter=trace".into())
     misc.insert(
         "logging".into(),
-        Value::String("txqueue=trace,consensus=trace,engine=trace".into()),
+        Value::String("txqueue=info,consensus=debug,engine=trace,tx_own=trace".into()),
     );
-    misc.insert("log_file".into(), Value::String("parity.log".into()));
+    misc.insert("log_file".into(), Value::String("diamond-node.log".into()));
 
     // metrics.insert("");
 

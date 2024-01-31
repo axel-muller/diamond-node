@@ -225,7 +225,7 @@ impl txpool::Listener<Transaction> for LocalTransactionsList {
             return;
         }
 
-        warn!(target: "own_tx", "Transaction canceled (hash {:?})", tx.hash());
+        warn!(target: "own_tx", "Transaction canceled (hash {:?}), zero gas price: {}, nonce: {} data: {} ", tx.hash(),  tx.has_zero_gas_price(), tx.nonce(),  rustc_hex::ToHex::to_hex(tx.transaction.tx().data.as_slice()));
         self.insert(*tx.hash(), Status::Canceled(tx.clone()));
         self.clear_old();
     }

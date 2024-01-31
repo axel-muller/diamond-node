@@ -158,10 +158,10 @@ impl HbbftPeersManagement {
     // a current validator.
     pub fn connect_to_current_validators(
         &mut self,
-        network_info: &NetworkInfo<NodeId>,
+        validator_set: &Vec<NodeId>,
         client_arc: &Arc<dyn EngineClient>,
     ) {
-        warn!(target: "Engine", "adding current validators as reserved peers: {}", network_info.validator_set().all_ids().count());
+        info!(target: "Engine", "adding current validators as reserved peers: {}", validator_set.len());
         // todo: iterate over NodeIds, extract the address
         // we do not need to connect to ourself.
         // figure out the IP and port from the contracts
@@ -181,8 +181,6 @@ impl HbbftPeersManagement {
             return;
         }
 
-        let ids: Vec<&NodeId> = network_info.validator_set().all_ids().collect();
-
         // let mut validators_to_remove: BTreeSet<String> =  BTreeSet::new();
 
         let mut validators_to_remove: BTreeSet<Address> = self
@@ -194,7 +192,7 @@ impl HbbftPeersManagement {
         // validators_to_remove
         let mut current_validator_connections: Vec<ValidatorConnectionData> = Vec::new();
 
-        for node in ids.iter() {
+        for node in validator_set.iter() {
             let address = public_key_to_address(&node.0);
 
             if address == self.own_validator_address {
@@ -247,10 +245,10 @@ impl HbbftPeersManagement {
         self.connected_current_validators = current_validator_connections;
     }
 
-    // if we drop out as a current validator,
-    // as well a pending validator, we should drop
-    // all reserved connections.
-    // in later addition, we will keep the Partner Node Connections here. (upcomming feature)
+    /// if we drop out as a current validator,
+    /// as well a pending validator, we should drop
+    /// all reserved connections.
+    /// in later addition, we will keep the Partner Node Connections here. (upcomming feature)
     pub fn disconnect_all_validators(&mut self, client_arc: &Arc<dyn EngineClient>) {
         // we safely can disconnect even in situation where we are syncing.
 
@@ -371,7 +369,7 @@ impl HbbftPeersManagement {
         // we do not need to do a special handling for 0.0.0.0, because
         // our IP is always different to that.
 
-        warn!(target: "engine", "checking if internet address needs to be updated.");
+        trace!(target: "engine", "checking if internet address needs to be updated.");
 
         let current_endpoint = if let Some(peers_management) = block_chain_client
             .reserved_peers_management()
@@ -390,14 +388,14 @@ impl HbbftPeersManagement {
         };
         //let peers_management =
 
-        warn!(target: "engine", "current Endpoint: {:?}", current_endpoint);
+        trace!(target: "engine", "current Endpoint: {:?}", current_endpoint);
 
         // todo: we can improve performance,
         // by assuming that we are the only one who writes the internet address.
         // so we have to query this data only once, and then we can cache it.
         match get_validator_internet_address(engine_client, &staking_address) {
             Ok(validator_internet_address) => {
-                warn!(target: "engine", "stored validator address{:?}", validator_internet_address);
+                trace!(target: "engine", "stored validator address{:?}", validator_internet_address);
                 if validator_internet_address.eq(&current_endpoint) {
                     // if the current stored endpoint is the same as the current endpoint,
                     // we don't need to do anything.
@@ -536,6 +534,7 @@ fn connect_to_validator_core(
     };
 
     if socket_addr.port() == 0 {
+        error!(target: "engine", "connect_to_validator_core: no port specified for Node ( Public (NodeId): {:?} , staking address: {}, socket_addr: {:?}", node_id, staking_address, socket_addr);
         // we interprate port 0 as NULL.
         return None;
     }
