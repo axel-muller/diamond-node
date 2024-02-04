@@ -32,6 +32,21 @@ pub struct HbbftParamsSkipBlockReward {
     pub to_block: Option<u64>,
 }
 
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct HbbftNetworkForks {
+
+
+}
+
+pub struct HbbftNetworkFork {
+    /// Block number at which the fork starts.
+    pub block_number_start: u64,
+    /// Validator set at the fork.
+    pub validator_set: Vec<Address>,
+}
+
 /// Hbbft parameters.
 #[derive(Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -54,6 +69,12 @@ pub struct HbbftParams {
     /// Directory where to store the Hbbft Messages.
     /// Usually only the latest HBBFT messages are interesting for Debug, Analytics or Evidence.
     pub blocks_to_keep_directory: Option<String>,
+    /// Hbbft network forks.
+    /// A Fork defines a new Validator Set.
+    /// This validator set is becomming pending so it can write it's PARTs and ACKS.
+    /// From beginning of the fork trigger block until the finality of the key gen transactions,
+    /// no block verifications are done.
+    pub forks: HbbftNetworkForks,
 }
 
 /// Hbbft engine config.
