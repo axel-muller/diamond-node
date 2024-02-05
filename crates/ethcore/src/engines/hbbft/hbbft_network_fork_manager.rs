@@ -1,7 +1,14 @@
 use std::collections::VecDeque;
 
 use ethereum_types::Address;
+use hbbft::sync_key_gen::Ack;
+use hbbft::sync_key_gen::Part;
 
+struct HbbftForkKeys {
+    validators: Vec<Address>,
+    parts: Vec<Part>,
+    acks: Vec<Ack>,
+}
 
 struct HbbftFork {
     start_timestamp: u64,
@@ -9,7 +16,7 @@ struct HbbftFork {
     is_finished: bool,
     end_timestamp: u64,
     end_block: u64,
-    validator_set: Vec<Address>,
+    validator_set: HbbftForkKeys,
 }
 
 
