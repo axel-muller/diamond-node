@@ -43,10 +43,10 @@ pub struct HbbftNetworkFork {
     /// Validator set at the fork.
     
     pub validators: Vec<Address>,
-    #[serde_as(as = "serde_with::hex::Hex")]
-    pub parts: Vec<u8>,
-    #[serde_as(as = "serde_with::hex::Hex")]
-    pub acks: Vec<u8>, 
+    #[serde_as(as = "Vec<serde_with::hex::Hex>")]
+    pub parts: Vec<Vec<u8>>,
+    #[serde_as(as = "Vec<serde_with::hex::Hex>")]
+    pub acks: Vec<Vec<u8>>, 
 }
 
 
@@ -151,8 +151,8 @@ mod tests {
                         "validators": [
                             "0xfe163fc225f3863cef09f1f68ead173f30300d13"
                         ],
-                        "parts": "19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9",
-                        "acks": "19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"
+                        "parts": ["19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"],
+                        "acks": ["19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"]
                     }
                 ]
 			}
@@ -161,8 +161,8 @@ mod tests {
         let deserialized: Hbbft = serde_json::from_str(s).unwrap();
         assert_eq!(deserialized.params.forks.len() , 1);
         assert_eq!(deserialized.params.forks.get(0).expect("").block_number_start , 777);
-        assert_eq!(deserialized.params.forks.get(0).expect("").parts.len() , 64);
-        assert_eq!(deserialized.params.forks.get(0).expect("").acks.len() , 64);
+        assert_eq!(deserialized.params.forks.get(0).expect("").parts.len() , 1);
+        assert_eq!(deserialized.params.forks.get(0).expect("").acks.len() , 1);
         
         
     }
