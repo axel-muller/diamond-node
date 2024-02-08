@@ -3,8 +3,8 @@ mod contracts;
 mod contribution;
 mod hbbft_early_epoch_end_manager;
 mod hbbft_engine;
-mod hbbft_network_fork_manager;
 mod hbbft_message_memorium;
+mod hbbft_network_fork_manager;
 mod hbbft_peers_management;
 mod hbbft_state;
 mod keygen_transactions;
@@ -17,7 +17,6 @@ pub use self::hbbft_engine::HoneyBadgerBFT;
 
 use crypto::publickey::Public;
 use std::fmt;
-
 
 #[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NodeId(pub Public);

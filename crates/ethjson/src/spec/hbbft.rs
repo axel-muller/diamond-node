@@ -41,14 +41,12 @@ pub struct HbbftNetworkFork {
     /// Block number at which the fork starts.
     pub block_number_start: u64,
     /// Validator set at the fork.
-    
     pub validators: Vec<Address>,
     #[serde_as(as = "Vec<serde_with::hex::Hex>")]
     pub parts: Vec<Vec<u8>>,
     #[serde_as(as = "Vec<serde_with::hex::Hex>")]
-    pub acks: Vec<Vec<u8>>, 
+    pub acks: Vec<Vec<u8>>,
 }
-
 
 /// Hbbft parameters.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -120,8 +118,8 @@ mod tests {
     #[test]
     fn hbbft_deserialization_forks() {
         // let s = r#"{
-		// 	"params": {
-		// 		"forks": {
+        // 	"params": {
+        // 		"forks": {
         //             {
         //                 "blockNumberStart" : 777,
         //                 "validators": [
@@ -135,8 +133,8 @@ mod tests {
         //                 ]
         //             }
         //         }
-		// 	}
-		// }"#;
+        // 	}
+        // }"#;
 
         let s = r#"{
 			"params": {
@@ -159,12 +157,18 @@ mod tests {
 		}"#;
 
         let deserialized: Hbbft = serde_json::from_str(s).unwrap();
-        assert_eq!(deserialized.params.forks.len() , 1);
-        assert_eq!(deserialized.params.forks.get(0).expect("").block_number_start , 777);
-        assert_eq!(deserialized.params.forks.get(0).expect("").parts.len() , 1);
-        assert_eq!(deserialized.params.forks.get(0).expect("").acks.len() , 1);
-        
-        
+        assert_eq!(deserialized.params.forks.len(), 1);
+        assert_eq!(
+            deserialized
+                .params
+                .forks
+                .get(0)
+                .expect("")
+                .block_number_start,
+            777
+        );
+        assert_eq!(deserialized.params.forks.get(0).expect("").parts.len(), 1);
+        assert_eq!(deserialized.params.forks.get(0).expect("").acks.len(), 1);
     }
 
     #[test]

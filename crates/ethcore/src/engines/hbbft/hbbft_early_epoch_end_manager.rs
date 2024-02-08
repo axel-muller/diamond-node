@@ -13,9 +13,7 @@ use std::{
 };
 
 use super::{
-    contracts::connectivity_tracker_hbbft::{
-        report_reconnect, is_connectivity_loss_reported,
-    },
+    contracts::connectivity_tracker_hbbft::{is_connectivity_loss_reported, report_reconnect},
     hbbft_message_memorium::HbbftMessageMemorium,
     NodeId,
 };
@@ -129,11 +127,9 @@ impl HbbftEarlyEpochEndManager {
         signing_address: &Address,
         epoch: u64,
     ) -> Vec<NodeId> {
-
         let mut result = Vec::<NodeId>::new();
 
         for validator in validators.iter() {
-
             let validator_address = if let Some(a) = node_id_to_address.get(validator) {
                 a
             } else {
@@ -141,7 +137,13 @@ impl HbbftEarlyEpochEndManager {
                 continue;
             };
 
-            if let Ok(reported) = is_connectivity_loss_reported(client, block_id, signing_address, epoch, validator_address) {
+            if let Ok(reported) = is_connectivity_loss_reported(
+                client,
+                block_id,
+                signing_address,
+                epoch,
+                validator_address,
+            ) {
                 if reported {
                     result.push(validator.clone());
                 }
@@ -227,9 +229,18 @@ impl HbbftEarlyEpochEndManager {
         }
     }
 
-    pub fn is_reported(&self, client: &dyn EngineClient, other_validator_address: &Address) -> bool {
-
-        let result = is_connectivity_loss_reported(client, BlockId::Latest, &self.signing_address, self.current_tracked_epoch_number, other_validator_address);
+    pub fn is_reported(
+        &self,
+        client: &dyn EngineClient,
+        other_validator_address: &Address,
+    ) -> bool {
+        let result = is_connectivity_loss_reported(
+            client,
+            BlockId::Latest,
+            &self.signing_address,
+            self.current_tracked_epoch_number,
+            other_validator_address,
+        );
 
         if let Ok(r) = result {
             return r;
@@ -258,7 +269,6 @@ impl HbbftEarlyEpochEndManager {
             debug!(target: "engine", "early-epoch-end: no decision: syncing");
             return;
         }
-
 
         if full_client.is_syncing() {
             // if we are syncing, we wont do any blaming.
@@ -294,7 +304,7 @@ impl HbbftEarlyEpochEndManager {
                         continue;
                     }
                 };
-                
+
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
                     let last_sealing_message = node_history.get_sealing_message();
 
@@ -305,21 +315,16 @@ impl HbbftEarlyEpochEndManager {
                             // this function will also add the validator to the list of flagged validators.
                             self.notify_about_missing_validator(&validator, client, full_client);
                         }
-
                     } else {
                         // this validator is OK.
                         // maybe it was flagged and we need to unflag it ?
-
-                        
 
                         if self.is_reported(client, validator_address) {
                             self.notify_about_validator_reconnect(&validator, full_client, client);
                         }
                     }
                 } else {
-                    
                     debug!(target: "engine", "early-epoch-end: no history info for validator {validator}");
-
 
                     // we do not have any history for this node.
                     if !self.is_reported(client, validator_address) {

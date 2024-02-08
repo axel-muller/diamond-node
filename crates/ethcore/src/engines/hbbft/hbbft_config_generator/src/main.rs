@@ -239,7 +239,7 @@ fn to_toml(
     }
 
     let mut misc = Map::new();
-    
+
     // example for a more verbose logging.
     // Value::String("txqueue=trace,consensus=debug,engine=trace,own_tx=trace,miner=trace,tx_filter=trace".into())
     misc.insert(

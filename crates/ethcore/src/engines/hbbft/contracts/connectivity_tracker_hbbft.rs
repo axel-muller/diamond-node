@@ -45,7 +45,6 @@ pub fn is_connectivity_loss_reported(
     )?);
 }
 
-
 pub fn get_current_flagged_validators_from_contract(
     client: &dyn EngineClient,
     block_id: BlockId,
