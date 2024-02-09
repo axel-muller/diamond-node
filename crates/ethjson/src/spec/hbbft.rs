@@ -40,6 +40,11 @@ pub struct HbbftParamsSkipBlockReward {
 pub struct HbbftNetworkFork {
     /// Block number at which the fork starts.
     pub block_number_start: u64,
+
+    /// Forks that became finished, require a definition when the take over of the 
+    /// specified validators was finished.
+    #[serde(default)]
+    pub block_number_end: Option<u64>,
     /// Validator set at the fork.
     pub validators: Vec<Address>,
     #[serde_as(as = "Vec<serde_with::hex::Hex>")]
