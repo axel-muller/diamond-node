@@ -117,24 +117,6 @@ mod tests {
 
     #[test]
     fn hbbft_deserialization_forks() {
-        // let s = r#"{
-        // 	"params": {
-        // 		"forks": {
-        //             {
-        //                 "blockNumberStart" : 777,
-        //                 "validators": [
-        //                     "0xfe163fc225f3863cef09f1f68ead173f30300d13"
-        //                 ],
-        //                 "parts": [
-        //                     "0x19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"
-        //                 ],
-        //                 "acks": [
-        //                     "0x19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"
-        //                 ]
-        //             }
-        //         }
-        // 	}
-        // }"#;
 
         let s = r#"{
 			"params": {
