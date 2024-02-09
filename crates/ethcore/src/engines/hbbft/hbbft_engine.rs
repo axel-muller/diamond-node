@@ -1,6 +1,7 @@
 use super::{
     block_reward_hbbft::BlockRewardContract,
     hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
+    hbbft_network_fork_manager::HbbftNetworkForkManager,
 };
 use crate::{
     client::BlockChainClient,
@@ -92,6 +93,7 @@ pub struct HoneyBadgerBFT {
     peers_management: Mutex<HbbftPeersManagement>,
     current_minimum_gas_price: Mutex<Option<U256>>,
     early_epoch_manager: Mutex<Option<HbbftEarlyEpochEndManager>>,
+    fork_manager: Mutex<HbbftNetworkForkManager>,
 }
 
 struct TransitionHandler {
@@ -422,6 +424,7 @@ impl HoneyBadgerBFT {
     /// Creates an instance of the Honey Badger BFT Engine.
     pub fn new(params: HbbftParams, machine: EthereumMachine) -> Result<Arc<Self>, Error> {
         let is_unit_test = params.is_unit_test.unwrap_or(false);
+
         let engine = Arc::new(HoneyBadgerBFT {
             transition_service: IoService::<()>::start("Hbbft")?,
             client: Arc::new(RwLock::new(None)),
@@ -450,6 +453,7 @@ impl HoneyBadgerBFT {
             peers_management: Mutex::new(HbbftPeersManagement::new()),
             current_minimum_gas_price: Mutex::new(None),
             early_epoch_manager: Mutex::new(None),
+            fork_manager: Mutex::new(HbbftNetworkForkManager::new()),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -1419,6 +1423,13 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn register_client(&self, client: Weak<dyn EngineClient>) {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
+
+            if let Some(latest_block) = client.block_number(BlockId::Latest) {
+                self.fork_manager.lock().initialize(latest_block, self.params.forks.clone());
+            } else {
+                error!(target: "engine", "hbbft-hardfork : could not initialialize hardfork manager, no latest block found.");
+            }
+
             let mut state = self.hbbft_state.write();
             match state.update_honeybadger(
                 client,
