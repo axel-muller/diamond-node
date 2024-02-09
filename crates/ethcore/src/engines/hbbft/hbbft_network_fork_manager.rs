@@ -5,33 +5,27 @@ use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::sync_key_gen::{Ack, Part};
 
 struct HbbftFork {
-//    start_timestamp: u64,
+    //    start_timestamp: u64,
     start_block: u64,
-//    end_timestamp: u64,
+    //    end_timestamp: u64,
     end_block: Option<u64>,
     validators: Vec<Address>,
     parts: Vec<Part>,
     acks: Vec<Ack>,
 }
 
-
 impl HbbftFork {
-
     pub fn from_definition(fork_definiton: &HbbftNetworkFork) -> HbbftFork {
-
-        let parts  = fork_definiton.parts.iter().map(|p| { 
-            
+        let parts = fork_definiton.parts.iter().map(|p| {
             if let Ok(part) = bincode::deserialize( p.as_slice()) {
                 part
             } else {
                 error!(target:"engine", "hbbft-hardfork: could not interprete part from spec: {:?}", p.as_slice());
-                panic!("hbbft-hardfork: could not interprete part from spec: {:?}", p.as_slice());
-                
+                panic!("hbbft-hardfork: could not interprete part from spec: {:?}", p.as_slice());   
             }
         }).collect();
 
-        let acks = fork_definiton.acks.iter().map(|a| { 
-            
+        let acks = fork_definiton.acks.iter().map(|a| {
             if let Ok(ack) = bincode::deserialize( a.as_slice()) {
                 ack
             } else {
@@ -47,7 +41,7 @@ impl HbbftFork {
             end_block: fork_definiton.block_number_end,
             validators: fork_definiton.validators.clone(),
             parts,
-            acks
+            acks,
         }
     }
 }
@@ -91,7 +85,11 @@ impl HbbftNetworkForkManager {
     /// the Fork Manager is able to determine when the next fork is pending.
     /// Forks that are already known to be finished,
     /// have to be declared as finished.
-    pub fn initialize(&mut self, startup_block_number: u64, mut fork_definition:  Vec<HbbftNetworkFork>,) {
+    pub fn initialize(
+        &mut self,
+        startup_block_number: u64,
+        mut fork_definition: Vec<HbbftNetworkFork>,
+    ) {
         if self.is_init {
             panic!("HbbftNetworkForkManager is already initialized");
         }
@@ -120,7 +118,8 @@ impl HbbftNetworkForkManager {
                     continue;
                 }
 
-                self.pending_forks.push_back(HbbftFork::from_definition(fork_def));
+                self.pending_forks
+                    .push_back(HbbftFork::from_definition(fork_def));
             }
         }
 
