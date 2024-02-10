@@ -89,6 +89,17 @@ impl HbbftState {
             }
         }
 
+        // https://github.com/DMDcoin/diamond-node/issues/98
+        // check here if we are in a fork scenario.
+        // in a fork scenario, the new honeybadger keys will come from the config,
+        // and not from the contracts.
+        // also the current block will trigger the epoch end,
+        // this will start the loop for finding a new validator set,
+        // probably it will fail multiple times,
+        // because nodes that do not apply to the fork rule will drop out.
+        // this might happen for a lot of key-gen rounds, until a set with responsive validators
+        // can be found.
+
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
