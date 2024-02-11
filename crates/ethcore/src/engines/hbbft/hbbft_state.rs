@@ -2,6 +2,7 @@ use client::traits::EngineClient;
 use engines::signer::EngineSigner;
 use ethcore_miner::pool::{PoolVerifiedTransaction, ScoredTransaction};
 use ethereum_types::U256;
+use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::{
     crypto::{PublicKey, Signature},
     honey_badger::{self, HoneyBadgerBuilder},
@@ -23,11 +24,7 @@ use super::{
         keygen_history::{initialize_synckeygen, synckeygen_to_network_info},
         staking::{get_posdao_epoch, get_posdao_epoch_start},
         validator_set::ValidatorType,
-    },
-    contribution::Contribution,
-    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
-    hbbft_peers_management::HbbftPeersManagement,
-    NodeId,
+    }, contribution::Contribution, hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager, hbbft_network_fork_manager::HbbftNetworkForkManager, hbbft_peers_management::HbbftPeersManagement, NodeId
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -44,6 +41,7 @@ pub(crate) struct HbbftState {
     current_posdao_epoch_start_block: u64,
     last_posdao_epoch_start_block: Option<u64>,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    fork_manager: HbbftNetworkForkManager,
 }
 
 impl HbbftState {
@@ -56,6 +54,7 @@ impl HbbftState {
             current_posdao_epoch_start_block: 0,
             last_posdao_epoch_start_block: None,
             future_messages_cache: BTreeMap::new(),
+            fork_manager: HbbftNetworkForkManager::new(),
         }
     }
 
@@ -63,6 +62,10 @@ impl HbbftState {
         let mut builder: HoneyBadgerBuilder<Contribution, _> =
             HoneyBadger::builder(Arc::new(network_info));
         return Some(builder.build());
+    }
+
+    pub fn init_fork_manager(&mut self, latest_block: u64, fork_definition: Vec<HbbftNetworkFork>) {
+        self.fork_manager.initialize(latest_block, fork_definition);
     }
 
     /**
@@ -99,6 +102,8 @@ impl HbbftState {
         // because nodes that do not apply to the fork rule will drop out.
         // this might happen for a lot of key-gen rounds, until a set with responsive validators
         // can be found.
+
+        
 
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
