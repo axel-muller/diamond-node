@@ -1423,12 +1423,10 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     fn register_client(&self, client: Weak<dyn EngineClient>) {
         *self.client.write() = Some(client.clone());
         if let Some(client) = self.client_arc() {
-            
             let mut state = self.hbbft_state.write();
-            
+
             if let Some(latest_block) = client.block_number(BlockId::Latest) {
                 state.init_fork_manager(latest_block, self.params.forks.clone());
-
             } else {
                 error!(target: "engine", "hbbft-hardfork : could not initialialize hardfork manager, no latest block found.");
             }

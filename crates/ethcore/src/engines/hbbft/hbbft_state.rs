@@ -24,7 +24,12 @@ use super::{
         keygen_history::{initialize_synckeygen, synckeygen_to_network_info},
         staking::{get_posdao_epoch, get_posdao_epoch_start},
         validator_set::ValidatorType,
-    }, contribution::Contribution, hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager, hbbft_network_fork_manager::HbbftNetworkForkManager, hbbft_peers_management::HbbftPeersManagement, NodeId
+    },
+    contribution::Contribution,
+    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
+    hbbft_network_fork_manager::HbbftNetworkForkManager,
+    hbbft_peers_management::HbbftPeersManagement,
+    NodeId,
 };
 
 pub type HbMessage = honey_badger::Message<NodeId>;
@@ -102,8 +107,6 @@ impl HbbftState {
         // because nodes that do not apply to the fork rule will drop out.
         // this might happen for a lot of key-gen rounds, until a set with responsive validators
         // can be found.
-
-        
 
         if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
