@@ -46,8 +46,9 @@ pub struct HbbftNetworkFork {
     #[serde(default)]
     pub block_number_end: Option<u64>,
 
-    /// Validator set at the fork.
-    pub validators: Vec<Address>,
+    /// Validator set (public keys) of the fork.
+    #[serde_as(as = "Vec<serde_with::hex::Hex>")]
+    pub validators: Vec<Vec<u8>>,
 
     #[serde_as(as = "Vec<serde_with::hex::Hex>")]
     pub parts: Vec<Vec<u8>>,
@@ -119,8 +120,9 @@ impl HbbftParams {
 
 #[cfg(test)]
 mod tests {
-    use super::Hbbft;
     use ethereum_types::Address;
+
+    use super::Hbbft;
     use std::str::FromStr;
 
     #[test]
@@ -136,7 +138,7 @@ mod tests {
                     {
                         "blockNumberStart" : 777,
                         "validators": [
-                            "0xfe163fc225f3863cef09f1f68ead173f30300d13"
+                            "12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
                         ],
                         "parts": ["19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"],
                         "acks": ["19585436b7d97298a751e2a6020c30677497772013001420c0a6aea5790347bdf5531c1387be685a232b01ec614913b18da0a6cbcd1074f1733f902a7eb656e9"]
@@ -158,6 +160,8 @@ mod tests {
         );
         assert_eq!(deserialized.params.forks.get(0).expect("").parts.len(), 1);
         assert_eq!(deserialized.params.forks.get(0).expect("").acks.len(), 1);
+        assert_eq!(deserialized.params.forks.get(0).expect("").validators.len(), 1);
+        assert_eq!(deserialized.params.forks.get(0).expect("").validators.get(0).expect("").len(), 64);
     }
 
     #[test]
