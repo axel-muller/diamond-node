@@ -12,7 +12,7 @@ use crate::{
 use bytes::ToPretty;
 
 use ethereum_types::Address;
-use hbbft::NetworkInfo;
+
 
 use super::{contracts::staking::get_pool_public_key, NodeId};
 
