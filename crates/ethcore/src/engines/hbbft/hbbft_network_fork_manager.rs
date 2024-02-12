@@ -9,8 +9,13 @@ use super::NodeId;
 struct HbbftFork {
     //    start_timestamp: u64,
     start_block: u64,
-    //    end_timestamp: u64,
+
+    // start epoch is set, if the fork has been started.
+    start_epoch: Option<u64>,
+
+    // end_block is set when the fork process is finished and the network operation has normaliced again.
     end_block: Option<u64>,
+
     validators: Vec<Address>,
     parts: Vec<Part>,
     acks: Vec<Ack>,
@@ -40,6 +45,7 @@ impl HbbftFork {
 
         HbbftFork {
             start_block: fork_definiton.block_number_start,
+            start_epoch: None,
             end_block: fork_definiton.block_number_end,
             validators: fork_definiton.validators.clone(),
             parts,
@@ -53,8 +59,6 @@ impl HbbftFork {
 /// It allows cheap queries to see if a Fork is pending,
 /// and stores information about a fork that is finished.
 pub struct HbbftNetworkForkManager {
-    /// If a fork is currently in progress, this is true.
-    is_currently_forking: bool,
 
     /// a ordered list with upcomming forks.
     finished_forks: VecDeque<HbbftFork>,
@@ -75,10 +79,40 @@ impl HbbftNetworkForkManager {
     /// declares the fork as active,
     pub fn should_fork(
         &mut self,
-        last_block_number: u64
+        last_block_number: u64,
+        current_epoch: u64
     ) -> Option<NetworkInfo<NodeId>> {
         // fields omitted
 
+        if let Some(next_fork) = self.pending_forks.front_mut() {
+            
+            if next_fork.start_block == last_block_number {
+               
+                todo!("Fork not implemented!");
+                
+                // return Some(NetworkInfo {
+                //     validators: next_fork.validators.clone(),
+                //     parts: next_fork.parts.clone(),
+                //     acks: next_fork.acks.clone(),
+                // });
+            } else if next_fork.start_block > last_block_number {
+
+                // in the following blocks after the fork process was started,
+                // it is possible for the network to have now ended the fork process.
+                // we are checking if the current epoch is greater than the start epoch.
+
+                if let Some(start_epoch) = next_fork.start_epoch {
+                    if current_epoch == start_epoch + 1 {
+                        next_fork.end_block = Some(last_block_number);
+
+                        // the fork process is finished.
+                        // we are moving the fork to the finished forks list.
+                        
+                        // self.finished_forks.push_back(self.pending_forks.pop_front().unwrap());
+                    }
+                }
+            } // else: we are just waiting for the fork to happen.
+        }
         None
 
     }
@@ -144,7 +178,6 @@ impl HbbftNetworkForkManager {
 
     pub fn new() -> HbbftNetworkForkManager {
         HbbftNetworkForkManager {
-            is_currently_forking: false,
             finished_forks: VecDeque::new(),
             pending_forks: VecDeque::new(),
             is_init: false,
