@@ -1196,6 +1196,7 @@ impl Spec {
         load_bundled!("test/authority_round_block_reward_contract")
     }
 
+    /// test: authority_round_rewrite_bytecode_transitions
     #[cfg(any(test, feature = "test-helpers"))]
     pub fn new_test_round_rewrite_bytecode_transitions() -> Self {
         load_bundled!("test/authority_round_rewrite_bytecode_transitions")
