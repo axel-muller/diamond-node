@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 
 use ethereum_types::Address;
 use ethjson::spec::hbbft::HbbftNetworkFork;
-use hbbft::sync_key_gen::{Ack, Part};
+use hbbft::{sync_key_gen::{Ack, Part}, NetworkInfo};
+
+use super::NodeId;
 
 struct HbbftFork {
     //    start_timestamp: u64,
@@ -67,17 +69,18 @@ pub struct HbbftNetworkForkManager {
 }
 
 impl HbbftNetworkForkManager {
+
     /// Returns None if not forking
     /// Returns a List of Addresses that become the new validator set and
     /// declares the fork as active,
     pub fn should_fork(
         &mut self,
-        last_block_number: u64,
-        last_block_time_stamp: u64,
-    ) -> Option<Vec<Address>> {
+        last_block_number: u64
+    ) -> Option<NetworkInfo<NodeId>> {
         // fields omitted
 
         None
+
     }
 
     /// Initializes the fork Manager,
@@ -148,3 +151,6 @@ impl HbbftNetworkForkManager {
         }
     }
 }
+
+
+
