@@ -69,8 +69,8 @@ impl HbbftState {
         return Some(builder.build());
     }
 
-    pub fn init_fork_manager(&mut self, latest_block: u64, fork_definition: Vec<HbbftNetworkFork>) {
-        self.fork_manager.initialize(latest_block, fork_definition);
+    pub fn init_fork_manager(&mut self, own_id: NodeId, latest_block: u64, fork_definition: Vec<HbbftNetworkFork>) {
+        self.fork_manager.initialize(own_id, latest_block,  fork_definition);
     }
 
     /**

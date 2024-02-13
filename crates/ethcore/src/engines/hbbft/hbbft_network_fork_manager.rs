@@ -1,11 +1,15 @@
-use std::collections::VecDeque;
+use std::{collections::{BTreeMap, VecDeque}, sync::Arc};
 
 use ethereum_types::Address;
 use ethjson::spec::hbbft::HbbftNetworkFork;
-use hbbft::{sync_key_gen::{Ack, Part}, NetworkInfo};
+use hbbft::{crypto::PublicKeySet, sync_key_gen::{Ack, Part, SyncKeyGen}, util::max_faulty, NetworkInfo};
+use parking_lot::RwLock;
+
+use crate::engines::{hbbft::contracts::keygen_history::{KeyPairWrapper, PublicWrapper}, EngineSigner};
 
 use super::NodeId;
 
+#[derive(Debug)]
 struct HbbftFork {
     //    start_timestamp: u64,
     start_block: u64,
@@ -16,7 +20,7 @@ struct HbbftFork {
     // end_block is set when the fork process is finished and the network operation has normaliced again.
     end_block: Option<u64>,
 
-    validators: Vec<Address>,
+    validators: Vec<NodeId>,
     parts: Vec<Part>,
     acks: Vec<Ack>,
 }
@@ -36,18 +40,26 @@ impl HbbftFork {
             if let Ok(ack) = bincode::deserialize( a.as_slice()) {
                 ack
             } else {
-                error!(target:"engine", "hbbft-hardfork: could not interprete part from spec: {:?}", a.as_slice());
-                panic!("hbbft-hardfork: could not interprete part from spec: {:?}", a.as_slice());
+                error!(target:"engine", "hbbft-hardfork: could not interprete acks from spec: {:?}", a.as_slice());
+                panic!("hbbft-hardfork: could not interprete acks from spec: {:?}", a.as_slice());
             }
         }).collect();
 
-        //bincode::deserialize(&serialized_part).unwrap();
+        
+        let node_ids = fork_definiton.acks.iter().map(|h| {
+            if let Ok(node_id) = bincode::deserialize( h.as_slice()) {
+                node_id
+            } else {
+                error!(target:"engine", "hbbft-hardfork: could not interprete nodeIds from spec: {:?}", h.as_slice());
+                panic!("hbbft-hardfork: could not interprete part from spec: {:?}", h.as_slice());
+            }
+        }).collect();
 
         HbbftFork {
             start_block: fork_definiton.block_number_start,
             start_epoch: None,
             end_block: fork_definiton.block_number_end,
-            validators: fork_definiton.validators.clone(),
+            validators: node_ids,
             parts,
             acks,
         }
@@ -70,6 +82,8 @@ pub struct HbbftNetworkForkManager {
     /// we cannot apply the RAI pattern because of the delayed Hbbft initialization
     /// this variable tracks if the fork manager is initialized or not.
     is_init: bool,
+
+    own_id: NodeId
 }
 
 impl HbbftNetworkForkManager {
@@ -80,7 +94,8 @@ impl HbbftNetworkForkManager {
     pub fn should_fork(
         &mut self,
         last_block_number: u64,
-        current_epoch: u64
+        current_epoch: u64,
+        signer_lock: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
     ) -> Option<NetworkInfo<NodeId>> {
         // fields omitted
 
@@ -88,13 +103,52 @@ impl HbbftNetworkForkManager {
             
             if next_fork.start_block == last_block_number {
                
-                todo!("Fork not implemented!");
+               //let keys : PublicKeySet = PublicKeySet::
+               let wrapper = KeyPairWrapper {
+                    inner: signer_lock.clone(),
+                };
                 
-                // return Some(NetworkInfo {
-                //     validators: next_fork.validators.clone(),
-                //     parts: next_fork.parts.clone(),
-                //     acks: next_fork.acks.clone(),
-                // });
+                let mut rng = rand::thread_rng();
+                let mut pub_keys_btree: BTreeMap<NodeId, PublicWrapper> = BTreeMap::new();
+
+                for v in next_fork.validators.iter() {
+                    pub_keys_btree.insert(v.clone(), PublicWrapper { 
+                        inner: v.clone().0
+                    });
+                }
+                
+                let pub_keys: Arc<BTreeMap<NodeId, PublicWrapper>> = Arc::new(pub_keys_btree);
+                let skg = match SyncKeyGen::new(self.own_id, wrapper, pub_keys, max_faulty(next_fork.validators.len()), &mut rng) {
+                    Ok(s) => s.0,
+                    Err(e) => {
+                        error!(target: "engine", "hbbft-hardfork: could not create SyncKeyGen: {:?}", e);
+                        panic!("hbbft-hardfork: could not create SyncKeyGen: {:?}", e);
+                    }
+                };
+                
+                if !skg.is_ready() {
+                    error!(target: "engine", "hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}", next_fork);
+                    panic!("hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}", next_fork);
+                }
+
+
+                let (pks, sks) = match skg.generate() {
+                    Ok((p, s)) => (p, s),
+                    Err(e) => {
+                        error!(target: "engine", "hbbft-hardfork: could not generate keys for fork: {:?} {:?}", e, next_fork);
+                        panic!("hbbft-hardfork: could not generate keys for fork: {:?} {:?}", e, next_fork);
+                    }
+                };
+
+                let result = NetworkInfo::<NodeId>::new(
+                    self.own_id,
+                    sks,
+                    pks,
+                    next_fork.validators.clone()
+                );
+
+                return Some(result);
+
             } else if next_fork.start_block > last_block_number {
 
                 // in the following blocks after the fork process was started,
@@ -108,7 +162,7 @@ impl HbbftNetworkForkManager {
                         // the fork process is finished.
                         // we are moving the fork to the finished forks list.
                         
-                        // self.finished_forks.push_back(self.pending_forks.pop_front().unwrap());
+                        self.finished_forks.push_back(self.pending_forks.pop_front().unwrap());
                     }
                 }
             } // else: we are just waiting for the fork to happen.
@@ -124,12 +178,15 @@ impl HbbftNetworkForkManager {
     /// have to be declared as finished.
     pub fn initialize(
         &mut self,
+        own_id: NodeId,
         startup_block_number: u64,
         mut fork_definition: Vec<HbbftNetworkFork>,
     ) {
         if self.is_init {
             panic!("HbbftNetworkForkManager is already initialized");
         }
+
+        self.own_id = own_id;        
 
         fork_definition.sort_by_key(|fork| fork.block_number_start);
 
@@ -181,9 +238,41 @@ impl HbbftNetworkForkManager {
             finished_forks: VecDeque::new(),
             pending_forks: VecDeque::new(),
             is_init: false,
+            own_id: NodeId::default(),
         }
     }
 }
 
 
 
+#[cfg(test)]
+mod tests { 
+
+    use super::*;
+    use ethjson::spec::hbbft::HbbftNetworkFork;
+    use hbbft::sync_key_gen::{Ack, Part};
+    use ethereum_types::Address;
+
+    #[test]
+    fn test_should_fork() {
+        // let mut fork_manager = HbbftNetworkForkManager::new();
+        // let mut fork_definition = Vec::new();
+
+        // let mut fork = HbbftNetworkFork {
+        //     block_number_start: 10,
+        //     block_number_end: Some(20),
+        //     validators: vec![Address::from([0; 20])],
+        //     parts: vec![bincode::serialize(&Part::new(0, 0)).unwrap()],
+        //     acks: vec![bincode::serialize(&Ack::new(0, 0)).unwrap()],
+        // };
+
+        // fork_definition.push(fork);
+
+        // fork_manager.initialize(5, fork_definition);
+
+        // let result = fork_manager.should_fork(10, 0);
+        // assert!(result.is_some());
+    }
+
+
+}
