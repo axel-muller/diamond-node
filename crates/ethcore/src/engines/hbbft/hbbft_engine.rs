@@ -1421,15 +1421,11 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     }
 
     fn register_client(&self, client: Weak<dyn EngineClient>) {
-
-        
         *self.client.write() = Some(client.clone());
-
-        
 
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();
-            
+
             // todo: better get the own ID from devP2P communication ?!
             let own_public_key = match self.signer.read().as_ref() {
                 Some(signer) => signer
@@ -1437,9 +1433,13 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                     .expect("Signer's public key must be available!"),
                 None => Public::from(H512::from_low_u64_be(0)),
             };
-            
+
             if let Some(latest_block) = client.block_number(BlockId::Latest) {
-                state.init_fork_manager(NodeId(own_public_key), latest_block, self.params.forks.clone());
+                state.init_fork_manager(
+                    NodeId(own_public_key),
+                    latest_block,
+                    self.params.forks.clone(),
+                );
             } else {
                 error!(target: "engine", "hbbft-hardfork : could not initialialize hardfork manager, no latest block found.");
             }

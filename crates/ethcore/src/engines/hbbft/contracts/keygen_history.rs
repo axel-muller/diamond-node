@@ -108,8 +108,8 @@ pub fn part_of_address(
     match outcome {
         PartOutcome::Invalid(e) => {
             error!(target: "engine", "Part for address {} is invalid: {:?}", address, e);
-            Err(CallError::ReturnValueInvalid) 
-        },
+            Err(CallError::ReturnValueInvalid)
+        }
         PartOutcome::Valid(ack) => Ok(ack),
     }
 }

@@ -160,8 +160,22 @@ mod tests {
         );
         assert_eq!(deserialized.params.forks.get(0).expect("").parts.len(), 1);
         assert_eq!(deserialized.params.forks.get(0).expect("").acks.len(), 1);
-        assert_eq!(deserialized.params.forks.get(0).expect("").validators.len(), 1);
-        assert_eq!(deserialized.params.forks.get(0).expect("").validators.get(0).expect("").len(), 64);
+        assert_eq!(
+            deserialized.params.forks.get(0).expect("").validators.len(),
+            1
+        );
+        assert_eq!(
+            deserialized
+                .params
+                .forks
+                .get(0)
+                .expect("")
+                .validators
+                .get(0)
+                .expect("")
+                .len(),
+            64
+        );
     }
 
     #[test]

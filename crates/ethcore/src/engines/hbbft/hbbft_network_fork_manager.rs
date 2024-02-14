@@ -1,11 +1,22 @@
-use std::{collections::{BTreeMap, VecDeque}, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 use ethereum_types::Address;
 use ethjson::spec::hbbft::HbbftNetworkFork;
-use hbbft::{crypto::PublicKeySet, sync_key_gen::{Ack, Part, SyncKeyGen}, util::max_faulty, NetworkInfo};
+use hbbft::{
+    crypto::PublicKeySet,
+    sync_key_gen::{Ack, Part, PartOutcome, SyncKeyGen},
+    util::max_faulty,
+    NetworkInfo,
+};
 use parking_lot::RwLock;
 
-use crate::engines::{hbbft::contracts::keygen_history::{KeyPairWrapper, PublicWrapper}, EngineSigner};
+use crate::engines::{
+    hbbft::contracts::keygen_history::{KeyPairWrapper, PublicWrapper},
+    EngineSigner,
+};
 
 use super::NodeId;
 
@@ -45,7 +56,6 @@ impl HbbftFork {
             }
         }).collect();
 
-        
         let node_ids = fork_definiton.acks.iter().map(|h| {
             if let Ok(node_id) = bincode::deserialize( h.as_slice()) {
                 node_id
@@ -71,7 +81,6 @@ impl HbbftFork {
 /// It allows cheap queries to see if a Fork is pending,
 /// and stores information about a fork that is finished.
 pub struct HbbftNetworkForkManager {
-
     /// a ordered list with upcomming forks.
     finished_forks: VecDeque<HbbftFork>,
 
@@ -83,11 +92,10 @@ pub struct HbbftNetworkForkManager {
     /// this variable tracks if the fork manager is initialized or not.
     is_init: bool,
 
-    own_id: NodeId
+    own_id: NodeId,
 }
 
 impl HbbftNetworkForkManager {
-
     /// Returns None if not forking
     /// Returns a List of Addresses that become the new validator set and
     /// declares the fork as active,
@@ -100,57 +108,78 @@ impl HbbftNetworkForkManager {
         // fields omitted
 
         if let Some(next_fork) = self.pending_forks.front_mut() {
-            
             if next_fork.start_block == last_block_number {
-               
-               //let keys : PublicKeySet = PublicKeySet::
-               let wrapper = KeyPairWrapper {
+                //let keys : PublicKeySet = PublicKeySet::
+                let wrapper = KeyPairWrapper {
                     inner: signer_lock.clone(),
                 };
-                
+
                 let mut rng = rand::thread_rng();
                 let mut pub_keys_btree: BTreeMap<NodeId, PublicWrapper> = BTreeMap::new();
 
                 for v in next_fork.validators.iter() {
-                    pub_keys_btree.insert(v.clone(), PublicWrapper { 
-                        inner: v.clone().0
-                    });
+                    pub_keys_btree.insert(v.clone(), PublicWrapper { inner: v.clone().0 });
                 }
-                
+
                 let pub_keys: Arc<BTreeMap<NodeId, PublicWrapper>> = Arc::new(pub_keys_btree);
-                let skg = match SyncKeyGen::new(self.own_id, wrapper, pub_keys, max_faulty(next_fork.validators.len()), &mut rng) {
+                let mut skg = match SyncKeyGen::new(
+                    self.own_id,
+                    wrapper,
+                    pub_keys,
+                    max_faulty(next_fork.validators.len()),
+                    &mut rng,
+                ) {
                     Ok(s) => s.0,
                     Err(e) => {
                         error!(target: "engine", "hbbft-hardfork: could not create SyncKeyGen: {:?}", e);
                         panic!("hbbft-hardfork: could not create SyncKeyGen: {:?}", e);
                     }
                 };
-                
-                if !skg.is_ready() {
-                    error!(target: "engine", "hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}", next_fork);
-                    panic!("hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}", next_fork);
+
+                //adding the PARTs to the SyncKeyGen
+
+                for i_p in 0..next_fork.validators.len() {
+                    let part = next_fork.parts.get(i_p).unwrap();
+                    let node_id = next_fork.validators.get(i_p).unwrap();
+                    let outcome = skg.handle_part(node_id, part.clone(), &mut rng).unwrap();
+
+                    match outcome {
+                        PartOutcome::Invalid(e) => {
+                            error!(target: "engine", "hbbft-hardfork: Part for node {} is invalid: {:?}", node_id.as_8_byte_string(), e);
+                            panic!(
+                                "hbbft-hardfork: Part for node {} is invalid: {:?}",
+                                node_id.as_8_byte_string(),
+                                e
+                            );
+                        }
+                        PartOutcome::Valid(_) => {}
+                    }
                 }
 
+                if !skg.is_ready() {
+                    error!(target: "engine", "hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}", next_fork);
+                    panic!(
+                        "hbbft-hardfork: missing parts for SyncKeyGen for fork {:?}",
+                        next_fork
+                    );
+                }
 
                 let (pks, sks) = match skg.generate() {
                     Ok((p, s)) => (p, s),
                     Err(e) => {
                         error!(target: "engine", "hbbft-hardfork: could not generate keys for fork: {:?} {:?}", e, next_fork);
-                        panic!("hbbft-hardfork: could not generate keys for fork: {:?} {:?}", e, next_fork);
+                        panic!(
+                            "hbbft-hardfork: could not generate keys for fork: {:?} {:?}",
+                            e, next_fork
+                        );
                     }
                 };
 
-                let result = NetworkInfo::<NodeId>::new(
-                    self.own_id,
-                    sks,
-                    pks,
-                    next_fork.validators.clone()
-                );
+                let result =
+                    NetworkInfo::<NodeId>::new(self.own_id, sks, pks, next_fork.validators.clone());
 
                 return Some(result);
-
             } else if next_fork.start_block > last_block_number {
-
                 // in the following blocks after the fork process was started,
                 // it is possible for the network to have now ended the fork process.
                 // we are checking if the current epoch is greater than the start epoch.
@@ -161,14 +190,14 @@ impl HbbftNetworkForkManager {
 
                         // the fork process is finished.
                         // we are moving the fork to the finished forks list.
-                        
-                        self.finished_forks.push_back(self.pending_forks.pop_front().unwrap());
+
+                        self.finished_forks
+                            .push_back(self.pending_forks.pop_front().unwrap());
                     }
                 }
             } // else: we are just waiting for the fork to happen.
         }
         None
-
     }
 
     /// Initializes the fork Manager,
@@ -186,7 +215,7 @@ impl HbbftNetworkForkManager {
             panic!("HbbftNetworkForkManager is already initialized");
         }
 
-        self.own_id = own_id;        
+        self.own_id = own_id;
 
         fork_definition.sort_by_key(|fork| fork.block_number_start);
 
@@ -243,15 +272,13 @@ impl HbbftNetworkForkManager {
     }
 }
 
-
-
 #[cfg(test)]
-mod tests { 
+mod tests {
 
     use super::*;
+    use ethereum_types::Address;
     use ethjson::spec::hbbft::HbbftNetworkFork;
     use hbbft::sync_key_gen::{Ack, Part};
-    use ethereum_types::Address;
 
     #[test]
     fn test_should_fork() {
@@ -273,6 +300,4 @@ mod tests {
         // let result = fork_manager.should_fork(10, 0);
         // assert!(result.is_some());
     }
-
-
 }

@@ -13,7 +13,6 @@ use bytes::ToPretty;
 
 use ethereum_types::Address;
 
-
 use super::{contracts::staking::get_pool_public_key, NodeId};
 
 #[derive(Clone, Debug)]
@@ -25,9 +24,6 @@ struct ValidatorConnectionData {
     peer_string: String,
     mining_address: Address,
 }
-
-// impl ValidatorConnectionData {
-// }
 
 pub struct HbbftPeersManagement {
     own_validator_address: Address,
