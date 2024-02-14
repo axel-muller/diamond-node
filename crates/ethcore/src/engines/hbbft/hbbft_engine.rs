@@ -1429,13 +1429,6 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
 
         if let Some(client) = self.client_arc() {
             let mut state = self.hbbft_state.write();
-
-            // let our_addr = match *self.signer.read() {
-            //     Some(ref signer) => signer.address(),
-            //     None => {
-            //         NodeId::default()
-            //     }
-            // };
             
             // todo: better get the own ID from devP2P communication ?!
             let own_public_key = match self.signer.read().as_ref() {
