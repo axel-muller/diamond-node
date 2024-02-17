@@ -93,7 +93,6 @@ pub struct HoneyBadgerBFT {
     peers_management: Mutex<HbbftPeersManagement>,
     current_minimum_gas_price: Mutex<Option<U256>>,
     early_epoch_manager: Mutex<Option<HbbftEarlyEpochEndManager>>,
-    fork_manager: Mutex<HbbftNetworkForkManager>,
 }
 
 struct TransitionHandler {
@@ -453,7 +452,6 @@ impl HoneyBadgerBFT {
             peers_management: Mutex::new(HbbftPeersManagement::new()),
             current_minimum_gas_price: Mutex::new(None),
             early_epoch_manager: Mutex::new(None),
-            fork_manager: Mutex::new(HbbftNetworkForkManager::new()),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
