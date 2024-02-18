@@ -7,7 +7,7 @@ use ethereum_types::Address;
 use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::{
     crypto::PublicKeySet,
-    sync_key_gen::{Ack, Part, PartOutcome, SyncKeyGen},
+    sync_key_gen::{Ack, AckOutcome, Part, PartOutcome, SyncKeyGen},
     util::max_faulty,
     NetworkInfo,
 };
@@ -33,7 +33,7 @@ struct HbbftFork {
 
     validators: Vec<NodeId>,
     parts: Vec<Part>,
-    acks: Vec<Ack>,
+    acks: Vec<Vec<Ack>>,
 }
 
 impl HbbftFork {
@@ -47,16 +47,21 @@ impl HbbftFork {
             }
         }).collect();
 
-        let acks = fork_definiton.acks.iter().map(|a| {
-            if let Ok(ack) = bincode::deserialize( a.as_slice()) {
-                ack
-            } else {
-                error!(target:"engine", "hbbft-hardfork: could not interprete acks from spec: {:?}", a.as_slice());
-                panic!("hbbft-hardfork: could not interprete acks from spec: {:?}", a.as_slice());
+        let acks = fork_definiton.acks.iter().map(|acks| {
+            let mut fork_acks: Vec<Ack> = Vec::new();
+
+            for ack_bytes in acks {
+                if let Ok(ack) = bincode::deserialize( ack_bytes.as_slice()) {
+                    fork_acks.push(ack);
+                } else {
+                    error!(target:"engine", "hbbft-hardfork: could not interprete acks from spec: {:?}", ack_bytes.as_slice());
+                    panic!("hbbft-hardfork: could not interprete acks from spec: {:?}", ack_bytes.as_slice());
+                }
             }
+            fork_acks
         }).collect();
 
-        let node_ids = fork_definiton.acks.iter().map(|h| {
+        let node_ids = fork_definiton.validators.iter().map(|h| {
             if let Ok(node_id) = bincode::deserialize( h.as_slice()) {
                 node_id
             } else {
@@ -109,7 +114,7 @@ impl HbbftNetworkForkManager {
 
         if let Some(next_fork) = self.pending_forks.front_mut() {
             if next_fork.start_block == last_block_number {
-                //let keys : PublicKeySet = PublicKeySet::
+                
                 let wrapper = KeyPairWrapper {
                     inner: signer_lock.clone(),
                 };
@@ -138,9 +143,9 @@ impl HbbftNetworkForkManager {
 
                 //adding the PARTs to the SyncKeyGen
 
-                for i_p in 0..next_fork.validators.len() {
-                    let part = next_fork.parts.get(i_p).unwrap();
-                    let node_id = next_fork.validators.get(i_p).unwrap();
+                for i in 0..next_fork.validators.len() {
+                    let part = next_fork.parts.get(i).unwrap();
+                    let node_id = next_fork.validators.get(i).unwrap();
                     let outcome = skg.handle_part(node_id, part.clone(), &mut rng).unwrap();
 
                     match outcome {
@@ -153,6 +158,27 @@ impl HbbftNetworkForkManager {
                             );
                         }
                         PartOutcome::Valid(_) => {}
+                    }
+                }
+
+                for i in 0..next_fork.validators.len() {
+                    let acks = next_fork.acks.get(i).unwrap();
+
+                    for ack in acks.iter() {
+                        let node_id = next_fork.validators.get(i).unwrap();
+                        let outcome = skg.handle_ack(node_id, ack.clone()).unwrap();
+
+                        match outcome {
+                            AckOutcome::Invalid(e) => {
+                                error!(target: "engine", "hbbft-hardfork: Part for node {} is invalid: {:?}", node_id.as_8_byte_string(), e);
+                                panic!(
+                                    "hbbft-hardfork: Part for node {} is invalid: {:?}",
+                                    node_id.as_8_byte_string(),
+                                    e
+                                );
+                            }
+                            AckOutcome::Valid => {}
+                        }
                     }
                 }
 
@@ -275,29 +301,41 @@ impl HbbftNetworkForkManager {
 #[cfg(test)]
 mod tests {
 
+    use std::{fs, str::FromStr};
+
+    use crate::engines::{hbbft::test::hbbft_test_client::HbbftTestClient, signer::from_keypair};
+
     use super::*;
     use ethereum_types::Address;
     use ethjson::spec::hbbft::HbbftNetworkFork;
     use hbbft::sync_key_gen::{Ack, Part};
+    //use parity_crypto::publickey::{KeyPair, Secret};
 
     #[test]
-    fn test_should_fork() {
-        // let mut fork_manager = HbbftNetworkForkManager::new();
-        // let mut fork_definition = Vec::new();
+    fn test_fork_manager_should_fork() {
+ 
+        let mut fork_manager = HbbftNetworkForkManager::new();
+        
+        let test_file_content = std::fs::read("res/local_tests/hbbft_test_fork.json").expect("could not read test file.");
+        let test_fork = serde_json::from_slice::<HbbftNetworkFork>(test_file_content.as_slice()).expect("fork file is parsable.");
 
-        // let mut fork = HbbftNetworkFork {
-        //     block_number_start: 10,
-        //     block_number_end: Some(20),
-        //     validators: vec![Address::from([0; 20])],
-        //     parts: vec![bincode::serialize(&Part::new(0, 0)).unwrap()],
-        //     acks: vec![bincode::serialize(&Ack::new(0, 0)).unwrap()],
-        // };
 
-        // fork_definition.push(fork);
+        //let test_client = HbbftTestClient::new();
+        
+        let key1 = KeyPair::from_secret(
+            Secret::from_str("0000000000000000000000000000000000000000000000000000000000000001")
+                .unwrap(),
+        ).unwrap();
 
-        // fork_manager.initialize(5, fork_definition);
+        let signer = from_keypair(key1);
 
-        // let result = fork_manager.should_fork(10, 0);
-        // assert!(result.is_some());
+        //let signer = Box::new(Signer (key1));
+        let signer_lock = Arc::new(RwLock::new(Some(signer)));
+
+        let own_id = NodeId::default();
+        fork_manager.initialize(own_id, 1, vec![test_fork]);
+        
+        assert!(fork_manager.should_fork(9, 1, signer_lock).is_none());
+
     }
 }

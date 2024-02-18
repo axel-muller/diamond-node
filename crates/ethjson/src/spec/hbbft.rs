@@ -34,7 +34,7 @@ pub struct HbbftParamsSkipBlockReward {
 }
 
 #[serde_as]
-#[derive(Debug, PartialEq, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct HbbftNetworkFork {
@@ -53,8 +53,15 @@ pub struct HbbftNetworkFork {
     #[serde_as(as = "Vec<serde_with::hex::Hex>")]
     pub parts: Vec<Vec<u8>>,
 
-    #[serde_as(as = "Vec<serde_with::hex::Hex>")]
-    pub acks: Vec<Vec<u8>>,
+    #[serde_as(as = "Vec<Vec<serde_with::hex::Hex>>")]
+    pub acks: Vec<Vec<Vec<u8>>>,
+}
+
+impl HbbftNetworkFork {
+    /// Returns true if the fork is finished.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("HbbftNetworkFork must convert to JSON")
+    }
 }
 
 /// Hbbft parameters.

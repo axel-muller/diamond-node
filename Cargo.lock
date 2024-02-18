@@ -2140,6 +2140,7 @@ dependencies = [
  "clap",
  "ethcore",
  "ethereum-types 0.9.2",
+ "ethjson",
  "ethkey",
  "ethstore",
  "hbbft",
