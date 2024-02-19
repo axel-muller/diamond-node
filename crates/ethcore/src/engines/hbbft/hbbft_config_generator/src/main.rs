@@ -511,10 +511,11 @@ fn main() {
     // Write the password file
     fs::write("password.txt", "test").expect("Unable to write password.txt file");
 
+    let key_sync_file_validators_only = key_sync_history_data(&parts, &acks, &enodes_map, true);
     // only pass over enodes in the enodes_map that are also available for acks and parts.
     fs::write(
         "keygen_history.json",
-        key_sync_history_data(&parts, &acks, &enodes_map, true).to_json(),
+        key_sync_file_validators_only.to_json(),
     )
     .expect("Unable to write keygen history data file");
 
@@ -526,7 +527,7 @@ fn main() {
 
     fs::write(
         "fork_example.json",
-        key_sync_history_data(&parts, &acks, &enodes_map, false).create_example_fork_definition().to_json(),
+        key_sync_file_validators_only.create_example_fork_definition().to_json(),
     )
     .expect("Unable to write fork_example.json data file");
 }
