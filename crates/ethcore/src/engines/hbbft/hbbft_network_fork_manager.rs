@@ -1,9 +1,10 @@
+
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
 };
 
-use ethereum_types::Address;
+use ethereum_types::{Address, H512};
 use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::{
     crypto::PublicKeySet,
@@ -61,13 +62,8 @@ impl HbbftFork {
             fork_acks
         }).collect();
 
-        let node_ids = fork_definiton.parts.iter().map(|h| {
-            if let Ok(node_id) = bincode::deserialize( h.as_slice()) {
-                node_id
-            } else {
-                error!(target:"engine", "hbbft-hardfork: could not interprete nodeIds from spec: {:?}", h.as_slice());
-                panic!("hbbft-hardfork: could not interprete part from spec: {:?}", h.as_slice());
-            }
+        let node_ids = fork_definiton.validators.iter().map(|h| {
+            NodeId(H512::from_slice(h.as_slice()))
         }).collect();
 
         HbbftFork {
