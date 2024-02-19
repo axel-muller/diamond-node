@@ -333,9 +333,12 @@ mod tests {
         let signer_lock = Arc::new(RwLock::new(Some(signer)));
 
         let own_id = NodeId::default();
-        fork_manager.initialize(own_id, 1, vec![test_fork]);
-        
-        assert!(fork_manager.should_fork(9, 1, signer_lock).is_none());
+        fork_manager.initialize(own_id, 8, vec![test_fork]);
+        assert!(fork_manager.should_fork(9, 1, signer_lock.clone()).is_none());
+        let fork = fork_manager.should_fork(10, 1, signer_lock.clone());
+        assert!(fork.is_some());
+        assert!(fork.unwrap().num_nodes() == 2);
+        assert!(fork_manager.should_fork(11, 1, signer_lock.clone()).is_none());
 
     }
 }
