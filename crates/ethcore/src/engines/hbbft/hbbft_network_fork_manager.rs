@@ -309,6 +309,10 @@ mod tests {
     use ethereum_types::Address;
     use ethjson::spec::hbbft::HbbftNetworkFork;
     use hbbft::sync_key_gen::{Ack, Part};
+
+    use crypto::publickey::{
+        KeyPair, Secret,
+    };
     //use parity_crypto::publickey::{KeyPair, Secret};
 
     #[test]
@@ -316,7 +320,7 @@ mod tests {
  
         let mut fork_manager = HbbftNetworkForkManager::new();
         
-        let test_file_content = std::fs::read("res/local_tests/hbbft_test_fork.json").expect("could not read test file.");
+        let test_file_content = std::fs::read("res/local_tests/hbbft/hbbft_test_fork.json").expect("could not read test file.");
         let test_fork = serde_json::from_slice::<HbbftNetworkFork>(test_file_content.as_slice()).expect("fork file is parsable.");
 
 
