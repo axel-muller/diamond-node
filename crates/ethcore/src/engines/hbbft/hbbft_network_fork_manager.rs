@@ -61,7 +61,7 @@ impl HbbftFork {
             fork_acks
         }).collect();
 
-        let node_ids = fork_definiton.validators.iter().map(|h| {
+        let node_ids = fork_definiton.parts.iter().map(|h| {
             if let Ok(node_id) = bincode::deserialize( h.as_slice()) {
                 node_id
             } else {
