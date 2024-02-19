@@ -269,4 +269,26 @@ mod tests {
             false
         );
     }
+
+    #[test]
+    fn test_fork_serialisation() {
+        let fork = super::HbbftNetworkFork {
+            block_number_start: 10,
+            block_number_end: Some(100),
+            validators: vec![vec![1, 2, 3, 4]],
+            parts: vec![vec![5, 6, 7, 8]],
+            acks: vec![vec![vec![9, 10, 11, 12]]],
+        };
+
+        let json = fork.to_json();
+        let deserialized: super::HbbftNetworkFork = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.block_number_start, 10);
+        assert_eq!(deserialized.block_number_end, Some(100));
+        assert_eq!(deserialized.validators.len(), 1);
+        assert_eq!(deserialized.parts.len(), 1);
+        assert_eq!(deserialized.acks.len(), 1);
+
+        assert_eq!(deserialized.parts[0][1], 6);
+        assert_eq!(deserialized.acks[0][0][2], 11);
+    }
 }
