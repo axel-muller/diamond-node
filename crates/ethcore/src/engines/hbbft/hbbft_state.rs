@@ -114,11 +114,14 @@ impl HbbftState {
         // this might happen for a lot of key-gen rounds, until a set with responsive validators
         // can be found.
 
-
         if let Some(last_block_number) = client.block_number(block_id) {
-            if let Some(network_info) = self.fork_manager.should_fork(last_block_number, self.current_posdao_epoch, signer.clone()) {
+            if let Some(network_info) = self.fork_manager.should_fork(
+                last_block_number,
+                self.current_posdao_epoch,
+                signer.clone(),
+            ) {
                 info!(target: "engine", "Forking at block {last_block_number}, starting new honeybadger instance with new validator set.");
-                
+
                 self.public_master_key = Some(network_info.public_key_set().public_key());
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
                 self.network_info = Some(network_info);

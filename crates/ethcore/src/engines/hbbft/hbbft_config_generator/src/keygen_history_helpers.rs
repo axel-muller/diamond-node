@@ -122,24 +122,26 @@ pub struct KeyGenHistoryData {
     acks: Vec<Vec<Vec<u8>>>,
 }
 
-
 impl KeyGenHistoryData {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Keygen History must convert to JSON")
     }
 
     pub fn create_example_fork_definition(&self) -> HbbftNetworkFork {
+        let validators: Vec<Vec<u8>> = self
+            .public_keys
+            .iter()
+            .map(|v| {
+                let mut hex = v.clone();
+                println!("public key: {}", v);
+                if v.starts_with("0x") {
+                    hex = v.split_at(2).1.to_string();
+                }
 
-        let validators : Vec<Vec<u8>> = self.public_keys.iter().map(|v| {
-            let mut hex = v.clone();
-            println!("public key: {}", v);
-            if v.starts_with("0x") {
-                hex = v.split_at(2).1.to_string();
-            }
-            
-            let public = hex.parse::<Public>().expect("Could not parse public key");
-            public.as_bytes().to_vec()
-        }).collect();
+                let public = hex.parse::<Public>().expect("Could not parse public key");
+                public.as_bytes().to_vec()
+            })
+            .collect();
 
         HbbftNetworkFork {
             block_number_start: 10,

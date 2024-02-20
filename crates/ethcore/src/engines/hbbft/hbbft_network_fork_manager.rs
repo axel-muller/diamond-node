@@ -1,4 +1,3 @@
-
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
@@ -62,9 +61,11 @@ impl HbbftFork {
             fork_acks
         }).collect();
 
-        let node_ids = fork_definiton.validators.iter().map(|h| {
-            NodeId(H512::from_slice(h.as_slice()))
-        }).collect();
+        let node_ids = fork_definiton
+            .validators
+            .iter()
+            .map(|h| NodeId(H512::from_slice(h.as_slice())))
+            .collect();
 
         HbbftFork {
             start_block: fork_definiton.block_number_start,
@@ -110,7 +111,6 @@ impl HbbftNetworkForkManager {
 
         if let Some(next_fork) = self.pending_forks.front_mut() {
             if next_fork.start_block == last_block_number {
-                
                 let wrapper = KeyPairWrapper {
                     inner: signer_lock.clone(),
                 };
@@ -306,26 +306,25 @@ mod tests {
     use ethjson::spec::hbbft::HbbftNetworkFork;
     use hbbft::sync_key_gen::{Ack, Part};
 
-    use crypto::publickey::{
-        KeyPair, Secret,
-    };
+    use crypto::publickey::{KeyPair, Secret};
     //use parity_crypto::publickey::{KeyPair, Secret};
 
     #[test]
     fn test_fork_manager_should_fork() {
- 
         let mut fork_manager = HbbftNetworkForkManager::new();
-        
-        let test_file_content = std::fs::read("res/local_tests/hbbft/hbbft_test_fork.json").expect("could not read test file.");
-        let test_fork = serde_json::from_slice::<HbbftNetworkFork>(test_file_content.as_slice()).expect("fork file is parsable.");
 
+        let test_file_content = std::fs::read("res/local_tests/hbbft/hbbft_test_fork.json")
+            .expect("could not read test file.");
+        let test_fork = serde_json::from_slice::<HbbftNetworkFork>(test_file_content.as_slice())
+            .expect("fork file is parsable.");
 
         //let test_client = HbbftTestClient::new();
-        
+
         let key1 = KeyPair::from_secret(
             Secret::from_str("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let signer = from_keypair(key1);
 
@@ -334,11 +333,14 @@ mod tests {
 
         let own_id = NodeId::default();
         fork_manager.initialize(own_id, 8, vec![test_fork]);
-        assert!(fork_manager.should_fork(9, 1, signer_lock.clone()).is_none());
+        assert!(fork_manager
+            .should_fork(9, 1, signer_lock.clone())
+            .is_none());
         let fork = fork_manager.should_fork(10, 1, signer_lock.clone());
         assert!(fork.is_some());
         assert!(fork.unwrap().num_nodes() == 2);
-        assert!(fork_manager.should_fork(11, 1, signer_lock.clone()).is_none());
-
+        assert!(fork_manager
+            .should_fork(11, 1, signer_lock.clone())
+            .is_none());
     }
 }
