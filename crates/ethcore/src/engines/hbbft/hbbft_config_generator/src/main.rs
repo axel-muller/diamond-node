@@ -3,6 +3,7 @@ extern crate bincode;
 extern crate clap;
 extern crate ethcore;
 extern crate ethereum_types;
+extern crate ethjson;
 extern crate ethkey;
 extern crate ethstore;
 extern crate hbbft;
@@ -12,7 +13,6 @@ extern crate rustc_hex;
 extern crate serde;
 extern crate serde_json;
 extern crate toml;
-extern crate ethjson;
 
 mod keygen_history_helpers;
 
@@ -374,6 +374,11 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(Arg::with_name("fork_block")
+        .long("fork block number")
+        .help("defines a fork block number.")
+        .required(false)
+        .takes_value(true),)
         .get_matches();
 
     let num_nodes_validators: usize = matches
@@ -395,6 +400,13 @@ fn main() {
                     .expect("tx_queue_per_sender need to be of integer type"),
             )
         });
+
+    let fork_block_number: Option<i64> = matches.value_of("fork_block_number").map_or(None, |v| {
+        Some(
+            v.parse::<i64>()
+                .expect("fork_block_number need to be of integer type"),
+        )
+    });
 
     let metrics_port_base: Option<u16> = matches.value_of("metrics_port_base").map_or(None, |v| {
         Some(
@@ -527,7 +539,9 @@ fn main() {
 
     fs::write(
         "fork_example.json",
-        key_sync_file_validators_only.create_example_fork_definition().to_json(),
+        key_sync_file_validators_only
+            .create_example_fork_definition()
+            .to_json(),
     )
     .expect("Unable to write fork_example.json data file");
 }
