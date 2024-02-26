@@ -41,14 +41,15 @@ pub struct Enode {
     address: Address,
     idx: usize,
     ip: String,
+    port: u16,
 }
 
 impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        let port = 30300usize + self.idx;
-        format!("enode://{:x}@{}:{}", self.public, self.ip, port)
+        
+        format!("enode://{:x}@{}:{}", self.public, self.ip, self.port)
     }
 }
 
@@ -56,6 +57,7 @@ fn generate_enodes(
     num_nodes: usize,
     private_keys: Vec<Secret>,
     external_ip: Option<&str>,
+    port_base: u16,
 ) -> BTreeMap<Public, Enode> {
     let mut map = BTreeMap::new();
     for i in 0..num_nodes {
@@ -85,6 +87,7 @@ fn generate_enodes(
                 address,
                 idx,
                 ip: ip.into(),
+                port: port_base + i as u16,
             },
         );
     }
@@ -437,12 +440,11 @@ fn main() {
         )
     });
 
-    let port_base: Option<u16> = matches.value_of("port_base").map_or(None, |v| {
-        Some(
+    
+    let port_base: u16 = matches.value_of("port_base").map( |v| {
             v.parse::<u16>()
-                .expect("metrics_port need to be an integer port definition 1-65555"),
-        )
-    });
+                .expect("metrics_port need to be an integer port definition 1-65555")
+    }).unwrap();
 
     let port_base_rpc: Option<u16> = matches.value_of("port_base_rpc").map_or(None, |v| {
         Some(
@@ -487,7 +489,7 @@ fn main() {
         assert!(private_keys.len() == num_nodes_total);
     };
 
-    let enodes_map = generate_enodes(num_nodes_total, private_keys, external_ip);
+    let enodes_map = generate_enodes(num_nodes_total, private_keys, external_ip, port_base);
     let mut rng = rand::thread_rng();
 
     let pub_keys = enodes_to_pub_keys(&enodes_map);
@@ -525,7 +527,7 @@ fn main() {
             tx_queue_per_sender.clone(),
             metrics_port_base,
             metrics_interface,
-            port_base.unwrap(),
+            port_base,
             port_base_rpc.unwrap(),
             port_base_ws.unwrap()
         ))
@@ -565,7 +567,7 @@ fn main() {
         tx_queue_per_sender.clone(),
         metrics_port_base,
         metrics_interface,
-        port_base.unwrap(),
+        port_base,
         port_base_rpc.unwrap(),
         port_base_ws.unwrap(),
     ))
