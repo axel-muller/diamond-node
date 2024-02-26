@@ -112,11 +112,10 @@ fn to_toml(
     tx_queue_per_sender: Option<i64>,
     base_metrics_port: Option<u16>,
     metrics_interface: Option<&str>,
+    base_port: u16,
+    base_rpc_port: u16,
+    base_ws_port: u16,
 ) -> Value {
-    let base_port = 30300i64;
-    let base_rpc_port = 8540i64;
-    let base_ws_port = 9540i64;
-
     let mut parity = Map::new();
     match config_type {
         ConfigType::PosdaoSetup => {
@@ -134,7 +133,7 @@ fn to_toml(
     }
 
     let mut network = Map::new();
-    network.insert("port".into(), Value::Integer(base_port + i as i64));
+    network.insert("port".into(), Value::Integer((base_port as usize + i) as i64));
     match config_type {
         ConfigType::PosdaoSetup => {
             network.insert(
@@ -183,12 +182,12 @@ fn to_toml(
         "traces",
     ]);
     rpc.insert("apis".into(), apis);
-    rpc.insert("port".into(), Value::Integer(base_rpc_port + i as i64));
+    rpc.insert("port".into(), Value::Integer((base_rpc_port as usize + i) as i64));
 
     let mut websockets = Map::new();
     websockets.insert("interface".into(), Value::String("all".into()));
     websockets.insert("origins".into(), to_toml_array(vec!["all"]));
-    websockets.insert("port".into(), Value::Integer(base_ws_port + i as i64));
+    websockets.insert("port".into(), Value::Integer((base_ws_port as usize + i) as i64));
 
     let mut ipc = Map::new();
     ipc.insert("disable".into(), Value::Boolean(true));
@@ -375,10 +374,33 @@ fn main() {
                 .takes_value(true),
         )
         .arg(Arg::with_name("fork_block")
-        .long("fork block number")
-        .help("defines a fork block number.")
-        .required(false)
-        .takes_value(true),)
+            .long("fork block number")
+            .help("defines a fork block number.")
+            .required(false)
+            .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("port_base")
+                .long("port_base")
+                .help("devp2p communication port base address")
+                .required(false)
+                .default_value("30300")
+                .takes_value(true),
+        ).arg(
+            Arg::with_name("port_base_rpc")
+                .long("port_base_rpc")
+                .help("rpc port base")
+                .required(false)
+                .default_value("8540")
+                .takes_value(true),
+        ).arg(
+            Arg::with_name("port_base_ws")
+                .long("port_base_ws")
+                .help("rpc web socket port base")
+                .required(false)
+                .default_value("9540")
+                .takes_value(true),
+        )
         .get_matches();
 
     let num_nodes_validators: usize = matches
@@ -409,6 +431,27 @@ fn main() {
     });
 
     let metrics_port_base: Option<u16> = matches.value_of("metrics_port_base").map_or(None, |v| {
+        Some(
+            v.parse::<u16>()
+                .expect("metrics_port need to be an integer port definition 1-65555"),
+        )
+    });
+
+    let port_base: Option<u16> = matches.value_of("port_base").map_or(None, |v| {
+        Some(
+            v.parse::<u16>()
+                .expect("metrics_port need to be an integer port definition 1-65555"),
+        )
+    });
+
+    let port_base_rpc: Option<u16> = matches.value_of("port_base_rpc").map_or(None, |v| {
+        Some(
+            v.parse::<u16>()
+                .expect("metrics_port need to be an integer port definition 1-65555"),
+        )
+    });
+
+    let port_base_ws: Option<u16> = matches.value_of("port_base_ws").map_or(None, |v| {
         Some(
             v.parse::<u16>()
                 .expect("metrics_port need to be an integer port definition 1-65555"),
@@ -472,6 +515,7 @@ fn main() {
             .expect("enode should be written to the reserved peers string");
         let i = enode.idx;
         let file_name = format!("hbbft_validator_{}.toml", i);
+        // the unwrap is safe, because there is a default value defined.
         let toml_string = toml::to_string(&to_toml(
             i,
             &config_type,
@@ -481,6 +525,9 @@ fn main() {
             tx_queue_per_sender.clone(),
             metrics_port_base,
             metrics_interface,
+            port_base.unwrap(),
+            port_base_rpc.unwrap(),
+            port_base_ws.unwrap()
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -503,6 +550,11 @@ fn main() {
             format!("hbbft_validator_key_{}.json", i),
         );
     }
+
+    // let base_port = 30300i64;
+    // let base_rpc_port = 8540i64;
+    // let base_ws_port = 9540i64;
+
     // Write rpc node config
     let rpc_string = toml::to_string(&to_toml(
         0,
@@ -513,6 +565,9 @@ fn main() {
         tx_queue_per_sender.clone(),
         metrics_port_base,
         metrics_interface,
+        port_base.unwrap(),
+        port_base_rpc.unwrap(),
+        port_base_ws.unwrap(),
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");
