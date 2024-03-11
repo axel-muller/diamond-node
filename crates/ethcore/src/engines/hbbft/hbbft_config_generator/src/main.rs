@@ -20,10 +20,7 @@ use clap::{App, Arg};
 use ethstore::{KeyFile, SafeAccount};
 use keygen_history_helpers::{enodes_to_pub_keys, generate_keygens, key_sync_history_data};
 use parity_crypto::publickey::{Address, Generator, KeyPair, Public, Random, Secret};
-use std::{
-    collections::BTreeMap, convert::TryInto, fmt::Write, fs, num::NonZeroU32, str::FromStr,
-    sync::Arc,
-};
+use std::{convert::TryInto, fmt::Write, fs, num::NonZeroU32, str::FromStr};
 use toml::{map::Map, Value};
 
 pub fn create_account() -> (Secret, Public, Address) {
@@ -48,7 +45,7 @@ impl ToString for Enode {
     fn to_string(&self) -> String {
         // Example:
         // enode://30ccdeb8c31972f570e4eea0673cd08cbe7cefc5de1d70119b39c63b1cba33b48e494e9916c0d1eab7d296774f3573da46025d1accdef2f3690bc9e6659a34b4@192.168.0.101:30300
-        
+
         format!("enode://{:x}@{}:{}", self.public, self.ip, self.port)
     }
 }
@@ -58,8 +55,8 @@ fn generate_enodes(
     private_keys: Vec<Secret>,
     external_ip: Option<&str>,
     port_base: u16,
-) -> BTreeMap<Public, Enode> {
-    let mut map = BTreeMap::new();
+) -> Vec<Enode> {
+    let mut map = Vec::new();
     for i in 0..num_nodes {
         // Note: node 0 is a regular full node (not a validator) in the testnet setup, so we start at index 1.
         let idx = i + 1;
@@ -79,26 +76,23 @@ fn generate_enodes(
             create_account()
         };
         println!("Debug, Secret: {:?}", secret);
-        map.insert(
+        map.push(Enode {
+            secret,
             public,
-            Enode {
-                secret,
-                public,
-                address,
-                idx,
-                ip: ip.into(),
-                port: port_base + i as u16,
-            },
-        );
+            address,
+            idx,
+            ip: ip.into(),
+            port: port_base + idx as u16,
+        });
     }
     // the map has the element order by their public key.
     // we reassign the idx here, so the index of the nodes follows
     // the same order like everything else.
-    let mut new_index = 1;
-    for public in map.iter_mut() {
-        public.1.idx = new_index;
-        new_index = new_index + 1;
-    }
+    // let mut new_index = 1;
+    // for public in map.iter_mut() {
+    //     public.1.idx = new_index;
+    //     new_index = new_index + 1;
+    // }
     map
 }
 
@@ -136,7 +130,10 @@ fn to_toml(
     }
 
     let mut network = Map::new();
-    network.insert("port".into(), Value::Integer((base_port as usize + i) as i64));
+    network.insert(
+        "port".into(),
+        Value::Integer((base_port as usize + i) as i64),
+    );
     match config_type {
         ConfigType::PosdaoSetup => {
             network.insert(
@@ -185,12 +182,18 @@ fn to_toml(
         "traces",
     ]);
     rpc.insert("apis".into(), apis);
-    rpc.insert("port".into(), Value::Integer((base_rpc_port as usize + i) as i64));
+    rpc.insert(
+        "port".into(),
+        Value::Integer((base_rpc_port as usize + i) as i64),
+    );
 
     let mut websockets = Map::new();
     websockets.insert("interface".into(), Value::String("all".into()));
     websockets.insert("origins".into(), to_toml_array(vec!["all"]));
-    websockets.insert("port".into(), Value::Integer((base_ws_port as usize + i) as i64));
+    websockets.insert(
+        "port".into(),
+        Value::Integer((base_ws_port as usize + i) as i64),
+    );
 
     let mut ipc = Map::new();
     ipc.insert("disable".into(), Value::Boolean(true));
@@ -440,11 +443,13 @@ fn main() {
         )
     });
 
-    
-    let port_base: u16 = matches.value_of("port_base").map( |v| {
+    let port_base: u16 = matches
+        .value_of("port_base")
+        .map(|v| {
             v.parse::<u16>()
                 .expect("metrics_port need to be an integer port definition 1-65555")
-    }).unwrap();
+        })
+        .unwrap();
 
     let port_base_rpc: Option<u16> = matches.value_of("port_base_rpc").map_or(None, |v| {
         Some(
@@ -489,30 +494,22 @@ fn main() {
         assert!(private_keys.len() == num_nodes_total);
     };
 
-    let enodes_map = generate_enodes(num_nodes_total, private_keys, external_ip, port_base);
+    let enodes = generate_enodes(num_nodes_total, private_keys, external_ip, port_base);
     let mut rng = rand::thread_rng();
 
-    let pub_keys = enodes_to_pub_keys(&enodes_map);
+    //let pub_keys = enodes_to_pub_keys(&enodes_map);
 
-    // we only need the first x pub_keys
-    let pub_keys_for_key_gen_btree = pub_keys
-        .iter()
-        .take(num_nodes_validators)
-        .map(|x| (x.0.clone(), x.1.clone()))
-        .collect();
+    let pub_keys_for_key_gen_btree = enodes_to_pub_keys(&enodes);
 
     let (_sync_keygen, parts, acks) = generate_keygens(
-        Arc::new(pub_keys_for_key_gen_btree),
+        pub_keys_for_key_gen_btree.clone(),
         &mut rng,
         (num_nodes_validators - 1) / 3,
     );
 
     let mut reserved_peers = String::new();
 
-    for pub_key in pub_keys.iter() {
-        let our_id = pub_key.0;
-
-        let enode = enodes_map.get(our_id).expect("validator id must be mapped");
+    for enode in enodes.iter() {
         writeln!(&mut reserved_peers, "{}", enode.to_string())
             .expect("enode should be written to the reserved peers string");
         let i = enode.idx;
@@ -529,7 +526,7 @@ fn main() {
             metrics_interface,
             port_base,
             port_base_rpc.unwrap(),
-            port_base_ws.unwrap()
+            port_base_ws.unwrap(),
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -580,7 +577,7 @@ fn main() {
     // Write the password file
     fs::write("password.txt", "test").expect("Unable to write password.txt file");
 
-    let key_sync_file_validators_only = key_sync_history_data(&parts, &acks, &enodes_map, true);
+    let key_sync_file_validators_only = key_sync_history_data(&parts, &acks, &enodes, true);
     // only pass over enodes in the enodes_map that are also available for acks and parts.
     fs::write(
         "keygen_history.json",
@@ -590,7 +587,7 @@ fn main() {
 
     fs::write(
         "nodes_info.json",
-        key_sync_history_data(&parts, &acks, &enodes_map, false).to_json(),
+        key_sync_history_data(&parts, &acks, &enodes, false).to_json(),
     )
     .expect("Unable to write nodes_info data file");
 

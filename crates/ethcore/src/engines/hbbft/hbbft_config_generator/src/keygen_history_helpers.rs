@@ -93,15 +93,13 @@ pub fn generate_keygens<R: rand::Rng>(
     (sync_keygen, parts, acks)
 }
 
-pub fn enodes_to_pub_keys(
-    enodes: &BTreeMap<Public, Enode>,
-) -> Arc<BTreeMap<Public, KeyPairWrapper>> {
+pub fn enodes_to_pub_keys(enodes: &Vec<Enode>) -> Arc<BTreeMap<Public, KeyPairWrapper>> {
     Arc::new(
         enodes
             .iter()
-            .map(|(n, e)| {
+            .map(|e| {
                 (
-                    n.clone(),
+                    e.public.clone(),
                     KeyPairWrapper {
                         public: e.public,
                         secret: e.secret.clone(),
@@ -156,7 +154,7 @@ impl KeyGenHistoryData {
 pub fn key_sync_history_data(
     parts: &BTreeMap<Public, Part>,
     acks: &BTreeMap<Public, Vec<PartOutcome>>,
-    enodes: &BTreeMap<Public, Enode>,
+    enodes: &Vec<Enode>,
     include_validators_only: bool,
 ) -> KeyGenHistoryData {
     let mut data = KeyGenHistoryData {
@@ -173,10 +171,13 @@ pub fn key_sync_history_data(
     let mut acks_total_bytes = 0;
     let mut num_acks = 0;
 
-    let ids = enodes.keys();
+    //let ids: Vec<Public> = enodes.iter().map(|e| e.public.clone()).collect();
+
     let mut staking_counter = 1;
     // Add Parts and Acks in strict order
-    for id in ids {
+    for enode in enodes.iter() {
+        let id = &enode.public;
+
         // if there is no part available for this node,
         // then the it is not a initial validator.
 
@@ -189,8 +190,7 @@ pub fn key_sync_history_data(
         data.staking_addresses
             .push(format!("{:?}", Address::from_low_u64_be(staking_counter)));
         staking_counter += 1;
-        data.public_keys
-            .push(format!("{:?}", enodes.get(id).unwrap().public));
+        data.public_keys.push(format!("{:?}", id));
         data.ip_addresses
             .push(format!("{:?}", H128::from_low_u64_be(1)));
 
