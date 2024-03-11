@@ -647,7 +647,7 @@ mod tests {
         let num_nodes = 4;
         let t = 1;
 
-        let enodes = generate_enodes(num_nodes, Vec::new(), None);
+        let enodes = generate_enodes(num_nodes, Vec::new(), None, 30300);
         let pub_keys = enodes_to_pub_keys(&enodes);
         let mut rng = rand::thread_rng();
 
