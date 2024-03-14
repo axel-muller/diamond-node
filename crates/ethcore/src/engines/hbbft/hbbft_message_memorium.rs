@@ -949,7 +949,7 @@ impl HbbftMessageMemorium {
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
-        warn!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
+        debug!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
         self.latest_epoch = staking_epoch;
         self.latest_epoch_start_block = staking_epoch_start_block;
         if let Ok(epoch_history_index) = self
