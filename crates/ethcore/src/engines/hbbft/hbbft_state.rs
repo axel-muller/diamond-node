@@ -126,6 +126,8 @@ impl HbbftState {
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
                 self.network_info = Some(network_info);
             }
+        } else {
+            error!(target: "engine", "fork: could not get block number for block_id: {:?}", block_id);
         }
         //
 
