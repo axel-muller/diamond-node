@@ -237,6 +237,8 @@ impl HbbftNetworkForkManager {
             panic!("HbbftNetworkForkManager is already initialized");
         }
 
+        debug!(target: "engine", "hbbft-hardfork: initializing HbbftNetworkForkManager. Startup block number: {}", startup_block_number);
+
         self.own_id = own_id;
 
         fork_definition.sort_by_key(|fork| fork.block_number_start);
