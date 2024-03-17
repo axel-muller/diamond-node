@@ -243,7 +243,7 @@ impl HbbftNetworkForkManager {
             return;
         }
 
-        debug!(target: "engine", "hbbft-hardfork: initializing HbbftNetworkForkManager. Startup block number: {} total forks defined: {}", startup_block_number, fork_definition.len());
+        debug!(target: "engine", "hbbft-hardfork: initializing HbbftNetworkForkManager. Startup block number: {} total forks defined: {}", startup_block_number, fork_definition_config.len());
 
         self.own_id = own_id;
 
