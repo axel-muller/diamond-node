@@ -231,16 +231,23 @@ impl HbbftNetworkForkManager {
         &mut self,
         own_id: NodeId,
         startup_block_number: u64,
-        mut fork_definition: Vec<HbbftNetworkFork>,
+        fork_definition_config: Vec<HbbftNetworkFork>,
     ) {
         if self.is_init {
             panic!("HbbftNetworkForkManager is already initialized");
         }
 
-        debug!(target: "engine", "hbbft-hardfork: initializing HbbftNetworkForkManager. Startup block number: {}", startup_block_number);
+        if fork_definition_config.len() == 0 {
+            
+            self.is_init = true;
+            return;
+        }
+
+        debug!(target: "engine", "hbbft-hardfork: initializing HbbftNetworkForkManager. Startup block number: {} total forks defined: {}", startup_block_number, fork_definition.len());
 
         self.own_id = own_id;
 
+        let mut fork_definition = fork_definition_config.clone();
         fork_definition.sort_by_key(|fork| fork.block_number_start);
 
         // the fork definition can contain
@@ -265,10 +272,22 @@ impl HbbftNetworkForkManager {
                     continue;
                 }
 
+                let fork = HbbftFork::from_definition(fork_def);
+                debug!(target: "engine", "hbbft-hardfork: added upcomming fork - add block {:?}", fork.start_block);
+
                 self.pending_forks
-                    .push_back(HbbftFork::from_definition(fork_def));
+                    .push_back(fork);
+            } else if fork_def.block_number_start <= startup_block_number {
+
+                let fork = HbbftFork::from_definition(fork_def);
+                debug!(target: "engine", "hbbft-hardfork: added upcomming fork - add block {:?}", fork.start_block);
+
+                self.pending_forks
+                    .push_back(fork);
             }
         }
+
+        self.is_init = true;
 
         // self.fork_definition.iter().filter(predicate).for_each(|fork| {
         //     self.pending_forks.push_back(HbbftFork {
