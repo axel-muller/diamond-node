@@ -277,7 +277,7 @@ impl HbbftNetworkForkManager {
 
                 self.pending_forks
                     .push_back(fork);
-            } else if fork_def.block_number_start <= startup_block_number {
+            } else if fork_def.block_number_start >= startup_block_number {
 
                 let fork = HbbftFork::from_definition(fork_def);
                 debug!(target: "engine", "hbbft-hardfork: added upcomming fork - add block {:?}", fork.start_block);
@@ -288,21 +288,6 @@ impl HbbftNetworkForkManager {
         }
 
         self.is_init = true;
-
-        // self.fork_definition.iter().filter(predicate).for_each(|fork| {
-        //     self.pending_forks.push_back(HbbftFork {
-        //         start_timestamp: 0,
-        //         start_block: fork.block_number_start,
-        //         is_finished: false,
-        //         end_timestamp: 0,
-        //         end_block: 0,
-        //         validator_set: HbbftForkKeys {
-        //             validators: fork.validators.clone(),
-        //             parts: Vec::new(),
-        //             acks: Vec::new(),
-        //         },
-        //     });
-        // });
     }
 
     pub fn new() -> HbbftNetworkForkManager {
