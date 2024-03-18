@@ -503,7 +503,7 @@ impl HoneyBadgerBFT {
             })
             .collect();
 
-        info!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
+        debug!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
             .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
 
         // Make sure the resulting transactions do not contain nonces out of order.
