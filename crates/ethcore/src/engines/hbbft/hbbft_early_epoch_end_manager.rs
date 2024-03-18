@@ -137,18 +137,21 @@ impl HbbftEarlyEpochEndManager {
                 continue;
             };
 
-            if let Ok(reported) = is_connectivity_loss_reported(
+            match is_connectivity_loss_reported(
                 client,
                 block_id,
                 signing_address,
                 epoch,
                 validator_address,
             ) {
-                if reported {
-                    result.push(validator.clone());
+                Ok(reported) => {
+                    if reported {
+                        result.push(validator.clone());
+                    }
                 }
-            } else {
-                error!(target: "engine", "early-epoch-end: could not get reported status for validator {validator:?}");
+                Err(e) => {
+                    error!(target: "engine", "early-epoch-end: could not get reported status for validator {validator:?}. call error: {e:?}");
+                }
             }
         }
 
