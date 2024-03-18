@@ -57,7 +57,7 @@ node-filter = { path = "crates/net/node-filter" }
 parity-crypto = { version = "0.6.2", features = [ "publickey" ] }
 rlp = { version = "0.4.6" }
 cli-signer= { path = "crates/util/cli-signer" }
-parity-daemonize = "0.3"
+parity-daemonize = { git = "https://github.com/DMDcoin/parity-daemonize.git", rev = "1d0802cd6880b0b914c6e82ba274bb3fc63238fb" }
 parity-local-store = { path = "crates/concensus/miner/local-store" }
 parity-runtime = { path = "crates/runtime/runtime" }
 parity-rpc = { path = "crates/rpc" }
