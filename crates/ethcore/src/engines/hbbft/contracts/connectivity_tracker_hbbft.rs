@@ -45,20 +45,22 @@ pub fn is_connectivity_loss_reported(
     )?);
 }
 
-pub fn get_current_flagged_validators_from_contract(
-    client: &dyn EngineClient,
-    block_id: BlockId,
-) -> Result<Vec<Address>, CallError> {
-    let c = BoundContract::bind(
-        client,
-        block_id,
-        *CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS,
-    );
-    return Ok(call_const_connectivity_tracker_hbbft!(
-        c,
-        get_flagged_validators
-    )?);
-}
+// currently not required for operation.
+// we just check if "we" have reported the validator.
+// pub fn get_current_flagged_validators_from_contract(
+//     client: &dyn EngineClient,
+//     block_id: BlockId,
+// ) -> Result<Vec<Address>, CallError> {
+//     let c = BoundContract::bind(
+//         client,
+//         block_id,
+//         *CONNECTIVITY_TRACKER_HBBFT_CONTRACT_ADDRESS,
+//     );
+//     return Ok(call_const_connectivity_tracker_hbbft!(
+//         c,
+//         get_flagged_validators
+//     )?);
+// }
 
 fn get_block_data(client: &dyn EngineClient) -> (u64, H256) {
     if let Some(block_number) = client.block_number(BlockId::Latest) {
