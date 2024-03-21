@@ -44,6 +44,7 @@ pub(crate) struct HbbftState {
     public_master_key: Option<PublicKey>,
     current_posdao_epoch: u64,
     current_posdao_epoch_start_block: u64,
+    last_fork_start_block: Option<u64>,
     last_posdao_epoch_start_block: Option<u64>,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
     fork_manager: HbbftNetworkForkManager,
@@ -58,6 +59,7 @@ impl HbbftState {
             current_posdao_epoch: 0,
             current_posdao_epoch_start_block: 0,
             last_posdao_epoch_start_block: None,
+            last_fork_start_block: None,
             future_messages_cache: BTreeMap::new(),
             fork_manager: HbbftNetworkForkManager::new(),
         }
@@ -103,6 +105,7 @@ impl HbbftState {
             }
         }
 
+        let mut has_forked = false;
         // https://github.com/DMDcoin/diamond-node/issues/98
         // check here if we are in a fork scenario.
         // in a fork scenario, the new honeybadger keys will come from the config,
@@ -124,14 +127,23 @@ impl HbbftState {
 
                 self.public_master_key = Some(network_info.public_key_set().public_key());
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
+
+                for x in network_info.validator_set().all_ids() { 
+                    info!(target: "engine", "Validator: {:?}", x);
+                }
+
                 self.network_info = Some(network_info);
+                self.last_fork_start_block = Some(last_block_number);
+                
+
+                has_forked = true;
             }
         } else {
             error!(target: "engine", "fork: could not get block number for block_id: {:?}", block_id);
         }
         //
 
-        if !force && self.current_posdao_epoch == target_posdao_epoch {
+        if !force && self.current_posdao_epoch == target_posdao_epoch && !has_forked {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
             return Some(());
