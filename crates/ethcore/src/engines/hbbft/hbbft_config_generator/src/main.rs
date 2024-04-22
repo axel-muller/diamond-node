@@ -500,7 +500,11 @@ fn main() {
 
     //let pub_keys = enodes_to_pub_keys(&enodes_map);
 
-    let enodes_for_key : Vec<Enode> = enodes.iter().take(num_nodes_validators).map(|e| e.clone()).collect();
+    let enodes_for_key: Vec<Enode> = enodes
+        .iter()
+        .take(num_nodes_validators)
+        .map(|e| e.clone())
+        .collect();
 
     let pub_keys_for_key_gen_btree = enodes_to_pub_keys(&enodes_for_key);
 

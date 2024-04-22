@@ -238,7 +238,6 @@ impl HbbftNetworkForkManager {
         }
 
         if fork_definition_config.len() == 0 {
-            
             self.is_init = true;
             return;
         }
@@ -275,15 +274,12 @@ impl HbbftNetworkForkManager {
                 let fork = HbbftFork::from_definition(fork_def);
                 debug!(target: "engine", "hbbft-hardfork: added upcomming fork - add block {:?}", fork.start_block);
 
-                self.pending_forks
-                    .push_back(fork);
+                self.pending_forks.push_back(fork);
             } else if fork_def.block_number_start >= startup_block_number {
-
                 let fork = HbbftFork::from_definition(fork_def);
                 debug!(target: "engine", "hbbft-hardfork: added upcomming fork - add block {:?}", fork.start_block);
 
-                self.pending_forks
-                    .push_back(fork);
+                self.pending_forks.push_back(fork);
             }
         }
 

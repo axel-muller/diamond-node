@@ -128,13 +128,12 @@ impl HbbftState {
                 self.public_master_key = Some(network_info.public_key_set().public_key());
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
 
-                for x in network_info.validator_set().all_ids() { 
+                for x in network_info.validator_set().all_ids() {
                     info!(target: "engine", "Validator: {:?}", x);
                 }
 
                 self.network_info = Some(network_info);
                 self.last_fork_start_block = Some(last_block_number);
-                
 
                 has_forked = true;
             }
