@@ -2,6 +2,7 @@ use client::traits::EngineClient;
 use engines::signer::EngineSigner;
 use ethcore_miner::pool::{PoolVerifiedTransaction, ScoredTransaction};
 use ethereum_types::U256;
+use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::{
     crypto::{PublicKey, Signature},
     honey_badger::{self, HoneyBadgerBuilder},
@@ -12,6 +13,7 @@ use rand::seq::IteratorRandom;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
+    time::Duration,
 };
 use types::{header::Header, ids::BlockId};
 
@@ -24,6 +26,8 @@ use super::{
         validator_set::ValidatorType,
     },
     contribution::Contribution,
+    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
+    hbbft_network_fork_manager::HbbftNetworkForkManager,
     hbbft_peers_management::HbbftPeersManagement,
     NodeId,
 };
@@ -40,8 +44,10 @@ pub(crate) struct HbbftState {
     public_master_key: Option<PublicKey>,
     current_posdao_epoch: u64,
     current_posdao_epoch_start_block: u64,
+    last_fork_start_block: Option<u64>,
     last_posdao_epoch_start_block: Option<u64>,
     future_messages_cache: BTreeMap<u64, Vec<(NodeId, HbMessage)>>,
+    fork_manager: HbbftNetworkForkManager,
 }
 
 impl HbbftState {
@@ -53,7 +59,9 @@ impl HbbftState {
             current_posdao_epoch: 0,
             current_posdao_epoch_start_block: 0,
             last_posdao_epoch_start_block: None,
+            last_fork_start_block: None,
             future_messages_cache: BTreeMap::new(),
+            fork_manager: HbbftNetworkForkManager::new(),
         }
     }
 
@@ -61,6 +69,16 @@ impl HbbftState {
         let mut builder: HoneyBadgerBuilder<Contribution, _> =
             HoneyBadger::builder(Arc::new(network_info));
         return Some(builder.build());
+    }
+
+    pub fn init_fork_manager(
+        &mut self,
+        own_id: NodeId,
+        latest_block: u64,
+        fork_definition: Vec<HbbftNetworkFork>,
+    ) {
+        self.fork_manager
+            .initialize(own_id, latest_block, fork_definition);
     }
 
     /**
@@ -73,6 +91,7 @@ impl HbbftState {
         client: Arc<dyn EngineClient>,
         signer: &Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
         peers_management_mutex: &Mutex<HbbftPeersManagement>,
+        early_epoch_end_manager_mutex: &Mutex<Option<HbbftEarlyEpochEndManager>>,
         current_minimum_gas_price: &Mutex<Option<U256>>,
         block_id: BlockId,
         force: bool,
@@ -86,7 +105,44 @@ impl HbbftState {
             }
         }
 
-        if !force && self.current_posdao_epoch == target_posdao_epoch {
+        let mut has_forked = false;
+        // https://github.com/DMDcoin/diamond-node/issues/98
+        // check here if we are in a fork scenario.
+        // in a fork scenario, the new honeybadger keys will come from the config,
+        // and not from the contracts.
+        // also the current block will trigger the epoch end,
+        // this will start the loop for finding a new validator set,
+        // probably it will fail multiple times,
+        // because nodes that do not apply to the fork rule will drop out.
+        // this might happen for a lot of key-gen rounds, until a set with responsive validators
+        // can be found.
+
+        if let Some(last_block_number) = client.block_number(block_id) {
+            if let Some(network_info) = self.fork_manager.should_fork(
+                last_block_number,
+                self.current_posdao_epoch,
+                signer.clone(),
+            ) {
+                info!(target: "engine", "Forking at block {last_block_number}, starting new honeybadger instance with new validator set.");
+
+                self.public_master_key = Some(network_info.public_key_set().public_key());
+                self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
+
+                for x in network_info.validator_set().all_ids() {
+                    info!(target: "engine", "Validator: {:?}", x);
+                }
+
+                self.network_info = Some(network_info);
+                self.last_fork_start_block = Some(last_block_number);
+
+                has_forked = true;
+            }
+        } else {
+            error!(target: "engine", "fork: could not get block number for block_id: {:?}", block_id);
+        }
+        //
+
+        if !force && self.current_posdao_epoch == target_posdao_epoch && !has_forked {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
             return Some(());
@@ -159,7 +215,7 @@ impl HbbftState {
         if let Some(mut peers_management) =
             peers_management_mutex.try_lock_for(std::time::Duration::from_millis(250))
         {
-            peers_management.connect_to_current_validators(&network_info, &client);
+            peers_management.connect_to_current_validators(&self.get_validator_set(), &client);
         } else {
             // maybe we should work with signals that signals that connect_to_current_validators should happen
             // instead of trying to achieve a lock here.
@@ -168,6 +224,28 @@ impl HbbftState {
             // and we are find.
             // if both nodes cannot acquire the lock, then we are busted.
             warn!(target: "engine", "could not acquire to connect to current validators on switching to new validator set for staking epoch {}.", self.current_posdao_epoch);
+        }
+
+        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+
+        if let Some(full_client) = client.as_full_client() {
+            let signing_address = if let Some(s) = signer.read().as_ref() {
+                s.address()
+            } else {
+                error!(target: "engine", "early epoch manager: signer is not set!");
+                ethereum_types::Address::zero()
+            };
+
+            *early_epoch_end_manager_mutex.lock() =
+                HbbftEarlyEpochEndManager::create_early_epoch_end_manager(
+                    allowed_devp2p_warmup_time,
+                    full_client,
+                    client.as_ref(),
+                    self.current_posdao_epoch,
+                    self.current_posdao_epoch_start_block,
+                    self.get_validator_set(),
+                    &signing_address,
+                );
         }
 
         Some(())
@@ -420,13 +498,13 @@ impl HbbftState {
                     if tx.nonce() >= min_nonce {
                         transactions_subset.push(tx);
                     } else {
-                        info!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
+                        debug!(target: "consensus", "Block creation: Pending transaction with nonce too low, got {}, expected at least {}", tx.nonce(), min_nonce);
                     }
                 }
             }
         }
 
-        info!(target: "consensus", "Block creation: Honeybadger epoch {}, Transactions subset target size: {}, actual size: {}, from available {}.", honey_badger.epoch(), transactions_subset_size, transactions_subset.len(), max_transactions_for_block.len());
+        trace!(target: "consensus", "Block creation: Honeybadger epoch {}, Transactions subset target size: {}, actual size: {}, from available {}.", honey_badger.epoch(), transactions_subset_size, transactions_subset.len(), max_transactions_for_block.len());
 
         let signed_transactions = transactions_subset
             .iter()
@@ -542,8 +620,21 @@ impl HbbftState {
         self.network_info.clone()
     }
 
-    pub fn get_current_network_info(&self) -> Option<NetworkInfo<NodeId>> {
-        return self.network_info.clone();
+    // pub fn get_current_network_info(&self) -> &Option<NetworkInfo<NodeId>> {
+    //     return &self.network_info;
+    // }
+
+    pub fn get_validator_set(&self) -> Vec<NodeId> {
+        if let Some(network_info) = &self.network_info {
+            let result: Vec<NodeId> = network_info
+                .validator_set()
+                .all_ids()
+                .map(|n| n.clone())
+                .collect();
+            return result;
+        }
+
+        return Vec::new();
     }
 
     pub fn get_current_posdao_epoch(&self) -> u64 {

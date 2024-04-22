@@ -1,5 +1,6 @@
 use crate::Enode;
 use ethereum_types::H128;
+use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::sync_key_gen::{AckOutcome, Part, PartOutcome, PublicKey, SecretKey, SyncKeyGen};
 use parity_crypto::publickey::{public_to_address, Address, Public, Secret};
 use serde::{Deserialize, Serialize};
@@ -92,15 +93,13 @@ pub fn generate_keygens<R: rand::Rng>(
     (sync_keygen, parts, acks)
 }
 
-pub fn enodes_to_pub_keys(
-    enodes: &BTreeMap<Public, Enode>,
-) -> Arc<BTreeMap<Public, KeyPairWrapper>> {
+pub fn enodes_to_pub_keys(enodes: &Vec<Enode>) -> Arc<BTreeMap<Public, KeyPairWrapper>> {
     Arc::new(
         enodes
             .iter()
-            .map(|(n, e)| {
+            .map(|e| {
                 (
-                    n.clone(),
+                    e.public.clone(),
                     KeyPairWrapper {
                         public: e.public,
                         secret: e.secret.clone(),
@@ -112,7 +111,7 @@ pub fn enodes_to_pub_keys(
 }
 
 #[derive(Serialize, Deserialize)]
-struct KeyGenHistoryData {
+pub struct KeyGenHistoryData {
     validators: Vec<String>,
     staking_addresses: Vec<String>,
     public_keys: Vec<String>,
@@ -121,12 +120,43 @@ struct KeyGenHistoryData {
     acks: Vec<Vec<Vec<u8>>>,
 }
 
+impl KeyGenHistoryData {
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Keygen History must convert to JSON")
+    }
+
+    pub fn create_example_fork_definition(&self) -> HbbftNetworkFork {
+        let validators: Vec<Vec<u8>> = self
+            .public_keys
+            .iter()
+            .map(|v| {
+                let mut hex = v.clone();
+                println!("public key: {}", v);
+                if v.starts_with("0x") {
+                    hex = v.split_at(2).1.to_string();
+                }
+
+                let public = hex.parse::<Public>().expect("Could not parse public key");
+                public.as_bytes().to_vec()
+            })
+            .collect();
+
+        HbbftNetworkFork {
+            block_number_start: 10,
+            block_number_end: Some(100),
+            validators: validators,
+            parts: self.parts.clone(),
+            acks: self.acks.clone(),
+        }
+    }
+}
+
 pub fn key_sync_history_data(
     parts: &BTreeMap<Public, Part>,
     acks: &BTreeMap<Public, Vec<PartOutcome>>,
-    enodes: &BTreeMap<Public, Enode>,
+    enodes: &Vec<Enode>,
     include_validators_only: bool,
-) -> String {
+) -> KeyGenHistoryData {
     let mut data = KeyGenHistoryData {
         validators: Vec::new(),
         staking_addresses: Vec::new(),
@@ -141,10 +171,13 @@ pub fn key_sync_history_data(
     let mut acks_total_bytes = 0;
     let mut num_acks = 0;
 
-    let ids = enodes.keys();
+    //let ids: Vec<Public> = enodes.iter().map(|e| e.public.clone()).collect();
+
     let mut staking_counter = 1;
     // Add Parts and Acks in strict order
-    for id in ids {
+    for enode in enodes.iter() {
+        let id = &enode.public;
+
         // if there is no part available for this node,
         // then the it is not a initial validator.
 
@@ -157,8 +190,7 @@ pub fn key_sync_history_data(
         data.staking_addresses
             .push(format!("{:?}", Address::from_low_u64_be(staking_counter)));
         staking_counter += 1;
-        data.public_keys
-            .push(format!("{:?}", enodes.get(id).unwrap().public));
+        data.public_keys.push(format!("{:?}", id));
         data.ip_addresses
             .push(format!("{:?}", H128::from_low_u64_be(1)));
 
@@ -215,7 +247,7 @@ pub fn key_sync_history_data(
         parts_total_bytes + acks_total_bytes
     );
 
-    serde_json::to_string(&data).expect("Keygen History must convert to JSON")
+    data
 }
 
 #[cfg(test)]

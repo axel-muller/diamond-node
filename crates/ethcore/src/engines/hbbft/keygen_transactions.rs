@@ -107,7 +107,7 @@ impl KeygenTransactionSender {
         let address = match signer.read().as_ref() {
             Some(signer) => signer.address(),
             None => {
-                trace!(target: "engine", "Could not send keygen transactions, because signer module could not be retrieved");
+                warn!(target: "engine", "Could not send keygen transactions, because signer module could not be retrieved");
                 return Err(CallError::ReturnValueInvalid);
             }
         };
@@ -131,12 +131,18 @@ impl KeygenTransactionSender {
         // if synckeygen creation fails then either signer or validator pub keys are problematic.
         // Todo: We should expect up to f clients to write invalid pub keys. Report and re-start pending validator set selection.
         let (mut synckeygen, part) = engine_signer_to_synckeygen(signer, Arc::new(pub_keys))
-            .map_err(|_| CallError::ReturnValueInvalid)?;
+            .map_err(|e| {
+                warn!(target:"engine", "engine_signer_to_synckeygen error {:?}", e);
+                CallError::ReturnValueInvalid
+            })?;
 
         // If there is no part then we are not part of the pending validator set and there is nothing for us to do.
         let part_data = match part {
             Some(part) => part,
-            None => return Err(CallError::ReturnValueInvalid),
+            None => {
+                warn!(target:"engine", "no part to write.");
+                return Err(CallError::ReturnValueInvalid);
+            }
         };
 
         let upcoming_epoch = get_posdao_epoch(client, BlockId::Latest)? + 1;
@@ -147,7 +153,10 @@ impl KeygenTransactionSender {
             ShouldSendKeyAnswer::Yes => {
                 let serialized_part = match bincode::serialize(&part_data) {
                     Ok(part) => part,
-                    Err(_) => return Err(CallError::ReturnValueInvalid),
+                    Err(e) => {
+                        warn!(target:"engine", "could not serialize part: {:?}", e);
+                        return Err(CallError::ReturnValueInvalid);
+                    }
                 };
                 let serialized_part_len = serialized_part.len();
                 let current_round = get_current_key_gen_round(client)?;
@@ -171,7 +180,10 @@ impl KeygenTransactionSender {
                         .gas_price(U256::from(10000000000u64));
                 full_client
                     .transact_silently(part_transaction)
-                    .map_err(|_| CallError::ReturnValueInvalid)?;
+                    .map_err(|e| {
+                        warn!(target:"engine", "could not transact_silently: {:?}", e);
+                        CallError::ReturnValueInvalid
+                    })?;
 
                 trace!(target:"engine", "PART Transaction send.");
                 return Ok(());
@@ -195,7 +207,7 @@ impl KeygenTransactionSender {
 							    Some(ack) => ack,
 							    None => {
 							        trace!(target:"engine", "could not retrieve part for {}", *v);
-							        return Err(CallError::ReturnValueInvalid);
+							        return Ok(());
 							    }
 							}
 					}
