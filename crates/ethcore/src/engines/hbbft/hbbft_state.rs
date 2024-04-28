@@ -105,7 +105,6 @@ impl HbbftState {
             }
         }
 
-        let mut has_forked = false;
         // https://github.com/DMDcoin/diamond-node/issues/98
         // check here if we are in a fork scenario.
         // in a fork scenario, the new honeybadger keys will come from the config,
@@ -125,6 +124,10 @@ impl HbbftState {
             ) {
                 info!(target: "engine", "Forking at block {last_block_number}, starting new honeybadger instance with new validator set.");
 
+                for id in network_info.validator_set().all_ids() {
+                    info!(target: "engine", "Fork Validator: {}", id);
+                }
+
                 self.public_master_key = Some(network_info.public_key_set().public_key());
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
 
@@ -134,15 +137,16 @@ impl HbbftState {
 
                 self.network_info = Some(network_info);
                 self.last_fork_start_block = Some(last_block_number);
+                self.current_posdao_epoch_start_block = last_block_number;
 
-                has_forked = true;
+                return Some(());
             }
         } else {
             error!(target: "engine", "fork: could not get block number for block_id: {:?}", block_id);
         }
         //
 
-        if !force && self.current_posdao_epoch == target_posdao_epoch && !has_forked {
+        if !force && self.current_posdao_epoch == target_posdao_epoch {
             // hbbft state is already up to date.
             // @todo Return proper error codes.
             return Some(());
