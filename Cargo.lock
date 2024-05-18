@@ -2150,6 +2150,7 @@ dependencies = [
  "rustc-hex 2.1.0",
  "serde",
  "serde_json",
+ "serde_with",
  "toml 0.5.8",
 ]
 

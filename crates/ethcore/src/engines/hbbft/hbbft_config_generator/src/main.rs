@@ -11,6 +11,7 @@ extern crate parity_crypto;
 extern crate rand;
 extern crate rustc_hex;
 extern crate serde;
+extern crate serde_with;
 extern crate serde_json;
 extern crate toml;
 
