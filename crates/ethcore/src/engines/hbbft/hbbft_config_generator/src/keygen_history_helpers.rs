@@ -4,6 +4,7 @@ use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::sync_key_gen::{AckOutcome, Part, PartOutcome, PublicKey, SecretKey, SyncKeyGen};
 use parity_crypto::publickey::{public_to_address, Address, Public, Secret};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone)]
@@ -110,13 +111,16 @@ pub fn enodes_to_pub_keys(enodes: &Vec<Enode>) -> Arc<BTreeMap<Public, KeyPairWr
     )
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct KeyGenHistoryData {
     validators: Vec<String>,
     staking_addresses: Vec<String>,
     public_keys: Vec<String>,
     ip_addresses: Vec<String>,
+    #[serde_as(as = "Vec<serde_with::hex::Hex>")]
     parts: Vec<Vec<u8>>,
+    #[serde_as(as = "Vec<Vec<serde_with::hex::Hex>>")]
     acks: Vec<Vec<Vec<u8>>>,
 }
 

@@ -229,6 +229,7 @@ pub fn initialize_synckeygen(
     block_id: BlockId,
     validator_type: ValidatorType,
 ) -> Result<SyncKeyGen<Public, PublicWrapper>, CallError> {
+    debug!(target: "engine", "Initializing SyncKeyGen with block_id: {:?}", block_id);
     let vmap = get_validator_pubkeys(&*client, block_id, validator_type)?;
     let pub_keys: BTreeMap<_, _> = vmap
         .values()
