@@ -4,8 +4,8 @@ use ethjson::spec::hbbft::HbbftNetworkFork;
 use hbbft::sync_key_gen::{AckOutcome, Part, PartOutcome, PublicKey, SecretKey, SyncKeyGen};
 use parity_crypto::publickey::{public_to_address, Address, Public, Secret};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, sync::Arc};
 use serde_with::serde_as;
+use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone)]
 pub struct KeyPairWrapper {
