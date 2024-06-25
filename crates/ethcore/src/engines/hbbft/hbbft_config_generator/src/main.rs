@@ -251,7 +251,7 @@ fn to_toml(
     // Value::String("txqueue=trace,consensus=debug,engine=trace,own_tx=trace,miner=trace,tx_filter=trace".into())
     misc.insert(
         "logging".into(),
-        Value::String("txqueue=info,consensus=debug,engine=trace,tx_own=trace".into()),
+        Value::String("txqueue=info,consensus=debug,engine=debug,tx_own=trace".into()),
     );
     misc.insert("log_file".into(), Value::String("diamond-node.log".into()));
 
