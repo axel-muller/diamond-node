@@ -231,11 +231,10 @@ fn to_toml(
     }
 
     mining.insert("force_sealing".into(), Value::Boolean(true));
-    mining.insert("min_gas_price".into(), Value::Integer(1000000000));
-    mining.insert(
-        "gas_floor_target".into(),
-        Value::String("1000000000".into()),
-    );
+    // we put an extremly low min gas price in the config
+    // the min gas price is gathered from the DAO
+    // this makes sure that the min_gas_price wont be higher then the gas pricce the DAO decides.
+    mining.insert("min_gas_price".into(), Value::Integer(1000));
     mining.insert("reseal_on_txs".into(), Value::String("none".into()));
     mining.insert("reseal_min_period".into(), Value::Integer(0));
 
