@@ -174,7 +174,6 @@ fn to_toml(
     let mut websockets = Map::new();
 
     if open_ports {
-        
         rpc.insert("interface".into(), Value::String("all".into()));
         rpc.insert("cors".into(), to_toml_array(vec!["all"]));
         rpc.insert("hosts".into(), to_toml_array(vec!["all"]));
@@ -193,14 +192,12 @@ fn to_toml(
             Value::Integer((base_rpc_port as usize + i) as i64),
         );
 
-
         websockets.insert("interface".into(), Value::String("all".into()));
         websockets.insert("origins".into(), to_toml_array(vec!["all"]));
         websockets.insert(
             "port".into(),
             Value::Integer((base_ws_port as usize + i) as i64),
         );
-    
     } else {
         rpc.insert("disable".into(), Value::Boolean(true));
         websockets.insert("disable".into(), Value::Boolean(true));
@@ -439,12 +436,12 @@ fn main() {
             )
         });
 
-    let fork_block_number: Option<i64> = matches.value_of("fork_block_number").map_or(None, |v| {
-        Some(
-            v.parse::<i64>()
-                .expect("fork_block_number need to be of integer type"),
-        )
-    });
+    // let fork_block_number: Option<i64> = matches.value_of("fork_block_number").map_or(None, |v| {
+    //     Some(
+    //         v.parse::<i64>()
+    //             .expect("fork_block_number need to be of integer type"),
+    //     )
+    // });
 
     let metrics_port_base: Option<u16> = matches.value_of("metrics_port_base").map_or(None, |v| {
         Some(
