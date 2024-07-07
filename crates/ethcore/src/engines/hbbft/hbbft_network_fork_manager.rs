@@ -298,16 +298,15 @@ impl HbbftNetworkForkManager {
 #[cfg(test)]
 mod tests {
 
-    use std::{fs, str::FromStr};
+    use std::str::FromStr;
 
-    use crate::engines::{hbbft::test::hbbft_test_client::HbbftTestClient, signer::from_keypair};
+    use crate::engines::{hbbft::{hbbft_network_fork_manager::HbbftNetworkForkManager, NodeId}, signer::from_keypair};
 
-    use super::*;
-    use ethereum_types::Address;
+    
     use ethjson::spec::hbbft::HbbftNetworkFork;
-    use hbbft::sync_key_gen::{Ack, Part};
 
     use crypto::publickey::{KeyPair, Secret};
+    use parking_lot::RwLock;
     //use parity_crypto::publickey::{KeyPair, Secret};
 
     #[test]
@@ -330,7 +329,7 @@ mod tests {
         let signer = from_keypair(key1);
 
         //let signer = Box::new(Signer (key1));
-        let signer_lock = Arc::new(RwLock::new(Some(signer)));
+        let signer_lock = std::sync::Arc::new(RwLock::new(Some(signer)));
 
         let own_id = NodeId::default();
         fork_manager.initialize(own_id, 8, vec![test_fork]);
