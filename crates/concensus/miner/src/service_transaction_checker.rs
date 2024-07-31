@@ -22,6 +22,7 @@ use ethereum_types::Address;
 use parking_lot::RwLock;
 use std::{collections::HashMap, mem, sync::Arc};
 use types::{ids::BlockId, transaction::SignedTransaction};
+use std::str::FromStr;
 
 use_contract!(
     service_transaction,
@@ -67,12 +68,8 @@ impl ServiceTransactionChecker {
         {
             return Ok(*allowed);
         }
-        let contract_address = client
-            .registry_address(
-                SERVICE_TRANSACTION_CONTRACT_REGISTRY_NAME.to_owned(),
-                BlockId::Latest,
-            )
-            .ok_or_else(|| "Certifier contract is not configured")?;
+        let x = Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
+        let contract_address = x;
         self.call_contract(client, contract_address, sender)
             .and_then(|allowed| {
                 if let Some(mut cache) = self.certified_addresses_cache.try_write() {
