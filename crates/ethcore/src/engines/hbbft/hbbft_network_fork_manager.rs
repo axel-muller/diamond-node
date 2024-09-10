@@ -300,9 +300,11 @@ mod tests {
 
     use std::str::FromStr;
 
-    use crate::engines::{hbbft::{hbbft_network_fork_manager::HbbftNetworkForkManager, NodeId}, signer::from_keypair};
+    use crate::engines::{
+        hbbft::{hbbft_network_fork_manager::HbbftNetworkForkManager, NodeId},
+        signer::from_keypair,
+    };
 
-    
     use ethjson::spec::hbbft::HbbftNetworkFork;
 
     use crypto::publickey::{KeyPair, Secret};
