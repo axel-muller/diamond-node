@@ -91,21 +91,17 @@ impl ServiceTransactionChecker {
             HashMap::default(),
         );
 
-        if let Some(contract_address) = client.registry_address(
-            SERVICE_TRANSACTION_CONTRACT_REGISTRY_NAME.to_owned(),
-            BlockId::Latest,
-        ) {
-            let addresses: Vec<_> = cache.keys().collect();
-            let mut cache: HashMap<Address, bool> = HashMap::default();
-            for address in addresses {
-                let allowed = self.call_contract(client, contract_address, *address)?;
-                cache.insert(*address, allowed);
-            }
-            *self.certified_addresses_cache.write() = cache;
-            Ok(true)
-        } else {
-            Ok(false)
+        let contract_address = Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
+    
+        let addresses: Vec<_> = cache.keys().collect();
+        let mut cache: HashMap<Address, bool> = HashMap::default();
+        for address in addresses {
+            let allowed = self.call_contract(client, contract_address, *address)?;
+            cache.insert(*address, allowed);
         }
+        *self.certified_addresses_cache.write() = cache;
+        Ok(true)
+        
     }
 
     fn call_contract<C: CallContract + RegistryInfo>(
