@@ -91,8 +91,9 @@ impl ServiceTransactionChecker {
             HashMap::default(),
         );
 
-        let contract_address = Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
-    
+        let contract_address =
+            Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
+
         let addresses: Vec<_> = cache.keys().collect();
         let mut cache: HashMap<Address, bool> = HashMap::default();
         for address in addresses {
@@ -101,7 +102,6 @@ impl ServiceTransactionChecker {
         }
         *self.certified_addresses_cache.write() = cache;
         Ok(true)
-        
     }
 
     fn call_contract<C: CallContract + RegistryInfo>(
