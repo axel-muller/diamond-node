@@ -1161,14 +1161,22 @@ impl HoneyBadgerBFT {
                 {
                     if all_available {
                         let null_signer = Arc::new(RwLock::new(None));
-                        if let Ok(synckeygen) = initialize_synckeygen(
+                        match initialize_synckeygen(
                             &*client,
                             &null_signer,
                             BlockId::Latest,
                             ValidatorType::Pending,
                         ) {
-                            if synckeygen.is_ready() {
-                                return true;
+                            Ok(synckeygen) => {
+                                if synckeygen.is_ready() {
+                                    return true;
+                                }
+                            }
+                            Err(e) => {
+                                error!(target: "consensus", "Error initializing synckeygen: {:?}", e);
+                            }
+                            Err(_) => {
+                                error!(target: "consensus", "Error initializing synckeygen: unknown Error");
                             }
                         }
                     }
