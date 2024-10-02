@@ -166,7 +166,10 @@ impl HbbftState {
             }
         };
 
-        assert!(synckeygen.is_ready());
+        if !synckeygen.is_ready() {
+            error!(target: "engine", "Synckeygen not ready when it should be!");
+            return None;
+        }
 
         let (pks, sks) = synckeygen.generate().ok()?;
         self.public_master_key = Some(pks.public_key());
