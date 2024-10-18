@@ -24,31 +24,30 @@ pub fn create_miner() {
     println!("Creating dmd v4 miner...");
     let mut name: String = "DPoSChain".to_string();
     match fs::read_to_string("spec.json") {
-        Ok(s) => {
-            match serde_json::from_str(s.as_str()) {
-                Ok(Value::Object(map)) => {
-                    if map.contains_key("name") {
-                        let x = &map["name"];
+        Ok(s) => match serde_json::from_str(s.as_str()) {
+            Ok(Value::Object(map)) => {
+                if map.contains_key("name") {
+                    let x = &map["name"];
 
-                        match x.as_str() {
-                            Some(n) => {
-                                name = String::from_str(n).expect("could not parse chain name from spec.json");
-                                println!("chain: {}", name);
-                            },
-                            None => {
-                                println!("could not read chain name from spec.json");
-                            }
+                    match x.as_str() {
+                        Some(n) => {
+                            name = String::from_str(n)
+                                .expect("could not parse chain name from spec.json");
+                            println!("chain: {}", name);
+                        }
+                        None => {
+                            println!("could not read chain name from spec.json");
                         }
                     }
-                },
-                _ => {
-                    println!("unable to parse spec.json");
                 }
+            }
+            _ => {
+                println!("unable to parse spec.json");
             }
         },
         Err(e) => {
             println!("unable to to open spec.json: {:?}", e);
-        },
+        }
     }
 
     //let serialized_json_key =
