@@ -134,9 +134,9 @@ pub fn report_reconnect(
             .gas(U256::from(200_000))
             .nonce(nonce);
 
-    info!(target:"consensus", "early-epoch-end: sending report_missing_connectivity for with nonce: {nonce}, missing: {:?} ", reconnected_validator);
+    info!(target:"engine", "early-epoch-end: sending report_reconnect for with nonce: {nonce}, missing: {:?} ", reconnected_validator);
     if let Err(e) = full_client.transact_silently(transaction) {
-        warn!(target:"consensus", "early-epoch-end: could not report_missing_connectivity {e:?}");
+        warn!(target:"engine", "early-epoch-end: could not report_missing_connectivity {e:?}");
         return false;
     }
     return true;
