@@ -942,7 +942,7 @@ impl HoneyBadgerBFT {
         mining_address: &Address,
     ) {
         // todo: acquire allowed devp2p warmup time from contracts ?!
-        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+        let allowed_devp2p_warmup_time = Duration::from_secs(1200);
 
         debug!(target: "engine", "early-epoch-end: handle_early_epoch_end.");
 
