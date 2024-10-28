@@ -505,6 +505,8 @@ impl HoneyBadgerBFT {
         debug!(target: "consensus", "Block creation: Batch received for epoch {}, total {} contributions, with {} unique transactions.", batch.epoch, batch
             .contributions.iter().fold(0, |i, c| i + c.1.transactions.len()), batch_txns.len());
 
+        trace!(target: "consensus", "Block creation: transactions {}", batch_txns.iter().map(|x| x.hash.to_string()).join(", "));
+
         // Make sure the resulting transactions do not contain nonces out of order.
         // Not necessary any more - we select contribution transactions by sender, contributing all transactions by that sender or none.
         // The transaction queue's "pending" transactions already guarantee there are no nonce gaps for a selected sender.
