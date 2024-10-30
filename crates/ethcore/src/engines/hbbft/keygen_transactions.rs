@@ -136,11 +136,9 @@ impl KeygenTransactionSender {
         let (mut synckeygen, part) = engine_signer_to_synckeygen(signer, pub_leys_arc.clone())
             .map_err(|e| {
                 warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_leys_arc.len(), e);
-                
                 pub_leys_arc.iter().for_each(|(k, v)| {
                     warn!(target:"engine", "pub key {}", k);
                 });
-                
                 CallError::ReturnValueInvalid
             })?;
 
