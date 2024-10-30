@@ -41,9 +41,9 @@ pub enum KeyGenError {
     NoSigner,
     NoFullClient,
     NoPartToWrite,
-    InvalidPublicKey(Vec<Public>),
     CallError(CallError),
-    Unexpected
+    Unexpected,
+
 }
 
 
@@ -185,10 +185,20 @@ impl KeygenTransactionSender {
                             // and usually run into the gas limit problems.
                             let gas: usize = failure_pub_keys.len() * 800 + 100_000;
 
+                            let serialized_part = match bincode::serialize(&failure_pub_keys) {
+                                Ok(part) => part,
+                                Err(e) => {
+                                    warn!(target:"engine", "could not serialize part: {:?}", e);
+                                    return Err(KeyGenError::Unexpected);
+                                }
+                            };
+
+                            let nonce = full_client.nonce(&address, BlockId::Latest).unwrap();
+
                             let part_transaction =
-                                TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, failure_pub_keys)
+                                TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, serialized_part)
                                     .gas(U256::from(gas))
-                                    .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
+                                    .nonce(nonce)
                                     .gas_price(U256::from(10000000000u64));
                             full_client
                                 .transact_silently(part_transaction)
@@ -197,7 +207,7 @@ impl KeygenTransactionSender {
                                     CallError::ReturnValueInvalid
                                 })?;
 
-                            trace!(target:"engine", "PART Transaction send.");
+                            trace!(target:"engine", "PART Transaction send for moving forward key gen phase with nonce: {}", nonce);
                             return Ok(());
                         },
                     }
