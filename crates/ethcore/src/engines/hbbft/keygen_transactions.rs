@@ -45,9 +45,7 @@ pub enum KeyGenError {
     NoPartToWrite,
     CallError(CallError),
     Unexpected,
-
 }
-
 
 impl From<CallError> for KeyGenError {
     fn from(e: CallError) -> Self {
@@ -141,60 +139,72 @@ impl KeygenTransactionSender {
 
         trace!(target:"engine", " get_validator_pubkeys...");
 
-        let vmap = get_validator_pubkeys(&*client, BlockId::Latest, ValidatorType::Pending).map_err(|e| KeyGenError::CallError(e))?;
+        let vmap = get_validator_pubkeys(&*client, BlockId::Latest, ValidatorType::Pending)
+            .map_err(|e| KeyGenError::CallError(e))?;
         let pub_keys: BTreeMap<_, _> = vmap
             .values()
             .map(|p| (*p, PublicWrapper { inner: p.clone() }))
             .collect();
 
         let pub_keys_arc = Arc::new(pub_keys);
-        let upcoming_epoch = get_posdao_epoch(client, BlockId::Latest).map_err(|e| KeyGenError::CallError(e))? + 1;
+        let upcoming_epoch =
+            get_posdao_epoch(client, BlockId::Latest).map_err(|e| KeyGenError::CallError(e))? + 1;
 
         //let pub_key_len = pub_keys.len();
         // if synckeygen creation fails then either signer or validator pub keys are problematic.
         // Todo: We should expect up to f clients to write invalid pub keys. Report and re-start pending validator set selection.
-        let (mut synckeygen, part) = 
-            match engine_signer_to_synckeygen(signer, pub_keys_arc.clone()) {
-                Ok((mut synckeygen_, part_)) => (synckeygen_, part_),
-                Err(e) => {
-                    warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_keys_arc.len(), e);
-                    //let mut failure_pub_keys: Vec<Public> = Vec::new(); 
-                    let mut failure_pub_keys:  Vec<u8> = Vec::new();
-                    pub_keys_arc.iter().for_each(|(k, v)| {
-                        warn!(target:"engine", "pub key {}", k.as_bytes().iter().join(""));
+        let (mut synckeygen, part) = match engine_signer_to_synckeygen(signer, pub_keys_arc.clone())
+        {
+            Ok((mut synckeygen_, part_)) => (synckeygen_, part_),
+            Err(e) => {
+                warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_keys_arc.len(), e);
+                //let mut failure_pub_keys: Vec<Public> = Vec::new();
+                let mut failure_pub_keys: Vec<u8> = Vec::new();
+                pub_keys_arc.iter().for_each(|(k, v)| {
+                    warn!(target:"engine", "pub key {}", k.as_bytes().iter().join(""));
 
-                        if !v.is_valid() {
-                            warn!(target:"engine", "INVALID pub key {}", k);
+                    if !v.is_valid() {
+                        warn!(target:"engine", "INVALID pub key {}", k);
 
-                            // append the bytes of the public key to the failure_pub_keys.
-                            k.as_bytes().iter().for_each(|b| {
-                                failure_pub_keys.push(*b);
-                            });
-                        }
-                    });
-
-                    // if we should send our parts, we will send the public keys of the troublemakers instead.
-
-                    match self.should_send_part(client, &address).map_err(|e| KeyGenError::CallError(e))? {
-                        ShouldSendKeyAnswer::NoNotThisKeyGenMode => return Err(KeyGenError::Unexpected),
-                        ShouldSendKeyAnswer::NoWaiting => return Err(KeyGenError::Unexpected),
-                        ShouldSendKeyAnswer::Yes => {
-
-                            let serialized_part = match bincode::serialize(&failure_pub_keys) {
-                                Ok(part) => part,
-                                Err(e) => {
-                                    warn!(target:"engine", "could not serialize part: {:?}", e);
-                                    return Err(KeyGenError::Unexpected);
-                                }
-                            };
-                                        
-                            send_part_transaction(full_client, client, &address, upcoming_epoch, serialized_part)?;
-                            trace!(target:"engine", "PART Transaction send for moving forward key gen phase");
-                            return Ok(());
-                        },
+                        // append the bytes of the public key to the failure_pub_keys.
+                        k.as_bytes().iter().for_each(|b| {
+                            failure_pub_keys.push(*b);
+                        });
                     }
-                },
-            };
+                });
+
+                // if we should send our parts, we will send the public keys of the troublemakers instead.
+
+                match self
+                    .should_send_part(client, &address)
+                    .map_err(|e| KeyGenError::CallError(e))?
+                {
+                    ShouldSendKeyAnswer::NoNotThisKeyGenMode => {
+                        return Err(KeyGenError::Unexpected)
+                    }
+                    ShouldSendKeyAnswer::NoWaiting => return Err(KeyGenError::Unexpected),
+                    ShouldSendKeyAnswer::Yes => {
+                        let serialized_part = match bincode::serialize(&failure_pub_keys) {
+                            Ok(part) => part,
+                            Err(e) => {
+                                warn!(target:"engine", "could not serialize part: {:?}", e);
+                                return Err(KeyGenError::Unexpected);
+                            }
+                        };
+
+                        send_part_transaction(
+                            full_client,
+                            client,
+                            &address,
+                            upcoming_epoch,
+                            serialized_part,
+                        )?;
+                        trace!(target:"engine", "PART Transaction send for moving forward key gen phase");
+                        return Ok(());
+                    }
+                }
+            }
+        };
 
         // If there is no part then we are not part of the pending validator set and there is nothing for us to do.
         let part_data = match part {
@@ -205,13 +215,11 @@ impl KeygenTransactionSender {
             }
         };
 
-        
         trace!(target:"engine", "preparing to send PARTS for upcoming epoch: {}", upcoming_epoch);
 
         // Check if we already sent our part.
         match self.should_send_part(client, &address)? {
             ShouldSendKeyAnswer::Yes => {
-
                 let serialized_part = match bincode::serialize(&part_data) {
                     Ok(part) => part,
                     Err(e) => {
@@ -220,7 +228,13 @@ impl KeygenTransactionSender {
                     }
                 };
 
-                send_part_transaction(full_client, client, &address, upcoming_epoch, serialized_part)?;
+                send_part_transaction(
+                    full_client,
+                    client,
+                    &address,
+                    upcoming_epoch,
+                    serialized_part,
+                )?;
                 trace!(target:"engine", "PART Transaction send.");
                 return Ok(());
             }
@@ -300,9 +314,13 @@ impl KeygenTransactionSender {
     }
 }
 
-
-fn send_part_transaction(full_client: &dyn BlockChainClient, client: &dyn EngineClient, mining_address: &Address, upcoming_epoch: U256 , data: Vec<u8>) -> Result<(), KeyGenError> {
-
+fn send_part_transaction(
+    full_client: &dyn BlockChainClient,
+    client: &dyn EngineClient,
+    mining_address: &Address,
+    upcoming_epoch: U256,
+    data: Vec<u8>,
+) -> Result<(), KeyGenError> {
     // the required gas values have been approximated by
     // experimenting and it's a very rough estimation.
     // it can be further fine tuned to be just above the real consumption.
@@ -312,17 +330,13 @@ fn send_part_transaction(full_client: &dyn BlockChainClient, client: &dyn Engine
 
     let nonce = full_client.nonce(&mining_address, BlockId::Latest).unwrap();
     let current_round = get_current_key_gen_round(client)?;
-    let write_part_data = key_history_contract::functions::write_part::call(
-        upcoming_epoch,
-        current_round,
-        data,
-    );
+    let write_part_data =
+        key_history_contract::functions::write_part::call(upcoming_epoch, current_round, data);
 
-    let part_transaction =
-        TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
-            .gas(U256::from(gas))
-            .nonce(nonce)
-            .gas_price(U256::from(10000000000u64));
+    let part_transaction = TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
+        .gas(U256::from(gas))
+        .nonce(nonce)
+        .gas_price(U256::from(10000000000u64));
     full_client
         .transact_silently(part_transaction)
         .map_err(|e| {
@@ -331,5 +345,4 @@ fn send_part_transaction(full_client: &dyn BlockChainClient, client: &dyn Engine
         })?;
 
     return Ok(());
-
 }
