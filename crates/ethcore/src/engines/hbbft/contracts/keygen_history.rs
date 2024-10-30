@@ -179,6 +179,13 @@ pub struct KeyPairWrapper {
     pub inner: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
 }
 
+impl PublicWrapper {
+    /// Check if the public key is valid.
+    pub fn is_valid(&self) -> bool {
+        self.encrypt(b"a", &mut rand::thread_rng()).is_ok()
+    }
+}
+
 impl<'a> PublicKey for PublicWrapper {
     type Error = crypto::publickey::Error;
     type SecretKey = KeyPairWrapper;

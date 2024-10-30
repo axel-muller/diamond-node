@@ -137,7 +137,11 @@ impl KeygenTransactionSender {
             .map_err(|e| {
                 warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_leys_arc.len(), e);
                 pub_leys_arc.iter().for_each(|(k, v)| {
-                    warn!(target:"engine", "pub key {}", k);
+                    warn!(target:"engine", "pub key {}", k.as_bytes().iter().join(""));
+
+                    if !v.is_valid() {
+                        warn!(target:"engine", "INVALID pub key {}", k);
+                    }
                 });
                 CallError::ReturnValueInvalid
             })?;
