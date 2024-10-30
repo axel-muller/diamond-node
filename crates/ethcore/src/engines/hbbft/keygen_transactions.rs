@@ -128,11 +128,19 @@ impl KeygenTransactionSender {
             .map(|p| (*p, PublicWrapper { inner: p.clone() }))
             .collect();
 
+        let pub_leys_arc = Arc::new(pub_keys);
+
+        //let pub_key_len = pub_keys.len();
         // if synckeygen creation fails then either signer or validator pub keys are problematic.
         // Todo: We should expect up to f clients to write invalid pub keys. Report and re-start pending validator set selection.
-        let (mut synckeygen, part) = engine_signer_to_synckeygen(signer, Arc::new(pub_keys))
+        let (mut synckeygen, part) = engine_signer_to_synckeygen(signer, pub_leys_arc.clone())
             .map_err(|e| {
-                warn!(target:"engine", "engine_signer_to_synckeygen error {:?}", e);
+                warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_leys_arc.len(), e);
+                
+                pub_leys_arc.iter().for_each(|(k, v)| {
+                    warn!(target:"engine", "pub key {}", k);
+                });
+                
                 CallError::ReturnValueInvalid
             })?;
 
