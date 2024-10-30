@@ -22,6 +22,8 @@ use parking_lot::RwLock;
 use std::{collections::BTreeMap, sync::Arc};
 use types::ids::BlockId;
 
+use crate::client::BlockChainClient;
+
 pub struct KeygenTransactionSender {
     last_keygen_mode: KeyGenMode,
     keygen_mode_counter: u64,
@@ -177,13 +179,6 @@ impl KeygenTransactionSender {
                         ShouldSendKeyAnswer::NoNotThisKeyGenMode => return Err(KeyGenError::Unexpected),
                         ShouldSendKeyAnswer::NoWaiting => return Err(KeyGenError::Unexpected),
                         ShouldSendKeyAnswer::Yes => {
-                                        
-                            // the required gas values have been approximated by
-                            // experimenting and it's a very rough estimation.
-                            // it can be further fine tuned to be just above the real consumption.
-                            // ACKs require much more gas,
-                            // and usually run into the gas limit problems.
-                            let gas: usize = failure_pub_keys.len() * 800 + 100_000;
 
                             let serialized_part = match bincode::serialize(&failure_pub_keys) {
                                 Ok(part) => part,
@@ -192,22 +187,9 @@ impl KeygenTransactionSender {
                                     return Err(KeyGenError::Unexpected);
                                 }
                             };
-
-                            let nonce = full_client.nonce(&address, BlockId::Latest).unwrap();
-
-                            let part_transaction =
-                                TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, serialized_part)
-                                    .gas(U256::from(gas))
-                                    .nonce(nonce)
-                                    .gas_price(U256::from(10000000000u64));
-                            full_client
-                                .transact_silently(part_transaction)
-                                .map_err(|e| {
-                                    warn!(target:"engine", "could not transact_silently: {:?}", e);
-                                    CallError::ReturnValueInvalid
-                                })?;
-
-                            trace!(target:"engine", "PART Transaction send for moving forward key gen phase with nonce: {}", nonce);
+                                        
+                            send_part_transaction(full_client, client, &address, upcoming_epoch, serialized_part)?;
+                            trace!(target:"engine", "PART Transaction send for moving forward key gen phase");
                             return Ok(());
                         },
                     }
@@ -229,6 +211,7 @@ impl KeygenTransactionSender {
         // Check if we already sent our part.
         match self.should_send_part(client, &address)? {
             ShouldSendKeyAnswer::Yes => {
+
                 let serialized_part = match bincode::serialize(&part_data) {
                     Ok(part) => part,
                     Err(e) => {
@@ -236,33 +219,8 @@ impl KeygenTransactionSender {
                         return Err(KeyGenError::Unexpected);
                     }
                 };
-                let serialized_part_len = serialized_part.len();
-                let current_round = get_current_key_gen_round(client)?;
-                let write_part_data = key_history_contract::functions::write_part::call(
-                    upcoming_epoch,
-                    current_round,
-                    serialized_part,
-                );
 
-                // the required gas values have been approximated by
-                // experimenting and it's a very rough estimation.
-                // it can be further fine tuned to be just above the real consumption.
-                // ACKs require much more gas,
-                // and usually run into the gas limit problems.
-                let gas: usize = serialized_part_len * 800 + 100_000;
-
-                let part_transaction =
-                    TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
-                        .gas(U256::from(gas))
-                        .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
-                        .gas_price(U256::from(10000000000u64));
-                full_client
-                    .transact_silently(part_transaction)
-                    .map_err(|e| {
-                        warn!(target:"engine", "could not transact_silently: {:?}", e);
-                        CallError::ReturnValueInvalid
-                    })?;
-
+                send_part_transaction(full_client, client, &address, upcoming_epoch, serialized_part)?;
                 trace!(target:"engine", "PART Transaction send.");
                 return Ok(());
             }
@@ -340,4 +298,38 @@ impl KeygenTransactionSender {
 
         Ok(())
     }
+}
+
+
+fn send_part_transaction(full_client: &dyn BlockChainClient, client: &dyn EngineClient, mining_address: &Address, upcoming_epoch: U256 , data: Vec<u8>) -> Result<(), KeyGenError> {
+
+    // the required gas values have been approximated by
+    // experimenting and it's a very rough estimation.
+    // it can be further fine tuned to be just above the real consumption.
+    // ACKs require much more gas,
+    // and usually run into the gas limit problems.
+    let gas: usize = data.len() * 800 + 100_000;
+
+    let nonce = full_client.nonce(&mining_address, BlockId::Latest).unwrap();
+    let current_round = get_current_key_gen_round(client)?;
+    let write_part_data = key_history_contract::functions::write_part::call(
+        upcoming_epoch,
+        current_round,
+        data,
+    );
+
+    let part_transaction =
+        TransactionRequest::call(*KEYGEN_HISTORY_ADDRESS, write_part_data.0)
+            .gas(U256::from(gas))
+            .nonce(nonce)
+            .gas_price(U256::from(10000000000u64));
+    full_client
+        .transact_silently(part_transaction)
+        .map_err(|e| {
+            warn!(target:"engine", "could not transact_silently: {:?}", e);
+            CallError::ReturnValueInvalid
+        })?;
+
+    return Ok(());
+
 }
