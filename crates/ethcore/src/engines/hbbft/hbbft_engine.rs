@@ -1009,6 +1009,7 @@ impl HoneyBadgerBFT {
             Some(client_arc) => {
                 if self.is_syncing(&client_arc) {
                     // we are syncing - do not do anything.
+                    trace!(target: "engine", "do_validator_engine_actions: skipping because we are syncing.");
                     return Ok(());
                 }
 
