@@ -39,7 +39,7 @@ pub(crate) struct HbbftEarlyEpochEndManager {
 
     node_id_to_address: BTreeMap<NodeId, Address>,
 
-    address_to_node_id: BTreeMap<Address, NodeId>,
+    // address_to_node_id: BTreeMap<Address, NodeId>,
 
     signing_address: Address,
 }
@@ -109,7 +109,7 @@ impl HbbftEarlyEpochEndManager {
             validators: validators,
             flagged_validators: flagged_validators,
             node_id_to_address,
-            address_to_node_id,
+            // address_to_node_id,
             signing_address: signing_address.clone(),
         };
 
