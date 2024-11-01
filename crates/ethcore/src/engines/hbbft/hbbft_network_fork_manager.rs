@@ -298,11 +298,11 @@ impl HbbftNetworkForkManager {
 #[cfg(test)]
 mod tests {
 
-    use std::str::FromStr;
+    use super::*;
     use crate::engines::signer::from_keypair;
-    use super::*;    
-    use ethjson::spec::hbbft::HbbftNetworkFork;
     use crypto::publickey::{KeyPair, Secret};
+    use ethjson::spec::hbbft::HbbftNetworkFork;
+    use std::str::FromStr;
 
     #[test]
     fn test_fork_manager_should_fork() {

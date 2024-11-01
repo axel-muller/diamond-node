@@ -40,7 +40,6 @@ pub(crate) struct HbbftEarlyEpochEndManager {
     node_id_to_address: BTreeMap<NodeId, Address>,
 
     // address_to_node_id: BTreeMap<Address, NodeId>,
-
     signing_address: Address,
 }
 
