@@ -1,7 +1,7 @@
 use client::traits::EngineClient;
 use crypto::{
     self,
-    publickey::{ec_math_utils::public_add, Public},
+    publickey::{Public},
 };
 use engines::{
     hbbft::{
