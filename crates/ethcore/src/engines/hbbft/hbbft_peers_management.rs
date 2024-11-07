@@ -9,11 +9,9 @@ use crate::{
     ethereum::public_key_to_address::public_key_to_address,
 };
 
-use bytes::ToPretty;
-
-use ethereum_types::Address;
-
 use super::{contracts::staking::get_pool_public_key, NodeId};
+use bytes::ToPretty;
+use ethereum_types::Address;
 
 #[derive(Clone, Debug)]
 struct ValidatorConnectionData {
