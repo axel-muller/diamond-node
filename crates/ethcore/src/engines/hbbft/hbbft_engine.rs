@@ -1178,9 +1178,6 @@ impl HoneyBadgerBFT {
                             Err(e) => {
                                 error!(target: "consensus", "Error initializing synckeygen: {:?}", e);
                             }
-                            Err(_) => {
-                                error!(target: "consensus", "Error initializing synckeygen: unknown Error");
-                            }
                         }
                     }
                 }

@@ -1,8 +1,5 @@
 use client::traits::EngineClient;
-use crypto::{
-    self,
-    publickey::{ec_math_utils::public_add, Public},
-};
+use crypto::{self, publickey::Public};
 use engines::{
     hbbft::{
         contracts::validator_set::{get_validator_pubkeys, ValidatorType},

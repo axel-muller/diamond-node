@@ -298,17 +298,11 @@ impl HbbftNetworkForkManager {
 #[cfg(test)]
 mod tests {
 
-    use std::{fs, str::FromStr};
-
-    use crate::engines::{hbbft::test::hbbft_test_client::HbbftTestClient, signer::from_keypair};
-
     use super::*;
-    use ethereum_types::Address;
-    use ethjson::spec::hbbft::HbbftNetworkFork;
-    use hbbft::sync_key_gen::{Ack, Part};
-
+    use crate::engines::signer::from_keypair;
     use crypto::publickey::{KeyPair, Secret};
-    //use parity_crypto::publickey::{KeyPair, Secret};
+    use ethjson::spec::hbbft::HbbftNetworkFork;
+    use std::str::FromStr;
 
     #[test]
     fn test_fork_manager_should_fork() {
