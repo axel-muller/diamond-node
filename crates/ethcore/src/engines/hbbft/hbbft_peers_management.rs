@@ -64,8 +64,6 @@ impl HbbftPeersManagement {
         client_arc: &Arc<dyn EngineClient>,
         pending_validators: &Vec<Address>,
     ) -> Result<usize, String> {
-
-        
         let block_chain_client = client_arc
             .as_full_client()
             .ok_or("reserverd peers: could not retrieve BlockChainClient for connect_to_pending_validators")?;
