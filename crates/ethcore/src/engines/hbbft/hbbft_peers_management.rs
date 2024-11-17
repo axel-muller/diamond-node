@@ -16,9 +16,9 @@ use ethereum_types::Address;
 #[derive(Clone, Debug)]
 struct ValidatorConnectionData {
     // mining_address: Address,
-    staking_address: Address,
-    socket_addr: SocketAddr,
-    public_key: NodeId,
+    // staking_address: Address,
+    // socket_addr: SocketAddr,
+    // public_key: NodeId,
     peer_string: String,
     mining_address: Address,
 }
@@ -40,7 +40,9 @@ impl HbbftPeersManagement {
         }
     }
 
-    /// connections are not always required
+    /// connections are not always required.
+    /// - during syncing
+    /// - if not validator address specified.
     fn should_not_connect(&self, client: &dyn BlockChainClient) -> bool {
         // don't do any connections while the network is syncing.
         // the connection is not required yet, and might be outdated.
@@ -62,6 +64,8 @@ impl HbbftPeersManagement {
         client_arc: &Arc<dyn EngineClient>,
         pending_validators: &Vec<Address>,
     ) -> Result<usize, String> {
+
+        
         let block_chain_client = client_arc
             .as_full_client()
             .ok_or("reserverd peers: could not retrieve BlockChainClient for connect_to_pending_validators")?;
@@ -542,14 +546,15 @@ fn connect_to_validator_core(
         info!(target: "engine", "adding reserved peer: {}", peer_string);
         if let Err(err) = peers_management.add_reserved_peer(&peer_string) {
             warn!(target: "engine", "failed to adding reserved: {} : {}", peer_string, err);
+            return None;
         }
 
         return Some(ValidatorConnectionData {
-            staking_address: staking_address,
+            //staking_address: staking_address,
             //mining_address: *address,
-            socket_addr: socket_addr,
+            //socket_addr: socket_addr,
             peer_string,
-            public_key: node_id.clone(),
+            //public_key: node_id.clone(),
             mining_address: Address::zero(), // all caller of this function will set this value.
         });
     } else {
