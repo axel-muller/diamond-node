@@ -16,7 +16,7 @@
 
 use std::{str::FromStr, sync::Arc, thread, time::Duration};
 
-use jsonrpc_core::{futures::Future, IoHandler, Success}; 
+use jsonrpc_core::{futures::Future, IoHandler, Success};
 use v1::{
     helpers::{
         dispatch,
@@ -30,6 +30,7 @@ use v1::{
     types::{ConfirmationResponse, RichRawTransaction},
 };
 
+use crate::dispatch::FullDispatcher;
 use accounts::AccountProvider;
 use bytes::ToPretty;
 use crypto::publickey::{Generator, Random, Secret};
@@ -39,7 +40,6 @@ use parity_runtime::{Executor, Runtime};
 use parking_lot::Mutex;
 use serde_json;
 use types::transaction::{Action, SignedTransaction, Transaction, TypedTransaction};
-use crate::dispatch::FullDispatcher;
 
 struct SigningTester {
     pub runtime: Runtime,
