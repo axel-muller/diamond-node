@@ -42,12 +42,11 @@ impl Contribution {
                 s.drain()
             })
             .collect();
-        let mut rng = rand::thread_rng();
 
         Contribution {
             transactions: ser_txns,
             timestamp: unix_now_secs(),
-            random_data: rng
+            random_data: rand::thread_rng()
                 .sample_iter(&Standard)
                 .take(RANDOM_BYTES_PER_EPOCH)
                 .collect(),

@@ -182,9 +182,10 @@ impl NodeStakingEpochHistory {
 
         if block_num > last_message_faulty {
             self.last_message_faulty = block_num;
-        } else {
-            warn!(target: "hbbft_message_memorium", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
-        }
+        } // else {
+          // this log entry is trigering often, probably there are more than 1 good messages able per block.// this log entry is trigering often, probably there are more than 1 good messages able per block.
+          // warn!(target: "hbbft_message_memorium", "add_message_event_faulty: event.block_num {block_num} <= last_message_faulty {last_message_faulty}");
+          // }
         self.num_faulty_messages += 1;
     }
 
@@ -195,9 +196,10 @@ impl NodeStakingEpochHistory {
 
         if block_num > last_message_good {
             self.last_message_good = block_num;
-        } else {
-            warn!(target: "hbbft_message_memorium", "add_message_event_good: event.block_num {block_num} <= last_message_good {last_message_good}");
-        }
+        } // else {
+          // this log entry is trigering often, probably there are more than 1 good messages able per block.
+          // warn!(target: "hbbft_message_memorium", "add_message_event_good: ! event.block_num {block_num} > last_message_good {last_message_good}");
+          // }
         self.num_good_messages += 1;
     }
 
@@ -219,6 +221,17 @@ impl NodeStakingEpochHistory {
         self.get_total_good_sealing_messages()
             + self.get_total_late_sealing_messages()
             + self.get_total_error_sealing_messages()
+    }
+
+    pub fn get_sealing_message(&self) -> u64 {
+        u64::max(
+            self.last_late_sealing_message,
+            self.last_good_sealing_message,
+        )
+    }
+
+    pub fn get_last_late_sealing_message(&self) -> u64 {
+        self.last_late_sealing_message
     }
 
     pub fn get_last_good_sealing_message(&self) -> u64 {
@@ -271,21 +284,9 @@ impl NodeStakingEpochHistory {
         //let metric: Metric = Metric::new();
         //r.registry().register(c)
 
-        //let label = self.get_node_id().0.to_hex();
+        //let node_id = self.get_node_id().0 .0;
 
-        let node_id = self.get_node_id().0 .0;
-
-        let other_node = std::format!(
-            "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
-            node_id[0],
-            node_id[1],
-            node_id[2],
-            node_id[3],
-            node_id[4],
-            node_id[5],
-            node_id[6],
-            node_id[7]
-        );
+        let other_node = self.get_node_id().as_8_byte_string();
 
         //r.register_gauge_with_label(name, help, label, value)
         r.register_gauge_with_other_node_label(
@@ -423,7 +424,23 @@ impl StakingEpochHistory {
         }
     }
 
-    fn get_history_for_node(&mut self, node_id: &NodeId) -> &mut NodeStakingEpochHistory {
+    pub fn get_history_for_node(&self, node_id: &NodeId) -> Option<&NodeStakingEpochHistory> {
+        let index_result = self
+            .node_staking_epoch_histories
+            .iter()
+            .position(|x| &x.get_node_id() == node_id);
+
+        match index_result {
+            Some(index) => {
+                return Some(&self.node_staking_epoch_histories[index]);
+            }
+            None => {
+                return None;
+            }
+        };
+    }
+
+    pub fn ensure_history_for_node(&mut self, node_id: &NodeId) -> &mut NodeStakingEpochHistory {
         let index_result = self
             .node_staking_epoch_histories
             .iter_mut()
@@ -446,33 +463,33 @@ impl StakingEpochHistory {
         if event.block_num > self.highest_block_num {
             self.highest_block_num = event.block_num;
         }
-        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        let node_staking_epoch_history = self.ensure_history_for_node(&event.node_id);
         node_staking_epoch_history.add_good_seal_event(event, staking_epoch_start_block);
         self.exported = false;
     }
 
     pub fn on_seal_late(&mut self, event: &SealEventLate) {
         let staking_epoch_start_block = self.staking_epoch_start_block;
-        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        let node_staking_epoch_history = self.ensure_history_for_node(&event.node_id);
         node_staking_epoch_history.add_seal_event_late(event, staking_epoch_start_block);
         self.exported = false;
     }
 
     pub fn on_seal_bad(&mut self, event: &SealEventBad) {
         let staking_epoch_start_block = self.staking_epoch_start_block;
-        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        let node_staking_epoch_history = self.ensure_history_for_node(&event.node_id);
         node_staking_epoch_history.add_bad_seal_event(event, staking_epoch_start_block);
         self.exported = false;
     }
 
     pub fn on_message_faulty(&mut self, event: &MessageEventFaulty) {
-        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        let node_staking_epoch_history = self.ensure_history_for_node(&event.node_id);
         node_staking_epoch_history.add_message_event_faulty(event);
         self.exported = false;
     }
 
     pub fn on_message_good(&mut self, event: &MessageEventGood) {
-        let node_staking_epoch_history = self.get_history_for_node(&event.node_id);
+        let node_staking_epoch_history = self.ensure_history_for_node(&event.node_id);
         node_staking_epoch_history.add_message_event_good(event);
         self.exported = false;
     }
@@ -692,6 +709,10 @@ impl HbbftMessageDispatcher {
             .write()
             .report_new_epoch(staking_epoch, staking_epoch_start_block);
     }
+
+    pub fn get_memorium(&self) -> &std::sync::Arc<RwLock<HbbftMessageMemorium>> {
+        return &self.memorial;
+    }
 }
 
 pub(crate) struct HbbftMessageMemorium {
@@ -846,7 +867,7 @@ impl HbbftMessageMemorium {
     fn on_seal_good(&mut self, seal: &SealEventGood) -> bool {
         debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
-        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+        if let Some(epoch_history) = self.get_staking_epoch_history_mut(block_num) {
             epoch_history.on_seal_good(seal);
             return true;
         } else {
@@ -873,7 +894,7 @@ impl HbbftMessageMemorium {
     fn on_seal_late(&mut self, seal: &SealEventLate) -> bool {
         debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
-        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+        if let Some(epoch_history) = self.get_staking_epoch_history_mut(block_num) {
             epoch_history.on_seal_late(seal);
             return true;
         } else {
@@ -884,7 +905,7 @@ impl HbbftMessageMemorium {
     fn on_seal_bad(&mut self, seal: &SealEventBad) -> bool {
         debug!(target: "hbbft_message_memorium", "working on  good seal!: {:?}", seal);
         let block_num = seal.block_num;
-        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+        if let Some(epoch_history) = self.get_staking_epoch_history_mut(block_num) {
             epoch_history.on_seal_bad(seal);
             return true;
         } else {
@@ -895,7 +916,7 @@ impl HbbftMessageMemorium {
     fn on_message_faulty(&mut self, event: &MessageEventFaulty) -> bool {
         debug!(target: "hbbft_message_memorium", "working on faulty message event!: {:?}", event);
         let block_num = event.block_num;
-        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+        if let Some(epoch_history) = self.get_staking_epoch_history_mut(block_num) {
             epoch_history.on_message_faulty(event);
             return true;
         } else {
@@ -905,7 +926,7 @@ impl HbbftMessageMemorium {
 
     fn on_message_good(&mut self, event: &MessageEventGood) -> bool {
         debug!(target: "hbbft_message_memorium", "working on good message event!: {:?}", event);
-        if let Some(epoch_history) = self.get_staking_epoch_history(event.block_num) {
+        if let Some(epoch_history) = self.get_staking_epoch_history_mut(event.block_num) {
             epoch_history.on_message_good(event);
             return true;
         } else {
@@ -913,9 +934,22 @@ impl HbbftMessageMemorium {
         }
     }
 
+    pub fn get_validator_data(
+        &self,
+        block_num: u64,
+        node_id: &NodeId,
+    ) -> Option<&Vec<NodeStakingEpochHistory>> {
+        if let Some(epoch_history) = self.get_staking_epoch_history(block_num) {
+            return Some(&epoch_history.node_staking_epoch_histories);
+        }
+        None
+    }
+
+    pub fn get_validator_last_late_block(&self, hbbft_epoch_number: u64) {}
+
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
-        warn!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
+        debug!(target: "hbbft_message_memorium", "report new epoch: {}", staking_epoch);
         self.latest_epoch = staking_epoch;
         self.latest_epoch_start_block = staking_epoch_start_block;
         if let Ok(epoch_history_index) = self
@@ -950,18 +984,35 @@ impl HbbftMessageMemorium {
         }
     }
 
-    fn get_staking_epoch_history(&mut self, block_num: u64) -> Option<&mut StakingEpochHistory> {
-        {
-            //let histories = &mut self.staking_epoch_history;
+    pub fn get_staking_epoch_history(&self, block_num: u64) -> Option<&StakingEpochHistory> {
+        //let histories = &mut self.staking_epoch_history;
 
-            // self.staking_epoch_history.get_mut(index)
-            for i in 0..self.staking_epoch_history.len() {
-                let e = &self.staking_epoch_history[i];
-                if block_num >= e.staking_epoch_start_block
-                    && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
-                {
-                    return Some(&mut self.staking_epoch_history[i]);
-                }
+        // self.staking_epoch_history.get_mut(index)
+        for i in 0..self.staking_epoch_history.len() {
+            let e = &self.staking_epoch_history[i];
+            if block_num >= e.staking_epoch_start_block
+                && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
+            {
+                return Some(&self.staking_epoch_history[i]);
+            }
+        }
+
+        None
+    }
+
+    fn get_staking_epoch_history_mut(
+        &mut self,
+        block_num: u64,
+    ) -> Option<&mut StakingEpochHistory> {
+        //let histories = &mut self.staking_epoch_history;
+
+        // self.staking_epoch_history.get_mut(index)
+        for i in 0..self.staking_epoch_history.len() {
+            let e = &self.staking_epoch_history[i];
+            if block_num >= e.staking_epoch_start_block
+                && (e.staking_epoch_end_block == 0 || block_num <= e.staking_epoch_end_block)
+            {
+                return Some(&mut self.staking_epoch_history[i]);
             }
         }
 
@@ -1193,6 +1244,17 @@ impl PrometheusMetrics for StakingEpochHistory {
 impl PrometheusMetrics for HbbftMessageMemorium {
     fn prometheus_metrics(&self, r: &mut stats::PrometheusRegistry) {
         //let epoch_history_len = self.staking_epoch_history.len() as i64;
+
+        // r.register_gauge(
+        //     "HbbftMessageMemorium_dispatched_message_event_faulty",
+        //     "dispatched_message_event_faulty",
+        //     self.dispatched_message_event_faulty.len() as i64,
+        // );
+        // r.register_gauge(
+        //     "HbbftMessageMemorium_dispatched_message_event_good",
+        //     "dispatched_message_event_good",
+        //     self.dispatched_message_event_good.len() as i64,
+        // );
 
         if let Some(history) = self.staking_epoch_history.iter().last() {
             history.prometheus_metrics(r);

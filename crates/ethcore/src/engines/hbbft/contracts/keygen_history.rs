@@ -46,9 +46,14 @@ pub fn engine_signer_to_synckeygen<'a>(
         inner: signer.clone(),
     };
     let public = match signer.read().as_ref() {
-        Some(signer) => signer
-            .public()
-            .expect("Signer's public key must be available!"),
+        Some(signer) => {
+            if let Some(this_public) = signer.public() {
+                this_public
+            } else {
+                error!(target: "engine", "Signer's public key must be available for address {:?}", signer.address());
+                return Err(hbbft::sync_key_gen::Error::UnknownSender);
+            }
+        }
         None => Public::from(H512::from_low_u64_be(0)),
     };
     let mut rng = rand::thread_rng();
@@ -106,7 +111,10 @@ pub fn part_of_address(
         .unwrap();
 
     match outcome {
-        PartOutcome::Invalid(_) => Err(CallError::ReturnValueInvalid),
+        PartOutcome::Invalid(e) => {
+            error!(target: "engine", "Part for address {} is invalid: {:?}", address, e);
+            Err(CallError::ReturnValueInvalid)
+        }
         PartOutcome::Valid(ack) => Ok(ack),
     }
 }
@@ -168,6 +176,13 @@ pub struct KeyPairWrapper {
     pub inner: Arc<RwLock<Option<Box<dyn EngineSigner>>>>,
 }
 
+impl PublicWrapper {
+    /// Check if the public key is valid.
+    pub fn is_valid(&self) -> bool {
+        self.encrypt(b"a", &mut rand::thread_rng()).is_ok()
+    }
+}
+
 impl<'a> PublicKey for PublicWrapper {
     type Error = crypto::publickey::Error;
     type SecretKey = KeyPairWrapper;
@@ -226,6 +241,7 @@ pub fn initialize_synckeygen(
     block_id: BlockId,
     validator_type: ValidatorType,
 ) -> Result<SyncKeyGen<Public, PublicWrapper>, CallError> {
+    debug!(target: "engine", "Initializing SyncKeyGen with block_id: {:?}", block_id);
     let vmap = get_validator_pubkeys(&*client, block_id, validator_type)?;
     let pub_keys: BTreeMap<_, _> = vmap
         .values()

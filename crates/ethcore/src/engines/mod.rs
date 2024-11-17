@@ -492,6 +492,12 @@ pub trait Engine<M: Machine>: Sync + Send {
         true
     }
 
+    /// Some Engine might define the minimum gas price by themselve.
+    /// (for example: contract)
+    fn minimum_gas_price(&self) -> Option<U256> {
+        None
+    }
+
     /// Sign using the EngineSigner, to be used for consensus tx signing.
     fn sign(&self, _hash: H256) -> Result<Signature, M::Error> {
         unimplemented!()
@@ -708,12 +714,6 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
     /// That is only possible if EIP-3607 is still not activated.
     fn allow_non_eoa_sender(&self, best_block_number: BlockNumber) -> bool {
         self.params().eip3607_transition > best_block_number
-    }
-
-    /// Some Engine might define the minimum gas price by themselve.
-    /// (for example: contract)
-    fn minimum_gas_price(&self) -> Option<U256> {
-        None
     }
 }
 
