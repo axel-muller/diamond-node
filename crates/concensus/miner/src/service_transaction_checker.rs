@@ -28,8 +28,6 @@ use_contract!(
     "res/contracts/service_transaction.json"
 );
 
-const SERVICE_TRANSACTION_CONTRACT_REGISTRY_NAME: &'static str = "service_transaction_checker";
-
 /// Service transactions checker.
 #[derive(Default, Clone)]
 pub struct ServiceTransactionChecker {
