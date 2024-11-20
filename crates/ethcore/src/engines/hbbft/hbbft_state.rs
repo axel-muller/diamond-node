@@ -166,7 +166,10 @@ impl HbbftState {
             }
         };
 
-        assert!(synckeygen.is_ready());
+        if !synckeygen.is_ready() {
+            error!(target: "engine", "Synckeygen not ready when it should be!");
+            return None;
+        }
 
         let (pks, sks) = synckeygen.generate().ok()?;
         self.public_master_key = Some(pks.public_key());
@@ -230,7 +233,7 @@ impl HbbftState {
             warn!(target: "engine", "could not acquire to connect to current validators on switching to new validator set for staking epoch {}.", self.current_posdao_epoch);
         }
 
-        let allowed_devp2p_warmup_time = Duration::from_secs(120);
+        let allowed_devp2p_warmup_time = Duration::from_secs(1200);
 
         if let Some(full_client) = client.as_full_client() {
             let signing_address = if let Some(s) = signer.read().as_ref() {

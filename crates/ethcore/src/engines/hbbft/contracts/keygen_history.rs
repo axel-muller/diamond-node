@@ -46,9 +46,14 @@ pub fn engine_signer_to_synckeygen<'a>(
         inner: signer.clone(),
     };
     let public = match signer.read().as_ref() {
-        Some(signer) => signer
-            .public()
-            .expect("Signer's public key must be available!"),
+        Some(signer) => {
+            if let Some(this_public) = signer.public() {
+                this_public
+            } else {
+                error!(target: "engine", "Signer's public key must be available for address {:?}", signer.address());
+                return Err(hbbft::sync_key_gen::Error::UnknownSender);
+            }
+        }
         None => Public::from(H512::from_low_u64_be(0)),
     };
     let mut rng = rand::thread_rng();

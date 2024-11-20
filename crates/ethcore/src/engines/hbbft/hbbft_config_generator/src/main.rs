@@ -242,6 +242,7 @@ fn to_toml(
     // this makes sure that the min_gas_price wont be higher then the gas pricce the DAO decides.
     mining.insert("min_gas_price".into(), Value::Integer(1000));
     mining.insert("reseal_on_txs".into(), Value::String("none".into()));
+    mining.insert("gas_floor_target".into(), Value::String("300000000".into()));
     mining.insert("reseal_min_period".into(), Value::Integer(0));
 
     if let Some(tx_queue_per_sender_) = tx_queue_per_sender {
