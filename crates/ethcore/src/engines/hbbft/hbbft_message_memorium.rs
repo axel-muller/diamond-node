@@ -6,7 +6,10 @@ use bytes::ToPretty;
 use hbbft::honey_badger::{self};
 use parking_lot::RwLock;
 use stats::PrometheusMetrics;
-use std::{collections::VecDeque, time::Duration};
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
 
 // use threshold_crypto::{SignatureShare};
 use engines::hbbft::{sealing, NodeId};
@@ -46,10 +49,14 @@ pub(crate) enum SealMessageState {
 pub(crate) struct NodeStakingEpochHistory {
     node_id: NodeId,
     last_good_sealing_message: u64,
+    last_good_sealing_message_time: Instant,
     last_late_sealing_message: u64,
+    last_late_sealing_message_time: Instant,
     last_error_sealing_message: u64,
+    last_error_sealing_message_time: Instant,
     // summed up lateness of all seals, including bad seals.
     cumulative_lateness: u64,
+
     sealing_blocks_good: Vec<u64>,
     sealing_blocks_late: Vec<u64>,
     sealing_blocks_bad: Vec<u64>,
@@ -64,11 +71,15 @@ pub(crate) struct NodeStakingEpochHistory {
 
 impl NodeStakingEpochHistory {
     pub fn new(node_id: NodeId) -> Self {
+        let now = Instant::now();
         NodeStakingEpochHistory {
             node_id,
             last_good_sealing_message: 0,
+            last_good_sealing_message_time: now,
             last_late_sealing_message: 0,
+            last_late_sealing_message_time: now,
             last_error_sealing_message: 0,
+            last_error_sealing_message_time: now,
             cumulative_lateness: 0,
             sealing_blocks_good: Vec::new(),
             sealing_blocks_late: Vec::new(),
@@ -132,6 +143,7 @@ impl NodeStakingEpochHistory {
         self.cumulative_lateness +=
             self.calc_cumulative_lateness_gap(event.block_num, staking_epoch_start_block_num);
         self.last_good_sealing_message = event.block_num;
+        self.last_good_sealing_message_time = Instant::now();
         self.sealing_blocks_good.push(event.block_num);
     }
 
@@ -149,6 +161,7 @@ impl NodeStakingEpochHistory {
             self.calc_cumulative_lateness_gap(event.block_num, staking_epoch_start_block);
 
         self.last_late_sealing_message = event.block_num;
+        self.last_late_sealing_message_time = Instant::now();
         self.cumulative_lateness += event.get_lateness();
         self.sealing_blocks_late.push(event.block_num);
     }
@@ -172,6 +185,7 @@ impl NodeStakingEpochHistory {
             self.calc_cumulative_lateness_gap(block_num, staking_epoch_start_block_num);
         self.cumulative_lateness += 1;
         self.last_error_sealing_message = event.block_num;
+        self.last_error_sealing_message_time = Instant::now();
         self.sealing_blocks_good.push(event.block_num);
     }
 
@@ -223,10 +237,17 @@ impl NodeStakingEpochHistory {
             + self.get_total_error_sealing_messages()
     }
 
-    pub fn get_sealing_message(&self) -> u64 {
+    pub fn get_last_sealing_message(&self) -> u64 {
         u64::max(
             self.last_late_sealing_message,
             self.last_good_sealing_message,
+        )
+    }
+
+    pub fn get_last_sealing_message_time(&self) -> Instant {
+        Instant::max(
+            self.last_late_sealing_message_time,
+            self.last_good_sealing_message_time,
         )
     }
 
@@ -944,8 +965,6 @@ impl HbbftMessageMemorium {
         }
         None
     }
-
-    pub fn get_validator_last_late_block(&self, hbbft_epoch_number: u64) {}
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {
