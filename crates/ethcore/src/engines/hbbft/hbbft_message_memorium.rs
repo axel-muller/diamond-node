@@ -237,10 +237,17 @@ impl NodeStakingEpochHistory {
             + self.get_total_error_sealing_messages()
     }
 
-    pub fn get_sealing_message(&self) -> u64 {
+    pub fn get_last_sealing_message(&self) -> u64 {
         u64::max(
             self.last_late_sealing_message,
             self.last_good_sealing_message,
+        )
+    }
+
+    pub fn get_last_sealing_message_time(&self) -> Instant {
+        Instant::max(
+            self.last_late_sealing_message_time,
+            self.last_good_sealing_message_time,
         )
     }
 
@@ -958,8 +965,6 @@ impl HbbftMessageMemorium {
         }
         None
     }
-
-    pub fn get_validator_last_late_block(&self, hbbft_epoch_number: u64) {}
 
     // report that hbbft has switched to a new staking epoch
     pub fn report_new_epoch(&mut self, staking_epoch: u64, staking_epoch_start_block: u64) {

@@ -285,6 +285,10 @@ impl HbbftEarlyEpochEndManager {
         };
 
         let treshold: u64 = 10;
+        // todo: read this out from contracts: ConnectivityTrackerHbbft -> reportDisallowPeriod
+        // requires us to update the Contracts ABIs:
+        // https://github.com/DMDcoin/diamond-node/issues/115
+        let treshold_time = Duration::from_secs(60 * 15);
 
         if block_num < self.start_block + treshold {
             // not enought blocks have passed this epoch,
@@ -308,11 +312,10 @@ impl HbbftEarlyEpochEndManager {
                 };
 
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
-                    let last_sealing_message = node_history.get_sealing_message();
-
-                    if last_sealing_message < block_num - treshold {
+                    let last_sealing_message_time = node_history.get_last_sealing_message_time();
+                    let last_sealing_message_lateness = last_sealing_message_time.elapsed();
+                    if last_sealing_message_lateness > treshold_time {
                         // we do not have to send notification, if we already did so.
-
                         if !self.is_reported(client, validator_address) {
                             // this function will also add the validator to the list of flagged validators.
                             self.notify_about_missing_validator(&validator, client, full_client);
@@ -320,7 +323,6 @@ impl HbbftEarlyEpochEndManager {
                     } else {
                         // this validator is OK.
                         // maybe it was flagged and we need to unflag it ?
-
                         if self.is_reported(client, validator_address) {
                             self.notify_about_validator_reconnect(&validator, full_client, client);
                         }

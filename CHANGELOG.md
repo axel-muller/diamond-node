@@ -1,3 +1,10 @@
+
+## Diamond Node Software 3.3.5-hbbft-0.9.5
+
+- [Improved Logging for Stage 5 Errors] (https://github.com/DMDcoin/diamond-node/issues/147)
+- [Early Epoch end: Applying new time based rules]  (https://github.com/DMDcoin/diamond-node/issues/87)
+
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.4
 
 - [Fixed: is major syncing information is wrong.] (https://github.com/DMDcoin/diamond-node/issues/73)
