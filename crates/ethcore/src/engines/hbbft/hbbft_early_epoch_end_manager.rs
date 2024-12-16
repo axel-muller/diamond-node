@@ -288,7 +288,12 @@ impl HbbftEarlyEpochEndManager {
         // todo: read this out from contracts: ConnectivityTrackerHbbft -> reportDisallowPeriod
         // requires us to update the Contracts ABIs:
         // https://github.com/DMDcoin/diamond-node/issues/115
-        let treshold_time = Duration::from_secs(60 * 15);
+        let treshold_time = Duration::from_secs(60 * 60);
+
+        if self.start_time.elapsed() < treshold_time {
+            debug!(target: "engine", "early-epoch-end: no decision: Treshold time not reached.");
+            return;
+        }
 
         if block_num < self.start_block + treshold {
             // not enought blocks have passed this epoch,
