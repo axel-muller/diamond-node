@@ -1,4 +1,7 @@
 
+## Diamond Node Software 3.3.5-hbbft-0.9.7
+
+- [Nodes that are not a active validator seem to try to send connectivity reports] (https://github.com/DMDcoin/diamond-node/issues/153)
 
 ## Diamond Node Software 3.3.5-hbbft-0.9.6
 
