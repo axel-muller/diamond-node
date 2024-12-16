@@ -696,7 +696,7 @@ impl ChainNotify for EthSync {
                     Some(session_info) => {
                         session_info.id == node_id
                     },
-                    None => { warn!(target:"sync", "No session exists for peerId {:?}", p); false},
+                    None => { warn!(target:"sync", "No session exists for peerId {:?} Node: {:?}", p, node_id); false},
                 }
             });
 
