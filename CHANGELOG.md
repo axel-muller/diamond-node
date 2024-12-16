@@ -1,4 +1,17 @@
 
+
+## Diamond Node Software 3.3.5-hbbft-0.9.6
+
+- [Early Epoch End: only report disconnectivities that exist for longer than 60 Minutes] (https://github.com/DMDcoin/diamond-node/issues/87)
+- [Improved Logging for Hbbft Session Management] (https://github.com/DMDcoin/diamond-node/issues/150)
+
+## Diamond Node Software 3.3.5-hbbft-0.9.5
+
+- [Improved Logging of ] (https://github.com/DMDcoin/diamond-node/issues/147)
+- [Early Epoch end: Applying new time based rules]  (https://github.com/DMDcoin/diamond-node/issues/87)
+
+
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.5
 
 - [Improved Logging for Stage 5 Errors] (https://github.com/DMDcoin/diamond-node/issues/147)
