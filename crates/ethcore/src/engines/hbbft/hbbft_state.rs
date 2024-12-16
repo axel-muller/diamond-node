@@ -631,6 +631,10 @@ impl HbbftState {
     //     return &self.network_info;
     // }
 
+    pub fn is_validator(&self) -> bool {
+        self.network_info.as_ref().is_some_and(|n| n.is_validator())
+    }
+
     pub fn get_validator_set(&self) -> Vec<NodeId> {
         if let Some(network_info) = &self.network_info {
             let result: Vec<NodeId> = network_info

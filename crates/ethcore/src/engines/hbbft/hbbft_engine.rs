@@ -942,26 +942,16 @@ impl HoneyBadgerBFT {
         block_chain_client: &dyn BlockChainClient,
         engine_client: &dyn EngineClient,
         mining_address: &Address,
+        epoch_start_block: u64,
+        epoch_num: u64,
+        validator_set: &Vec<NodeId>,
     ) {
         // todo: acquire allowed devp2p warmup time from contracts ?!
         let allowed_devp2p_warmup_time = Duration::from_secs(1200);
 
         debug!(target: "engine", "early-epoch-end: handle_early_epoch_end.");
 
-        let hbbft_state = if let Some(s) = self.hbbft_state.try_read_for(Duration::from_millis(300))
-        {
-            s
-        } else {
-            warn!(target: "engine", "early-epoch-end: could not acquire read lock for hbbft state.");
-            return;
-        };
-
-        let epoch_num = hbbft_state.get_current_posdao_epoch();
-        let epoch_start_block = hbbft_state.get_current_posdao_epoch_start_block();
-        let validator_set = hbbft_state.get_validator_set();
-
         // we got everything we need from hbbft_state - drop lock ASAP.
-        std::mem::drop(hbbft_state);
 
         if let Some(memorium) = self
             .hbbft_message_dispatcher
@@ -984,7 +974,7 @@ impl HoneyBadgerBFT {
                         engine_client,
                         epoch_num,
                         epoch_start_block,
-                        validator_set,
+                        validator_set.clone(),
                         mining_address,
                     );
 
@@ -1033,48 +1023,52 @@ impl HoneyBadgerBFT {
                     }
                 };
 
-                self.handle_early_epoch_end(block_chain_client, engine_client, &mining_address);
-
                 let should_handle_availability_announcements =
                     self.should_handle_availability_announcements();
                 let should_handle_internet_address_announcements =
                     self.should_handle_internet_address_announcements(block_chain_client);
 
                 let should_connect_to_validator_set = self.should_connect_to_validator_set();
+                let mut should_handle_early_epoch_end = false;
+
+                // we just keep those variables here, because we need them in the early_epoch_end_manager.
+                // this is just an optimization, so we do not acquire the lock for that much time.
+                let mut validator_set: Vec<NodeId> = Vec::new();
+                let mut epoch_start_block: u64 = 0;
+                let mut epoch_num: u64 = 0;
+
+                {
+                    let hbbft_state_option =
+                        self.hbbft_state.try_read_for(Duration::from_millis(50));
+                    match hbbft_state_option {
+                        Some(hbbft_state) => {
+                            should_handle_early_epoch_end = hbbft_state.is_validator();
+
+                            // if we are a pending validator, we will also do the reserved peers management.
+                            if should_handle_early_epoch_end {
+                                // we already remember here stuff the early epoch manager needs,
+                                // so we do not have to acquire the lock for that long.
+                                epoch_num = hbbft_state.get_current_posdao_epoch();
+                                epoch_start_block =
+                                    hbbft_state.get_current_posdao_epoch_start_block();
+                                validator_set = hbbft_state.get_validator_set();
+                            }
+                        }
+                        None => {
+                            // maybe improve here, to return with a result, that triggers a retry soon.
+                            warn!(target: "engine", "Unable to do_validator_engine_actions: Could not acquire read lock for hbbft state. Unable to decide about early epoch end.");
+                        }
+                    };
+                } // drop lock for hbbft_state
 
                 // if we do not have to do anything, we can return early.
                 if !(should_handle_availability_announcements
                     || should_handle_internet_address_announcements
-                    || should_connect_to_validator_set)
+                    || should_connect_to_validator_set
+                    || should_handle_early_epoch_end)
                 {
                     return Ok(());
                 }
-
-                // TODO:
-                // staking by mining address could be cached.
-                // but it COULD also get changed in the contracts, during the time the node is running.
-                // most likely since a Node can get staked, and than it becomes a mining address.
-                // a good solution for this is not to do this expensive operation that fequently.
-                let staking_address = match staking_by_mining_address(
-                    engine_client,
-                    &mining_address,
-                ) {
-                    Ok(staking_address) => {
-                        if staking_address.is_zero() {
-                            //TODO: here some fine handling can improve performance.
-                            //with this implementation every node (validator or not)
-                            //needs to query this state every block.
-                            //trace!(target: "engine", "availability handling not a validator");
-                            return Ok(());
-                        }
-                        staking_address
-                    }
-                    Err(call_error) => {
-                        error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                        let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
-                        return Err(message.into());
-                    }
-                };
 
                 // if we are not a potential validator, we already have already returned here.
                 if should_handle_availability_announcements {
@@ -1088,6 +1082,32 @@ impl HoneyBadgerBFT {
                 // since get latest nonce respects the pending transactions,
                 // we don't have to take care of sending 2 transactions at once.
                 if should_handle_internet_address_announcements {
+                    // TODO:
+                    // staking by mining address could be cached.
+                    // but it COULD also get changed in the contracts, during the time the node is running.
+                    // most likely since a Node can get staked, and than it becomes a mining address.
+                    // a good solution for this is not to do this expensive operation that fequently.
+                    let staking_address = match staking_by_mining_address(
+                        engine_client,
+                        &mining_address,
+                    ) {
+                        Ok(staking_address) => {
+                            if staking_address.is_zero() {
+                                //TODO: here some fine handling can improve performance.
+                                //with this implementation every node (validator or not)
+                                //needs to query this state every block.
+                                //trace!(target: "engine", "availability handling not a validator");
+                                return Ok(());
+                            }
+                            staking_address
+                        }
+                        Err(call_error) => {
+                            error!(target: "engine", "unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                            let message = format!("unable to ask for corresponding staking address for given mining address: {:?}", call_error);
+                            return Err(message.into());
+                        }
+                    };
+
                     if let Some(mut peers_management) = self
                         .peers_management
                         .try_lock_for(Duration::from_millis(100))
@@ -1099,33 +1119,32 @@ impl HoneyBadgerBFT {
                             &staking_address,
                         ) {
                             error!(target: "engine", "Error trying to announce own internet address: {:?}", error);
-                        } else {
                         }
                     }
                 }
 
+                // TODO: There or more trigger reasons now to access the state.
                 if should_connect_to_validator_set {
-                    // we
-                    let network_info_o = if let Some(hbbft_state) =
-                        self.hbbft_state.try_read_for(Duration::from_millis(50))
+                    if let Some(mut peers_management) = self
+                        .peers_management
+                        .try_lock_for(Duration::from_millis(100))
                     {
-                        Some(hbbft_state.get_validator_set())
-                    } else {
-                        None
-                    };
-
-                    if let Some(network_info) = network_info_o {
-                        if let Some(mut peers_management) = self
-                            .peers_management
-                            .try_lock_for(Duration::from_millis(100))
-                        {
-                            // connecting to current validators.
-                            peers_management
-                                .connect_to_current_validators(&network_info, &client_arc);
-                            self.has_connected_to_validator_set
-                                .store(true, Ordering::SeqCst);
-                        }
+                        // connecting to current validators.
+                        peers_management.connect_to_current_validators(&validator_set, &client_arc);
+                        self.has_connected_to_validator_set
+                            .store(true, Ordering::SeqCst);
                     }
+                }
+
+                if should_handle_early_epoch_end {
+                    self.handle_early_epoch_end(
+                        block_chain_client,
+                        engine_client,
+                        &mining_address,
+                        epoch_start_block,
+                        epoch_num,
+                        &validator_set,
+                    );
                 }
 
                 return Ok(());
@@ -1204,7 +1223,9 @@ impl HoneyBadgerBFT {
                                     .connect_to_pending_validators(&client, &validators)
                                 {
                                     Ok(value) => {
-                                        debug!(target: "engine", "added to additional {:?} reserved peers, because they are pending validators.",  value);
+                                        if value > 0 {
+                                            debug!(target: "engine", "added to additional {:?} reserved peers, because they are pending validators.",  value);
+                                        }
                                     }
                                     Err(err) => {
                                         warn!(target: "engine", "Error connecting to other pending validators: {:?}", err);
@@ -1240,7 +1261,7 @@ impl HoneyBadgerBFT {
         }
     }
 
-    /** returns if the signer of hbbft is tracked as available in the hbbft contracts. */
+    /** returns if the signer of hbbft is tracked as available in the hbbft contracts. NOTE:Low Performance.*/
     pub fn is_available(&self) -> Result<bool, Error> {
         match self.signer.read().as_ref() {
             Some(signer) => {
