@@ -1341,7 +1341,7 @@ impl IoHandler<NetworkIoMessage> for Host {
                         nodes.mark_as_useless(id);
                     }
                 }
-                trace!(target: "network", "Disabling peer {}", peer);
+                debug!(target: "network", "Disabling peer {}", peer);
                 self.kill_connection(*peer, io, false);
             }
             NetworkIoMessage::InitPublicInterface => self
