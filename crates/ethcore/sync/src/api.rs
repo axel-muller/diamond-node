@@ -569,7 +569,7 @@ impl NetworkProtocolHandler for SyncProtocolHandler {
     fn disconnected(&self, io: &dyn NetworkContext, peer: &PeerId) {
         trace_time!("sync::disconnected");
         if io.is_reserved_peer(*peer) {
-            trace!(target: "sync", "Disconnected from reserved peer {:?}", io.session_info(*peer).expect("").id);
+            trace!(target: "sync", "Disconnected from reserved peer peerID: {} {}",peer,  io.session_info(*peer).expect("").id.map_or("".to_string(), |f| format!("{:?}", f)));
         }
         if io.subprotocol_name() != PAR_PROTOCOL {
             self.sync.write().on_peer_aborting(
