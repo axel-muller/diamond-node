@@ -1,6 +1,6 @@
 use super::{
     block_reward_hbbft::BlockRewardContract,
-    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager,
+    hbbft_early_epoch_end_manager::HbbftEarlyEpochEndManager, hbbft_engine_cache::HbbftEngineCache,
 };
 use crate::{
     client::BlockChainClient,
@@ -92,6 +92,7 @@ pub struct HoneyBadgerBFT {
     peers_management: Mutex<HbbftPeersManagement>,
     current_minimum_gas_price: Mutex<Option<U256>>,
     early_epoch_manager: Mutex<Option<HbbftEarlyEpochEndManager>>,
+    hbbft_engine_cache: Mutex<HbbftEngineCache>,
 }
 
 struct TransitionHandler {
@@ -360,45 +361,31 @@ impl IoHandler<()> for TransitionHandler {
 
             debug!(target: "consensus", "Honey Badger check for unavailability shutdown.");
 
-            match self.engine.is_staked() {
-                Ok(is_stacked) => {
-                    if is_stacked {
-                        debug!(target: "consensus", "is_staked: {}", is_stacked);
-                        match self.engine.is_available() {
-                            Ok(is_available) => {
-                                if !is_available {
-                                    warn!(target: "consensus", "Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
+            let is_staked = self.engine.is_staked();
+            if is_staked {
+                debug!(target: "consensus", "We are staked!");
+                let is_available = self.engine.is_available();
+                if !is_available {
+                    warn!(target: "consensus", "Initiating Shutdown: Honey Badger Consensus detected that this Node has been flagged as unavailable, while it should be available.");
 
-                                    if let Some(ref weak) = *self.client.read() {
-                                        if let Some(c) = weak.upgrade() {
-                                            if let Some(id) = c.block_number(BlockId::Latest) {
-                                                warn!(target: "consensus", "BlockID: {id}");
-                                            }
-                                        }
-                                    }
-
-                                    let id: usize = std::process::id() as usize;
-                                    let thread_id = std::thread::current().id();
-                                    info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
-
-                                    if let Some(ref weak) = *self.client.read() {
-                                        if let Some(client) = weak.upgrade() {
-                                            info!(target: "engine", "demanding shutdown from hbbft engine.");
-                                            client.demand_shutdown();
-                                        }
-                                    }
-                                }
-                                // if the node is available, everythign is fine!
-                            }
-                            Err(error) => {
-                                warn!(target: "consensus", "Could not query Honey Badger check for unavailability shutdown. {:?}", error);
+                    if let Some(ref weak) = *self.client.read() {
+                        if let Some(c) = weak.upgrade() {
+                            if let Some(id) = c.block_number(BlockId::Latest) {
+                                warn!(target: "consensus", "BlockID: {id}");
                             }
                         }
                     }
-                    // else: just a regular node.
-                }
-                Err(error) => {
-                    warn!(target: "consensus", "Could not query Honey Badger check if validator is staked. {:?}", error);
+
+                    let id: usize = std::process::id() as usize;
+                    let thread_id = std::thread::current().id();
+                    info!(target: "engine", "Waiting for Signaling shutdown to process ID: {id} thread: {:?}", thread_id);
+
+                    if let Some(ref weak) = *self.client.read() {
+                        if let Some(client) = weak.upgrade() {
+                            info!(target: "engine", "demanding shutdown from hbbft engine.");
+                            client.demand_shutdown();
+                        }
+                    }
                 }
             }
         } else if timer == ENGINE_DELAYED_UNITL_SYNCED_TOKEN {
@@ -451,6 +438,7 @@ impl HoneyBadgerBFT {
             peers_management: Mutex::new(HbbftPeersManagement::new()),
             current_minimum_gas_price: Mutex::new(None),
             early_epoch_manager: Mutex::new(None),
+            hbbft_engine_cache: Mutex::new(HbbftEngineCache::new()),
         });
 
         if !engine.params.is_unit_test.unwrap_or(false) {
@@ -1014,6 +1002,15 @@ impl HoneyBadgerBFT {
                     }
                 };
 
+                let engine_client = client_arc.as_ref();
+                if let Err(err) = self
+                    .hbbft_engine_cache
+                    .lock()
+                    .refresh_cache(mining_address, engine_client)
+                {
+                    trace!(target: "engine", "do_validator_engine_actions: data could not get updated, follow up tasks might fail: {:?}", err);
+                }
+
                 let engine_client = client_arc.deref();
 
                 let block_chain_client = match engine_client.as_full_client() {
@@ -1261,114 +1258,14 @@ impl HoneyBadgerBFT {
         }
     }
 
-    /** returns if the signer of hbbft is tracked as available in the hbbft contracts. NOTE:Low Performance.*/
-    pub fn is_available(&self) -> Result<bool, Error> {
-        match self.signer.read().as_ref() {
-            Some(signer) => {
-                match self.client_arc() {
-                    Some(client) => {
-                        let engine_client = client.deref();
-                        let mining_address = signer.address();
-
-                        if mining_address.is_zero() {
-                            debug!(target: "consensus", "is_available: not available because mining address is zero: ");
-                            return Ok(false);
-                        }
-                        match super::contracts::validator_set::get_validator_available_since(
-                            engine_client,
-                            &mining_address,
-                        ) {
-                            Ok(available_since) => {
-                                debug!(target: "consensus", "available_since: {}", available_since);
-                                return Ok(!available_since.is_zero());
-                            }
-                            Err(err) => {
-                                warn!(target: "consensus", "Error get get_validator_available_since: ! {:?}", err);
-                            }
-                        }
-                    }
-                    None => {
-                        // warn!("Could not retrieve address for writing availability transaction.");
-                        warn!(target: "consensus", "is_available: could not get engine client");
-                    }
-                }
-            }
-            None => {}
-        }
-        return Ok(false);
+    /** returns if the signer of hbbft is tracked as available in the hbbft contracts..*/
+    pub fn is_available(&self) -> bool {
+        self.hbbft_engine_cache.lock().is_available()
     }
 
     /** returns if the signer of hbbft is stacked. */
-    pub fn is_staked(&self) -> Result<bool, Error> {
-        // is the configured validator stacked ??
-
-        // TODO: improvement:
-        // since a signer address can not change after boot,
-        // we can just cash the value
-        // so we don't need a read lock here,
-        // getting the numbers of required read locks down (deadlock risk)
-        // and improving the performance.
-
-        match self.signer.read().as_ref() {
-            Some(signer) => {
-                match self.client_arc() {
-                    Some(client) => {
-                        let engine_client = client.deref();
-                        let mining_address = signer.address();
-
-                        if mining_address.is_zero() {
-                            return Ok(false);
-                        }
-
-                        match super::contracts::validator_set::staking_by_mining_address(
-                            engine_client,
-                            &mining_address,
-                        ) {
-                            Ok(staking_address) => {
-                                // if there is no pool for this validator defined, we know that
-                                if staking_address.is_zero() {
-                                    return Ok(false);
-                                }
-                                match super::contracts::staking::stake_amount(
-                                    engine_client,
-                                    &staking_address,
-                                    &staking_address,
-                                ) {
-                                    Ok(stake_amount) => {
-                                        debug!(target: "consensus", "stake_amount: {}", stake_amount);
-
-                                        // we need to check if the pool stake amount is >= minimum stake
-                                        match super::contracts::staking::candidate_min_stake(
-                                            engine_client,
-                                        ) {
-                                            Ok(min_stake) => {
-                                                debug!(target: "consensus", "min_stake: {}", min_stake);
-                                                return Ok(stake_amount.ge(&min_stake));
-                                            }
-                                            Err(err) => {
-                                                error!(target: "consensus", "Error get candidate_min_stake: ! {:?}", err);
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        warn!(target: "consensus", "Error get stake_amount: ! {:?}", err);
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                warn!(target: "consensus", "Error get staking_by_mining_address: ! {:?}", err);
-                            }
-                        }
-                    }
-                    None => {
-                        // warn!("Could not retrieve address for writing availability transaction.");
-                        warn!(target: "consensus", "could not get engine client");
-                    }
-                }
-            }
-            None => {}
-        }
-        return Ok(false);
+    pub fn is_staked(&self) -> bool {
+        self.hbbft_engine_cache.lock().is_staked()
     }
 
     fn start_hbbft_epoch_if_ready(&self) {
@@ -1788,6 +1685,7 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     // note: this is by design not part of the PrometheusMetrics trait,
     // it is part of the Engine trait and does nothing by default.
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        let is_staked = self.is_staked();
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
         if let Some(early_epoch_manager_option) = self
             .early_epoch_manager

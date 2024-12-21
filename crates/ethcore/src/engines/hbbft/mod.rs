@@ -3,6 +3,7 @@ mod contracts;
 mod contribution;
 mod hbbft_early_epoch_end_manager;
 mod hbbft_engine;
+mod hbbft_engine_cache;
 mod hbbft_message_memorium;
 mod hbbft_network_fork_manager;
 mod hbbft_peers_management;
