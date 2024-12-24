@@ -194,7 +194,12 @@ impl HbbftEarlyEpochEndManager {
                 validator_address,
                 &self.signing_address,
             ) {
-                self.flagged_validators.push(validator.clone());
+                if !self.flagged_validators.contains(&validator) {
+                    // in this case, we already had this validator in the list,
+                    // what means that the transaction previous send was not successful.
+                    // we could here do some improvements to not spam to many disconnect reports into the system.
+                    self.flagged_validators.push(validator.clone());
+                }
             }
         } else {
             warn!("Could not find validator_address for node id in cache: {validator:?}");
@@ -223,6 +228,8 @@ impl HbbftEarlyEpochEndManager {
                 validator_address,
                 &self.signing_address,
             ) {
+                // Todo: we do not know if the transaction will get processed successful.
+                // shall we track transactions ?
                 self.flagged_validators.remove(index);
             }
         } else {
