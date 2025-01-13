@@ -1334,6 +1334,8 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
             Ok(())
         } else {
             error!(target: "engine", "Invalid seal for block #{}!", header.number());
+            let trace = std::backtrace::Backtrace::capture();
+            error!(target: "engine", "Invalid Seal Trace: #{trace:?}!");
             Err(BlockError::InvalidSeal.into())
         }
     }
