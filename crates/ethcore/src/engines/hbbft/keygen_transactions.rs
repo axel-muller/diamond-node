@@ -16,7 +16,7 @@ use engines::{
     },
     signer::EngineSigner,
 };
-use ethereum_types::{Address, Public, U256};
+use ethereum_types::{Address, U256};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, sync::Arc};
@@ -281,7 +281,7 @@ impl KeygenTransactionSender {
                 for ack in acks {
                     let ack_to_push = match bincode::serialize(&ack) {
                         Ok(serialized_ack) => serialized_ack,
-                        Err(e) => return Err(KeyGenError::Unexpected),
+                        Err(_) => return Err(KeyGenError::Unexpected),
                     };
                     total_bytes_for_acks += ack_to_push.len();
                     serialized_acks.push(ack_to_push);

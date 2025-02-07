@@ -15,7 +15,7 @@
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp,
+    cmp::{self},
     collections::{BTreeMap, HashSet, VecDeque},
     convert::TryFrom,
     io::{BufRead, BufReader},
@@ -194,6 +194,28 @@ struct Importer {
     pub bad_blocks: bad_blocks::BadBlocks,
 }
 
+#[derive(Default)]
+struct ClientStatistics {
+    logging_enabled: bool,
+    broadcasted_consensus_messages: AtomicU64,
+    broadcasted_consensus_messages_bytes: AtomicU64,
+    sent_consensus_messages: AtomicU64,
+    sent_consensus_messages_bytes: AtomicU64,
+}
+
+
+impl PrometheusMetrics for ClientStatistics {
+
+    fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
+        if self.logging_enabled {
+            r.register_counter("consens_messages_sent", "", self.sent_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_sent_bytes", "", self.sent_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_broadcasted", "", self.broadcasted_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_broadcasted_bytes", "", self.broadcasted_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
+        }
+    }
+}
+
 /// Blockchain database client backed by a persistent database. Owns and manages a blockchain and a block queue.
 /// Call `import_block()` to import a block asynchronously; `flush_queue()` flushes the queue.
 pub struct Client {
@@ -264,6 +286,8 @@ pub struct Client {
     importer: Importer,
 
     shutdown: ShutdownManager,
+
+    statistics: ClientStatistics,
 }
 
 impl Importer {
@@ -1030,6 +1054,9 @@ impl Client {
             trace!(target: "client", "Found registrar at {}", addr);
         }
 
+        let mut statistics = ClientStatistics::default();
+        statistics.logging_enabled = true;
+
         let client = Arc::new(Client {
             enabled: AtomicBool::new(true),
             sleep_state: Mutex::new(SleepState::new(awake)),
@@ -1060,6 +1087,7 @@ impl Client {
             importer,
             config,
             shutdown,
+            statistics,
         });
 
         let exec_client = client.clone();
@@ -3226,10 +3254,24 @@ impl super::traits::EngineClient for Client {
     }
 
     fn broadcast_consensus_message(&self, message: Bytes) {
+        self.statistics
+            .broadcasted_consensus_messages
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.statistics
+            .broadcasted_consensus_messages_bytes
+            .fetch_add(message.len() as u64, std::sync::atomic::Ordering::Relaxed);
+
         self.notify(|notify| notify.broadcast(ChainMessageType::Consensus(message.clone())));
     }
 
     fn send_consensus_message(&self, message: Bytes, node_id: Option<H512>) {
+        self.statistics
+            .sent_consensus_messages
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.statistics
+            .sent_consensus_messages_bytes
+            .fetch_add(message.len() as u64, std::sync::atomic::Ordering::Relaxed);
+
         self.notify(|notify| notify.send(ChainMessageType::Consensus(message.clone()), node_id));
     }
 
@@ -3593,8 +3635,10 @@ impl PrometheusMetrics for Client {
             report.transactions_applied as i64,
         );
 
+        let lockd = Duration::from_millis(50);
+
         self.state_db
-            .try_read_for(Duration::from_millis(200))
+            .try_read_for(lockd)
             .map(|state_db| {
                 let state_db_size = state_db.cache_size();
                 r.register_gauge(
@@ -3712,12 +3756,14 @@ impl PrometheusMetrics for Client {
             queue.verifying_queue_size as i64,
         );
 
-        // database info
-        self.db.read().key_value().prometheus_metrics(r);
+        if let Some(db) = self.db.try_read_for(lockd) {
+            db.prometheus_metrics(r);
+        };
 
         // engine specific metrics.
-
         self.engine.prometheus_metrics(r);
+
+        self.statistics.prometheus_metrics(r);
     }
 }
 

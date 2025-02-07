@@ -447,6 +447,8 @@ impl PrometheusMetrics for EthSync {
             "First block number of the present snapshot",
             manifest_block_num as i64,
         );
+
+        self.network.prometheus_metrics(r);
     }
 }
 
