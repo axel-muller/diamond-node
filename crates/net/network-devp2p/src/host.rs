@@ -135,9 +135,9 @@ impl NetworkingStatistics {
 impl PrometheusMetrics for NetworkingStatistics {
 
     fn prometheus_metrics(&self, registry: &mut PrometheusRegistry) {
-        registry.register_counter("p2p_bytes_sent","", self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed) as i64);
-        registry.register_counter("p2p_packages_sent","", self.packages_send.load(std::sync::atomic::Ordering::Relaxed) as i64);
-        registry.register_counter("p2p_peer_losses","", self.peer_losses.load(std::sync::atomic::Ordering::Relaxed) as i64);   
+        registry.register_counter("p2p_bytes_sent","total", self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed) as i64);
+        registry.register_counter("p2p_packages_sent","count", self.packages_send.load(std::sync::atomic::Ordering::Relaxed) as i64);
+        registry.register_counter("p2p_peer_losses","count", self.peer_losses.load(std::sync::atomic::Ordering::Relaxed) as i64);   
     }
 }
 
@@ -1551,18 +1551,18 @@ impl PrometheusMetrics for Host {
         if let Some((handshakes, egress, ingress)) =
             self.session_count_try(Duration::from_millis(20))
         {
-            r.register_gauge("p2p_ingress", "", ingress as i64);
-            r.register_gauge("p2p_egress", "", egress as i64);
-            r.register_gauge("p2p_handshakes", "", handshakes as i64);
+            r.register_gauge("p2p_ingress", "count", ingress as i64);
+            r.register_gauge("p2p_egress", "count", egress as i64);
+            r.register_gauge("p2p_handshakes", "count", handshakes as i64);
         }
 
         if let Some(reserved_nodes) = self.reserved_nodes.try_read_for(lockdur) {
-            r.register_gauge("p2p_reserved_nodes", "", reserved_nodes.len() as i64);
+            r.register_gauge("p2p_reserved_nodes", "count", reserved_nodes.len() as i64);
         }
 
         if let Some(nodes) = self.nodes.try_read_for(lockdur) {
-            r.register_gauge("p2p_nodes", "", nodes.count_nodes() as i64);
-            r.register_gauge("p2p_uselessnodes", "", nodes.count_useless() as i64);
+            r.register_gauge("p2p_nodes", "count", nodes.count_nodes() as i64);
+            r.register_gauge("p2p_uselessnodes", "count", nodes.count_useless() as i64);
         }
 
 
