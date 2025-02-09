@@ -208,10 +208,10 @@ impl PrometheusMetrics for ClientStatistics {
 
     fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
         if self.logging_enabled {
-            r.register_counter("consens_messages_sent", "", self.sent_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_sent_bytes", "", self.sent_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_broadcasted", "", self.broadcasted_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_broadcasted_bytes", "", self.broadcasted_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_sent", "count", self.sent_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_sent_bytes", "bytes", self.sent_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_broadcasted", "count", self.broadcasted_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter("consens_messages_broadcasted_bytes", "bytes", self.broadcasted_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
         }
     }
 }
