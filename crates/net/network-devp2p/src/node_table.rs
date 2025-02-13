@@ -429,12 +429,22 @@ impl NodeTable {
 
     /// Mark as useless, no further attempts to connect until next call to `clear_useless`.
     pub fn mark_as_useless(&mut self, id: &NodeId) {
+        info!(target: "network", "Node was marked as useless: {:?}", id);
         self.useless_nodes.insert(id.clone());
     }
 
     /// Attempt to connect to useless nodes again.
     pub fn clear_useless(&mut self) {
         self.useless_nodes.clear();
+    }
+
+    /// count of useless nodes.
+    pub fn count_useless(&self) -> usize {
+        self.useless_nodes.len()
+    }
+
+    pub fn count_nodes(&self) -> usize {
+        self.nodes.len()
     }
 
     /// Save the nodes.json file.

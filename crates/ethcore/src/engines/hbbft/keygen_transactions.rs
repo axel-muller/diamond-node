@@ -16,7 +16,7 @@ use engines::{
     },
     signer::EngineSigner,
 };
-use ethereum_types::{Address, Public, U256};
+use ethereum_types::{Address, U256};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, sync::Arc};
@@ -228,14 +228,15 @@ impl KeygenTransactionSender {
                     }
                 };
 
-                send_part_transaction(
+                let nonce = send_part_transaction(
                     full_client,
                     client,
                     &address,
                     upcoming_epoch,
                     serialized_part,
                 )?;
-                trace!(target:"engine", "PART Transaction send.");
+
+                debug!(target: "engine", "sending Part with nonce: {}",  nonce);
                 return Ok(());
             }
             ShouldSendKeyAnswer::NoWaiting => {
@@ -280,7 +281,7 @@ impl KeygenTransactionSender {
                 for ack in acks {
                     let ack_to_push = match bincode::serialize(&ack) {
                         Ok(serialized_ack) => serialized_ack,
-                        Err(e) => return Err(KeyGenError::Unexpected),
+                        Err(_) => return Err(KeyGenError::Unexpected),
                     };
                     total_bytes_for_acks += ack_to_push.len();
                     serialized_acks.push(ack_to_push);
@@ -303,6 +304,7 @@ impl KeygenTransactionSender {
                         .gas(U256::from(gas))
                         .nonce(full_client.nonce(&address, BlockId::Latest).unwrap())
                         .gas_price(U256::from(10000000000u64));
+                debug!(target: "engine", "sending acks with nonce: {}",  acks_transaction.nonce.unwrap());
                 full_client
                     .transact_silently(acks_transaction)
                     .map_err(|_| CallError::ReturnValueInvalid)?;
@@ -320,7 +322,7 @@ fn send_part_transaction(
     mining_address: &Address,
     upcoming_epoch: U256,
     data: Vec<u8>,
-) -> Result<(), KeyGenError> {
+) -> Result<U256, KeyGenError> {
     // the required gas values have been approximated by
     // experimenting and it's a very rough estimation.
     // it can be further fine tuned to be just above the real consumption.
@@ -344,5 +346,5 @@ fn send_part_transaction(
             CallError::ReturnValueInvalid
         })?;
 
-    return Ok(());
+    return Ok(nonce);
 }

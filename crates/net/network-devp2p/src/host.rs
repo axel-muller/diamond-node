@@ -29,7 +29,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering as AtomicOrdering},
+        atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering},
         Arc,
     },
     time::Duration,
@@ -47,6 +47,7 @@ use node_table::*;
 use parity_path::restrict_permissions_owner;
 use parking_lot::{Mutex, RwLock};
 use session::{Session, SessionData};
+use stats::{PrometheusMetrics, PrometheusRegistry};
 use PROTOCOL_VERSION;
 
 type Slab<T> = ::slab::Slab<T, usize>;
@@ -108,6 +109,47 @@ pub struct NetworkContext<'s> {
     session: Option<SharedSession>,
     session_id: Option<StreamToken>,
     reserved_peers: &'s HashSet<NodeId>,
+    statistics: &'s NetworkingStatistics,
+}
+
+pub struct NetworkingStatistics {
+    logging_enabled: bool,
+
+    bytes_sent: AtomicU64,
+    peer_losses: AtomicU64,
+    packages_send: AtomicU64,
+}
+
+impl NetworkingStatistics {
+    pub fn new(logging_enabled: bool) -> NetworkingStatistics {
+        NetworkingStatistics {
+            logging_enabled: logging_enabled,
+            bytes_sent: AtomicU64::new(0),
+            peer_losses: AtomicU64::new(0),
+            packages_send: AtomicU64::new(0),
+        }
+    }
+}
+
+impl PrometheusMetrics for NetworkingStatistics {
+    fn prometheus_metrics(&self, registry: &mut PrometheusRegistry) {
+        registry.register_counter(
+            "p2p_bytes_sent",
+            "total",
+            self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
+        registry.register_counter(
+            "p2p_packages_sent",
+            "count",
+            self.packages_send
+                .load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
+        registry.register_counter(
+            "p2p_peer_losses",
+            "count",
+            self.peer_losses.load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
+    }
 }
 
 impl<'s> NetworkContext<'s> {
@@ -118,6 +160,7 @@ impl<'s> NetworkContext<'s> {
         session: Option<SharedSession>,
         sessions: Arc<RwLock<Slab<SharedSession>>>,
         reserved_peers: &'s HashSet<NodeId>,
+        statistics: &'s NetworkingStatistics,
     ) -> NetworkContext<'s> {
         let id = session.as_ref().map(|s| s.lock().token());
         NetworkContext {
@@ -126,7 +169,8 @@ impl<'s> NetworkContext<'s> {
             session_id: id,
             session,
             sessions,
-            reserved_peers: reserved_peers,
+            reserved_peers,
+            statistics,
         }
     }
 
@@ -155,8 +199,22 @@ impl<'s> NetworkContextTrait for NetworkContext<'s> {
             session
                 .lock()
                 .send_packet(self.io, Some(protocol), packet_id as u8, &data)?;
+
+            if self.statistics.logging_enabled {
+                self.statistics
+                    .bytes_sent
+                    .fetch_add(data.len() as u64, std::sync::atomic::Ordering::Relaxed);
+                self.statistics
+                    .packages_send
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
         } else {
-            trace!(target: "network", "Send: Peer no longer exist")
+            trace!(target: "network", "Send: Peer no longer exist");
+            if self.statistics.logging_enabled {
+                self.statistics
+                    .peer_losses
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
         }
         Ok(())
     }
@@ -175,13 +233,13 @@ impl<'s> NetworkContextTrait for NetworkContext<'s> {
     fn disable_peer(&self, peer: PeerId) {
         self.io
             .message(NetworkIoMessage::DisablePeer(peer))
-            .unwrap_or_else(|e| warn!("Error sending network IO message: {:?}", e));
+            .unwrap_or_else(|e| warn!("Error disable_peer: {:?} {:?}", peer, e));
     }
 
     fn disconnect_peer(&self, peer: PeerId) {
         self.io
             .message(NetworkIoMessage::Disconnect(peer))
-            .unwrap_or_else(|e| warn!("Error sending network IO message: {:?}", e));
+            .unwrap_or_else(|e| warn!("Error disconnect_peer: {:?} {:?}", peer, e));
     }
 
     fn is_expired(&self) -> bool {
@@ -195,7 +253,7 @@ impl<'s> NetworkContextTrait for NetworkContext<'s> {
                 delay,
                 protocol: self.protocol,
             })
-            .unwrap_or_else(|e| warn!("Error sending network IO message: {:?}", e));
+            .unwrap_or_else(|e| warn!("Error register_timer: {:?}", e));
         Ok(())
     }
 
@@ -302,6 +360,7 @@ pub struct Host {
     reserved_nodes: RwLock<HashSet<NodeId>>,
     stopping: AtomicBool,
     filter: Option<Arc<dyn ConnectionFilter>>,
+    statistics: NetworkingStatistics,
 }
 
 impl Host {
@@ -373,6 +432,7 @@ impl Host {
             reserved_nodes: RwLock::new(HashSet::new()),
             stopping: AtomicBool::new(false),
             filter,
+            statistics: NetworkingStatistics::new(true),
         };
 
         for n in boot_nodes {
@@ -602,6 +662,26 @@ impl Host {
             }
         }
         (handshakes, egress, ingress)
+    }
+
+    // like session count, but does not block if read can not be achieved.
+    fn session_count_try(&self, lock_duration: Duration) -> Option<(usize, usize, usize)> {
+        let mut handshakes = 0;
+        let mut egress = 0;
+        let mut ingress = 0;
+
+        if let Some(lock) = self.sessions.try_read_for(lock_duration) {
+            for s in lock.iter() {
+                match s.try_lock() {
+                    Some(ref s) if s.is_ready() && s.info.originated => egress += 1,
+                    Some(ref s) if s.is_ready() && !s.info.originated => ingress += 1,
+                    _ => handshakes += 1,
+                }
+            }
+            return Some((handshakes, egress, ingress));
+        }
+
+        return None;
     }
 
     fn connecting_to(&self, id: &NodeId) -> bool {
@@ -970,6 +1050,7 @@ impl Host {
                                 Some(session.clone()),
                                 self.sessions.clone(),
                                 &reserved,
+                                &self.statistics,
                             ),
                             &token,
                         );
@@ -990,6 +1071,7 @@ impl Host {
                             Some(session.clone()),
                             self.sessions.clone(),
                             &reserved,
+                            &self.statistics,
                         ),
                         &token,
                         packet_id,
@@ -1108,6 +1190,7 @@ impl Host {
                         expired_session.clone(),
                         self.sessions.clone(),
                         &reserved,
+                        &self.statistics,
                     ),
                     &token,
                 );
@@ -1145,7 +1228,14 @@ impl Host {
     {
         let reserved = { self.reserved_nodes.read() };
 
-        let context = NetworkContext::new(io, protocol, None, self.sessions.clone(), &reserved);
+        let context = NetworkContext::new(
+            io,
+            protocol,
+            None,
+            self.sessions.clone(),
+            &reserved,
+            &self.statistics,
+        );
         action(&context);
     }
 
@@ -1160,7 +1250,14 @@ impl Host {
     {
         let reserved = { self.reserved_nodes.read() };
 
-        let context = NetworkContext::new(io, protocol, None, self.sessions.clone(), &reserved);
+        let context = NetworkContext::new(
+            io,
+            protocol,
+            None,
+            self.sessions.clone(),
+            &reserved,
+            &self.statistics,
+        );
         action(&context)
     }
 }
@@ -1256,6 +1353,7 @@ impl IoHandler<NetworkIoMessage> for Host {
                                 None,
                                 self.sessions.clone(),
                                 &reserved,
+                                &self.statistics,
                             ),
                             timer.token,
                         );
@@ -1286,6 +1384,7 @@ impl IoHandler<NetworkIoMessage> for Host {
                     None,
                     self.sessions.clone(),
                     &reserved,
+                    &self.statistics,
                 ));
                 self.handlers.write().insert(*protocol, h);
                 let mut info = self.info.write();
@@ -1341,7 +1440,7 @@ impl IoHandler<NetworkIoMessage> for Host {
                         nodes.mark_as_useless(id);
                     }
                 }
-                trace!(target: "network", "Disabling peer {}", peer);
+                debug!(target: "network", "Disabling peer {}", peer);
                 self.kill_connection(*peer, io, false);
             }
             NetworkIoMessage::InitPublicInterface => self
@@ -1453,6 +1552,33 @@ impl IoHandler<NetworkIoMessage> for Host {
             _ => warn!("Unexpected stream update"),
         }
     }
+}
+
+impl PrometheusMetrics for Host {
+    fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
+        let lockdur = Duration::from_millis(20);
+
+        if let Some((handshakes, egress, ingress)) =
+            self.session_count_try(Duration::from_millis(20))
+        {
+            r.register_gauge("p2p_ingress", "count", ingress as i64);
+            r.register_gauge("p2p_egress", "count", egress as i64);
+            r.register_gauge("p2p_handshakes", "count", handshakes as i64);
+        }
+
+        if let Some(reserved_nodes) = self.reserved_nodes.try_read_for(lockdur) {
+            r.register_gauge("p2p_reserved_nodes", "count", reserved_nodes.len() as i64);
+        }
+
+        if let Some(nodes) = self.nodes.try_read_for(lockdur) {
+            r.register_gauge("p2p_nodes", "count", nodes.count_nodes() as i64);
+            r.register_gauge("p2p_uselessnodes", "count", nodes.count_useless() as i64);
+        }
+
+        self.statistics.prometheus_metrics(r);
+    }
+
+    //r.register_gauge("connected_peers", "", self.connect_peers(io));
 }
 
 fn save_key(path: &Path, key: &Secret) {
