@@ -37,9 +37,10 @@ impl HbbftEngineCache {
         self.data.lock().is_staked
     }
 
-    pub fn signer_address(&self) -> Address {
-        self.data.lock().signer_address
-    }
+    // pub fn signer_address(&self) -> Address {
+    //     // this is dead code for now, but for further optimization we will use it in the future,
+    //     self.data.lock().signer_address
+    // }
 
     pub fn is_available(&self) -> bool {
         self.data.lock().is_available
