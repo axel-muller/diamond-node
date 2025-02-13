@@ -69,17 +69,13 @@ impl HbbftEngineCache {
         signer_address: Address,
         engine_client: &dyn EngineClient,
     ) -> Result<bool, Error> {
-        // match self.signer.read().as_ref() {
-        //     Some(signer) => {
-        //         match self.client_arc() {
-        //             Some(client) => {
         let engine_client = engine_client;
-        // let mining_address = signer.address();
 
         if signer_address.is_zero() {
             // debug!(target: "consensus", "is_available: not available because mining address is zero: ");
             return Ok(false);
         }
+
         match super::contracts::validator_set::get_validator_available_since(
             engine_client,
             &signer_address,
@@ -92,15 +88,6 @@ impl HbbftEngineCache {
                 warn!(target: "consensus", "Error get get_validator_available_since: ! {:?}", err);
             }
         }
-        //}
-        //             None => {
-        //                 // warn!("Could not retrieve address for writing availability transaction.");
-        //                 warn!(target: "consensus", "is_available: could not get engine client");
-        //             }
-        //         }
-        //     }
-        //     None => {}
-        // }
         return Ok(false);
     }
 
