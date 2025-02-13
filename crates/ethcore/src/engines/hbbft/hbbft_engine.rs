@@ -1688,6 +1688,13 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
     // it is part of the Engine trait and does nothing by default.
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         let is_staked = self.is_staked();
+
+        registry.register_gauge(
+            "hbbft_is_staked",
+            "Is the signer of the hbbft engine staked.",
+            is_staked as i64,
+        );
+
         self.hbbft_message_dispatcher.prometheus_metrics(registry);
         if let Some(early_epoch_manager_option) = self
             .early_epoch_manager
