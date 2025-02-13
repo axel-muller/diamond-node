@@ -203,15 +203,33 @@ struct ClientStatistics {
     sent_consensus_messages_bytes: AtomicU64,
 }
 
-
 impl PrometheusMetrics for ClientStatistics {
-
     fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
         if self.logging_enabled {
-            r.register_counter("consens_messages_sent", "count", self.sent_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_sent_bytes", "bytes", self.sent_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_broadcasted", "count", self.broadcasted_consensus_messages.load(std::sync::atomic::Ordering::Relaxed) as i64);
-            r.register_counter("consens_messages_broadcasted_bytes", "bytes", self.broadcasted_consensus_messages_bytes.load(std::sync::atomic::Ordering::Relaxed) as i64);
+            r.register_counter(
+                "consens_messages_sent",
+                "count",
+                self.sent_consensus_messages
+                    .load(std::sync::atomic::Ordering::Relaxed) as i64,
+            );
+            r.register_counter(
+                "consens_messages_sent_bytes",
+                "bytes",
+                self.sent_consensus_messages_bytes
+                    .load(std::sync::atomic::Ordering::Relaxed) as i64,
+            );
+            r.register_counter(
+                "consens_messages_broadcasted",
+                "count",
+                self.broadcasted_consensus_messages
+                    .load(std::sync::atomic::Ordering::Relaxed) as i64,
+            );
+            r.register_counter(
+                "consens_messages_broadcasted_bytes",
+                "bytes",
+                self.broadcasted_consensus_messages_bytes
+                    .load(std::sync::atomic::Ordering::Relaxed) as i64,
+            );
         }
     }
 }
@@ -3637,16 +3655,14 @@ impl PrometheusMetrics for Client {
 
         let lockd = Duration::from_millis(50);
 
-        self.state_db
-            .try_read_for(lockd)
-            .map(|state_db| {
-                let state_db_size = state_db.cache_size();
-                r.register_gauge(
-                    "statedb_cache_size",
-                    "State DB cache size",
-                    state_db_size as i64,
-                );
-            });
+        self.state_db.try_read_for(lockd).map(|state_db| {
+            let state_db_size = state_db.cache_size();
+            r.register_gauge(
+                "statedb_cache_size",
+                "State DB cache size",
+                state_db_size as i64,
+            );
+        });
 
         // blockchain cache
         let blockchain_cache_info = self.blockchain_cache_info();

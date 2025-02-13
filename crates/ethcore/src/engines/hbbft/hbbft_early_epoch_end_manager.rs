@@ -243,6 +243,8 @@ impl HbbftEarlyEpochEndManager {
         client: &dyn EngineClient,
         other_validator_address: &Address,
     ) -> bool {
+        // todo: for performance improvements, we could apply caching here,
+        // once we are up to date with the contract information and track the inclusion of our own reports.
         let result = is_connectivity_loss_reported(
             client,
             BlockId::Latest,
@@ -291,11 +293,11 @@ impl HbbftEarlyEpochEndManager {
             return;
         };
 
-        let treshold: u64 = 10;
+        let treshold: u64 = 2;
         // todo: read this out from contracts: ConnectivityTrackerHbbft -> reportDisallowPeriod
         // requires us to update the Contracts ABIs:
         // https://github.com/DMDcoin/diamond-node/issues/115
-        let treshold_time = Duration::from_secs(60 * 60);
+        let treshold_time = Duration::from_secs(22 * 60); // 22 Minutes = 2 times the heartbeat + 2 minutes as grace period.
 
         if self.start_time.elapsed() < treshold_time {
             debug!(target: "engine", "early-epoch-end: no decision: Treshold time not reached.");
@@ -324,9 +326,9 @@ impl HbbftEarlyEpochEndManager {
                 };
 
                 if let Some(node_history) = epoch_history.get_history_for_node(validator) {
-                    let last_sealing_message_time = node_history.get_last_sealing_message_time();
-                    let last_sealing_message_lateness = last_sealing_message_time.elapsed();
-                    if last_sealing_message_lateness > treshold_time {
+                    let last_message_time = node_history.get_last_good_message_time();
+                    let last_message_time_lateness = last_message_time.elapsed();
+                    if last_message_time_lateness > treshold_time {
                         // we do not have to send notification, if we already did so.
                         if !self.is_reported(client, validator_address) {
                             // this function will also add the validator to the list of flagged validators.

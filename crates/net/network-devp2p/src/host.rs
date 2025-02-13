@@ -131,13 +131,24 @@ impl NetworkingStatistics {
     }
 }
 
-
 impl PrometheusMetrics for NetworkingStatistics {
-
     fn prometheus_metrics(&self, registry: &mut PrometheusRegistry) {
-        registry.register_counter("p2p_bytes_sent","total", self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed) as i64);
-        registry.register_counter("p2p_packages_sent","count", self.packages_send.load(std::sync::atomic::Ordering::Relaxed) as i64);
-        registry.register_counter("p2p_peer_losses","count", self.peer_losses.load(std::sync::atomic::Ordering::Relaxed) as i64);   
+        registry.register_counter(
+            "p2p_bytes_sent",
+            "total",
+            self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
+        registry.register_counter(
+            "p2p_packages_sent",
+            "count",
+            self.packages_send
+                .load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
+        registry.register_counter(
+            "p2p_peer_losses",
+            "count",
+            self.peer_losses.load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
     }
 }
 
@@ -1545,7 +1556,6 @@ impl IoHandler<NetworkIoMessage> for Host {
 
 impl PrometheusMetrics for Host {
     fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
-        
         let lockdur = Duration::from_millis(20);
 
         if let Some((handshakes, egress, ingress)) =
@@ -1564,7 +1574,6 @@ impl PrometheusMetrics for Host {
             r.register_gauge("p2p_nodes", "count", nodes.count_nodes() as i64);
             r.register_gauge("p2p_uselessnodes", "count", nodes.count_useless() as i64);
         }
-
 
         self.statistics.prometheus_metrics(r);
     }
