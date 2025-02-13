@@ -85,7 +85,7 @@ impl HbbftEngineCache {
             &signer_address,
         ) {
             Ok(available_since) => {
-                debug!(target: "consensus", "available_since: {}", available_since);
+                trace!(target: "consensus", "available_since: {}", available_since);
                 return Ok(!available_since.is_zero());
             }
             Err(err) => {
@@ -126,12 +126,12 @@ impl HbbftEngineCache {
                     &staking_address,
                 ) {
                     Ok(stake_amount) => {
-                        debug!(target: "consensus", "stake_amount: {}", stake_amount);
+                        trace!(target: "consensus", "stake_amount: {}", stake_amount);
 
                         // we need to check if the pool stake amount is >= minimum stake
                         match super::contracts::staking::candidate_min_stake(engine_client) {
                             Ok(min_stake) => {
-                                debug!(target: "consensus", "min_stake: {}", min_stake);
+                                trace!(target: "consensus", "min_stake: {}", min_stake);
                                 return Ok(stake_amount.ge(&min_stake));
                             }
                             Err(err) => {
