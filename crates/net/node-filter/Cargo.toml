@@ -1,5 +1,5 @@
 [package]
-description = "OpenEthereum Smart Contract based Node Filter, Manage Permissions of Network Connections"
+description = "diamond-node Smart Contract based Node Filter, Manage Permissions of Network Connections"
 homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "node-filter"

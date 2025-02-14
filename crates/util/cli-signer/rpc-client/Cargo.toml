@@ -1,5 +1,5 @@
 [package]
-description = "OpenEthereum RPC Client"
+description = "diamond-node RPC Client"
 homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "parity-rpc-client"

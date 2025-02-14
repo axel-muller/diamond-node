@@ -1,5 +1,5 @@
 [package]
-description = "OpenEthereum Miner Interface."
+description = "diamond-node Miner Interface."
 name = "ethcore-miner"
 homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"

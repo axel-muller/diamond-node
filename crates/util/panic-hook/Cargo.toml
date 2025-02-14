@@ -1,5 +1,5 @@
 [package]
-description = "OpenEthereum custom panic hook"
+description = "diamond-node custom panic hook"
 homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "panic_hook"
