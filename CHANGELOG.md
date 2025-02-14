@@ -1,4 +1,14 @@
 
+
+## Diamond Node Software 3.3.5-hbbft-0.9.8
+
+- Improved Hbbft "No Session Exists" handling: https://github.com/DMDcoin/diamond-node/issues/150
+- Lock overhead reduction for validator actions
+- Connect & Disconnect Report management: fixed double sending of reports: https://github.com/DMDcoin/diamond-node/issues/157
+- Stage 3 Verification: Fixed State Pruning related error. https://github.com/DMDcoin/diamond-node/issues/161
+- Added Network and DevP2P related Information to the Prometheus Metrics: https://github.com/DMDcoin/diamond-node/issues/163
+- Early Epoch End: Treat any HBBFT Message as being a responsive partner node: https://github.com/DMDcoin/diamond-node/issues/87
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.7
 
 - [Nodes that are not a active validator seem to try to send connectivity reports] (https://github.com/DMDcoin/diamond-node/issues/153)

@@ -155,7 +155,7 @@ impl KeygenTransactionSender {
         // Todo: We should expect up to f clients to write invalid pub keys. Report and re-start pending validator set selection.
         let (mut synckeygen, part) = match engine_signer_to_synckeygen(signer, pub_keys_arc.clone())
         {
-            Ok((mut synckeygen_, part_)) => (synckeygen_, part_),
+            Ok((synckeygen_, part_)) => (synckeygen_, part_),
             Err(e) => {
                 warn!(target:"engine", "engine_signer_to_synckeygen pub keys count {:?} error {:?}", pub_keys_arc.len(), e);
                 //let mut failure_pub_keys: Vec<Public> = Vec::new();

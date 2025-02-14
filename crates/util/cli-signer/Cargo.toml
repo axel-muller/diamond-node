@@ -1,6 +1,6 @@
 [package]
-description = "OpenEthereum CLI Signer Tool"
-homepage = "https://github.com/openethereum/openethereum"
+description = "diamond-node CLI Signer Tool"
+homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "cli-signer"
 version = "1.4.0"

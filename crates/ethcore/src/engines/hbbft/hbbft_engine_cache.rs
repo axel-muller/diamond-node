@@ -37,9 +37,10 @@ impl HbbftEngineCache {
         self.data.lock().is_staked
     }
 
-    pub fn signer_address(&self) -> Address {
-        self.data.lock().signer_address
-    }
+    // pub fn signer_address(&self) -> Address {
+    //     // this is dead code for now, but for further optimization we will use it in the future,
+    //     self.data.lock().signer_address
+    // }
 
     pub fn is_available(&self) -> bool {
         self.data.lock().is_available
@@ -69,38 +70,25 @@ impl HbbftEngineCache {
         signer_address: Address,
         engine_client: &dyn EngineClient,
     ) -> Result<bool, Error> {
-        // match self.signer.read().as_ref() {
-        //     Some(signer) => {
-        //         match self.client_arc() {
-        //             Some(client) => {
         let engine_client = engine_client;
-        // let mining_address = signer.address();
 
         if signer_address.is_zero() {
             // debug!(target: "consensus", "is_available: not available because mining address is zero: ");
             return Ok(false);
         }
+
         match super::contracts::validator_set::get_validator_available_since(
             engine_client,
             &signer_address,
         ) {
             Ok(available_since) => {
-                debug!(target: "consensus", "available_since: {}", available_since);
+                trace!(target: "consensus", "available_since: {}", available_since);
                 return Ok(!available_since.is_zero());
             }
             Err(err) => {
                 warn!(target: "consensus", "Error get get_validator_available_since: ! {:?}", err);
             }
         }
-        //}
-        //             None => {
-        //                 // warn!("Could not retrieve address for writing availability transaction.");
-        //                 warn!(target: "consensus", "is_available: could not get engine client");
-        //             }
-        //         }
-        //     }
-        //     None => {}
-        // }
         return Ok(false);
     }
 
@@ -126,12 +114,12 @@ impl HbbftEngineCache {
                     &staking_address,
                 ) {
                     Ok(stake_amount) => {
-                        debug!(target: "consensus", "stake_amount: {}", stake_amount);
+                        trace!(target: "consensus", "stake_amount: {}", stake_amount);
 
                         // we need to check if the pool stake amount is >= minimum stake
                         match super::contracts::staking::candidate_min_stake(engine_client) {
                             Ok(min_stake) => {
-                                debug!(target: "consensus", "min_stake: {}", min_stake);
+                                trace!(target: "consensus", "min_stake: {}", min_stake);
                                 return Ok(stake_amount.ge(&min_stake));
                             }
                             Err(err) => {
