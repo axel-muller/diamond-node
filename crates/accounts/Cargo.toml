@@ -1,6 +1,6 @@
 [package]
 description = "OpenEthereum Account Management"
-homepage = "https://github.com/openethereum/openethereum"
+homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "ethcore-accounts"
 version = "0.1.0"
