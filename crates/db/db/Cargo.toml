@@ -1,6 +1,6 @@
 [package]
-description = "OpenEthereum DB access utilities"
-homepage = "https://github.com/openethereum/openethereum"
+description = "diamond-node DB access utilities"
+homepage = "https://github.com/dmdcoin/diamond-node"
 license = "GPL-3.0"
 name = "ethcore-db"
 version = "0.1.0"

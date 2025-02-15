@@ -63,6 +63,7 @@ pub(crate) struct NodeStakingEpochHistory {
     // messages.
     last_message_faulty: u64,
     last_message_good: u64,
+    last_message_good_time: Instant,
 
     num_faulty_messages: u64,
     num_good_messages: u64, // total_contributions_good: u64,
@@ -86,6 +87,7 @@ impl NodeStakingEpochHistory {
             sealing_blocks_bad: Vec::new(),
             last_message_faulty: 0,
             last_message_good: 0,
+            last_message_good_time: now,
             num_faulty_messages: 0,
             num_good_messages: 0,
         }
@@ -215,6 +217,7 @@ impl NodeStakingEpochHistory {
           // warn!(target: "hbbft_message_memorium", "add_message_event_good: ! event.block_num {block_num} > last_message_good {last_message_good}");
           // }
         self.num_good_messages += 1;
+        self.last_message_good_time = Instant::now();
     }
 
     /// GETTERS
@@ -249,6 +252,10 @@ impl NodeStakingEpochHistory {
             self.last_late_sealing_message_time,
             self.last_good_sealing_message_time,
         )
+    }
+
+    pub fn get_last_good_message_time(&self) -> Instant {
+        self.last_message_good_time
     }
 
     pub fn get_last_late_sealing_message(&self) -> u64 {

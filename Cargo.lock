@@ -110,7 +110,7 @@ dependencies = [
 [[package]]
 name = "app_dirs"
 version = "1.2.1"
-source = "git+https://github.com/openethereum/app-dirs-rs#0b37f9481ce29e9d5174ad185bca695b206368eb"
+source = "git+https://github.com/dmdcoin/app-dirs-rs#0b37f9481ce29e9d5174ad185bca695b206368eb"
 dependencies = [
  "ole32-sys",
  "shell32-sys",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "diamond-node"
-version = "3.3.5-hbbft-0.9.7"
+version = "3.3.5-hbbft-0.9.8"
 dependencies = [
  "ansi_term 0.10.2",
  "atty",
@@ -1070,7 +1070,7 @@ dependencies = [
 [[package]]
 name = "eth-secp256k1"
 version = "0.5.7"
-source = "git+https://github.com/paritytech/rust-secp256k1?rev=9791e79f21a5309dcb6e0bd254b1ef88fca2f1f4#9791e79f21a5309dcb6e0bd254b1ef88fca2f1f4"
+source = "git+https://github.com/dmdcoin/rust-secp256k1?rev=9791e79f21a5309dcb6e0bd254b1ef88fca2f1f4#9791e79f21a5309dcb6e0bd254b1ef88fca2f1f4"
 dependencies = [
  "arrayvec 0.4.12",
  "cc",
@@ -1509,6 +1509,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "slab 0.2.0",
+ "stats",
  "tempdir",
  "tiny-keccak 1.5.0",
 ]
@@ -3574,7 +3575,7 @@ dependencies = [
 
 [[package]]
 name = "parity-version"
-version = "3.3.5-hbbft-0.9.7"
+version = "3.3.5-hbbft-0.9.8"
 dependencies = [
  "parity-bytes",
  "rlp",

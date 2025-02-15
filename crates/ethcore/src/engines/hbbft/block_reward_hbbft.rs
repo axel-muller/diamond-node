@@ -21,7 +21,7 @@ use engines::{SystemOrCodeCall, SystemOrCodeCallKind};
 use error::Error;
 use ethabi::FunctionOutputDecoder;
 use ethabi_contract::use_contract;
-use ethereum_types::{Address, U256};
+use ethereum_types::Address;
 
 use_contract!(
     block_reward_contract,

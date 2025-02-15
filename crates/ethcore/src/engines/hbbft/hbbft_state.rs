@@ -42,6 +42,7 @@ pub(crate) struct HbbftState {
     network_info: Option<NetworkInfo<NodeId>>,
     honey_badger: Option<HoneyBadger>,
     public_master_key: Option<PublicKey>,
+    historic_public_keys: BTreeMap<u64, PublicKey>,
     current_posdao_epoch: u64,
     current_posdao_epoch_start_block: u64,
     last_fork_start_block: Option<u64>,
@@ -56,6 +57,7 @@ impl HbbftState {
             network_info: None,
             honey_badger: None,
             public_master_key: None,
+            historic_public_keys: BTreeMap::new(),
             current_posdao_epoch: 0,
             current_posdao_epoch_start_block: 0,
             last_posdao_epoch_start_block: None,
@@ -131,6 +133,9 @@ impl HbbftState {
                 self.public_master_key = Some(network_info.public_key_set().public_key());
                 self.honey_badger = Some(self.new_honey_badger(network_info.clone())?);
 
+                self.historic_public_keys
+                    .insert(target_posdao_epoch, self.public_master_key.unwrap().clone());
+
                 for x in network_info.validator_set().all_ids() {
                     info!(target: "engine", "Validator: {:?}", x);
                 }
@@ -173,6 +178,8 @@ impl HbbftState {
 
         let (pks, sks) = synckeygen.generate().ok()?;
         self.public_master_key = Some(pks.public_key());
+        self.historic_public_keys
+            .insert(target_posdao_epoch, pks.public_key());
         // Clear network info and honey badger instance, since we may not be in this POSDAO epoch any more.
         info!(target: "engine", "public master key: {:?}", pks.public_key());
 
@@ -540,6 +547,8 @@ impl HbbftState {
         signature: &Signature,
         header: &Header,
     ) -> bool {
+        // maybe add the option: "not ready yet ?!"
+
         self.skip_to_current_epoch(client.clone(), signer);
 
         // Check if posdao epoch fits the parent block of the header seal to verify.
@@ -552,56 +561,32 @@ impl HbbftState {
                 return false;
             }
         };
-        if self.current_posdao_epoch != target_posdao_epoch {
+
+        if self.current_posdao_epoch > target_posdao_epoch {
             trace!(target: "consensus", "verify_seal - hbbft state epoch does not match epoch at the header's parent, attempting to reconstruct the appropriate public key share from scratch.");
-            // If the requested block nr is already imported we try to generate the public master key from scratch.
-            let posdao_epoch_start = match get_posdao_epoch_start(
-                &*client,
-                BlockId::Number(parent_block_nr),
-            ) {
-                Ok(epoch_start) => epoch_start,
-                Err(e) => {
-                    error!(target: "consensus", "Querying epoch start block failed with error: {:?}", e);
+
+            match self.historic_public_keys.get(&target_posdao_epoch) {
+                Some(key) => {
+                    if key.verify(signature, header.bare_hash()) {
+                        return true;
+                    } else {
+                        error!(target: "consensus", "Failed to verify seal - historic public key verification failed!");
+                        return false;
+                    }
+                }
+                None => {
+                    warn!(target: "consensus", "unable to verifiy seal for historic block, public key not available.");
                     return false;
                 }
-            };
-
-            let synckeygen = match initialize_synckeygen(
-                &*client,
-                &Arc::new(RwLock::new(Option::None)),
-                BlockId::Number(posdao_epoch_start.low_u64()),
-                ValidatorType::Current,
-            ) {
-                Ok(synckeygen) => synckeygen,
-                Err(e) => {
-                    let diff = parent_block_nr - posdao_epoch_start.low_u64();
-                    error!(target: "consensus", "Error: Synckeygen failed. parent block: {} epoch_start: {}  diff {} with error: {:?}. current posdao: {:?} target epoch  {:?}", parent_block_nr, posdao_epoch_start, diff, e, self.current_posdao_epoch, target_posdao_epoch);
-                    return false;
-                }
-            };
-
-            if !synckeygen.is_ready() {
-                error!(target: "consensus", "Synckeygen not ready when it sohuld be!");
-                return false;
             }
-
-            let pks = match synckeygen.generate() {
-                Ok((pks, _)) => pks,
-                Err(e) => {
-                    error!(target: "consensus", "Generating of public key share failed with error: {:?}", e);
-                    return false;
+        } else {
+            // not a historic block, we can use the current public key.
+            match self.public_master_key {
+                Some(key) => key.verify(signature, header.bare_hash()),
+                None => {
+                    error!(target: "consensus", "Failed to verify seal - public master key not available!");
+                    false
                 }
-            };
-
-            trace!(target: "consensus", "verify_seal - successfully reconstructed public key share of past posdao epoch.");
-            return pks.public_key().verify(signature, header.bare_hash());
-        }
-
-        match self.public_master_key {
-            Some(key) => key.verify(signature, header.bare_hash()),
-            None => {
-                error!(target: "consensus", "Failed to verify seal - public master key not available!");
-                false
             }
         }
     }

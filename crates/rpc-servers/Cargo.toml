@@ -1,5 +1,5 @@
 [package]
-description = "OpenEthereum RPC servers (WS, HTTP, IPC)"
+description = "diamond-node RPC servers (WS, HTTP, IPC)"
 name = "oe-rpc-servers"
 version = "0.0.0"
 license = "GPL-3.0"
