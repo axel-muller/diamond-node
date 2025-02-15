@@ -429,8 +429,9 @@ impl NodeTable {
 
     /// Mark as useless, no further attempts to connect until next call to `clear_useless`.
     pub fn mark_as_useless(&mut self, id: &NodeId) {
-        info!(target: "network", "Node was marked as useless: {:?}", id);
-        self.useless_nodes.insert(id.clone());
+        if self.useless_nodes.insert(id.clone()) {
+            debug!(target: "network", "Node was marked as useless: {:?}", id);
+        }
     }
 
     /// Attempt to connect to useless nodes again.
