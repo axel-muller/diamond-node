@@ -2,9 +2,12 @@
 
 ## Diamond Node Software 3.3.5-hbbft-0.10.0
 
+
+
 ### Summary for Diamond Node Software 3.3.5-hbbft-0.10.0
 
-- 0.10.0
+- Bonus Score finalization 
+
 ## Diamond Node Software 3.3.5-hbbft-0.9.8
 
 - Improved Hbbft "No Session Exists" handling: https://github.com/DMDcoin/diamond-node/issues/150
