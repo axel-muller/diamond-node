@@ -90,12 +90,14 @@
 pub mod fork_filter;
 mod handler;
 mod propagator;
+mod propagator_statistics;
 pub mod request_id;
 mod requester;
 mod supplier;
 pub mod sync_packet;
 
 pub use self::fork_filter::ForkFilterApi;
+use self::propagator_statistics::SyncPropagatorStatistics;
 use super::{SyncConfig, WarpSync};
 use api::{EthProtocolInfo as PeerInfoDigest, PriorityTask, ETH_PROTOCOL, PAR_PROTOCOL};
 use block_sync::{BlockDownloader, DownloadAction};
@@ -131,8 +133,8 @@ use self::{
     },
 };
 
+use self::requester::SyncRequester;
 pub(crate) use self::supplier::SyncSupplier;
-use self::{propagator::SyncPropagator, requester::SyncRequester};
 
 malloc_size_of_is_0!(PeerInfo);
 
@@ -558,7 +560,7 @@ impl ChainSyncApi {
                     for peers in sync.get_peers(&chain_info, PeerState::SameBlock).chunks(10) {
                         check_deadline(deadline)?;
                         for peer in peers {
-                            SyncPropagator::send_packet(io, *peer, NewBlockPacket, rlp.clone());
+                            ChainSync::send_packet(io, *peer, NewBlockPacket, rlp.clone());
                             if let Some(ref mut peer) = sync.peers.get_mut(peer) {
                                 peer.latest_hash = hash;
                             }
@@ -568,7 +570,7 @@ impl ChainSyncApi {
                 }
                 PriorityTask::PropagateTransactions(time, _) => {
                     let hashes = sync.new_transaction_hashes(None);
-                    SyncPropagator::propagate_new_transactions(&mut sync, io, hashes, || {
+                    sync.propagate_new_transactions(io, hashes, || {
                         check_deadline(deadline).is_some()
                     });
                     debug!(target: "sync", "Finished transaction propagation, took {}ms", as_ms(time));
@@ -732,6 +734,8 @@ pub struct ChainSync {
     eip1559_transition: BlockNumber,
     /// Number of blocks for which new transactions will be returned in a result of `parity_newTransactionsStats` RPC call
     new_transactions_stats_period: BlockNumber,
+    /// Statistics of sync propagation
+    statistics: SyncPropagatorStatistics,
 }
 
 #[derive(Debug, Default)]
@@ -821,6 +825,7 @@ impl ChainSync {
             warp_sync: config.warp_sync,
             eip1559_transition: config.eip1559_transition,
             new_transactions_stats_period: config.new_transactions_stats_period,
+            statistics: SyncPropagatorStatistics::new(),
         };
         sync.update_targets(chain);
         sync
@@ -1725,9 +1730,10 @@ impl ChainSync {
         if !is_syncing || !sealed.is_empty() || !proposed.is_empty() {
             trace!(target: "sync", "Propagating blocks, state={:?}", self.state);
             // t_nb 11.4.1 propagate latest blocks
-            SyncPropagator::propagate_latest_blocks(self, io, sealed);
+            self.propagate_latest_blocks(io, sealed);
+
             // t_nb 11.4.4 propagate proposed blocks
-            SyncPropagator::propagate_proposed_blocks(self, io, proposed);
+            self.propagate_proposed_blocks(io, proposed);
         }
         if !invalid.is_empty() {
             info!(target: "sync", "Bad blocks in the queue, restarting sync");
@@ -1756,29 +1762,6 @@ impl ChainSync {
     /// Called when a new peer is connected
     pub fn on_peer_connected(&mut self, io: &mut dyn SyncIo, peer: PeerId) {
         SyncHandler::on_peer_connected(self, io, peer);
-    }
-
-    /// propagates new transactions to all peers
-    pub fn propagate_new_transactions(&mut self, io: &mut dyn SyncIo) {
-        let deadline = Instant::now() + Duration::from_millis(500);
-        SyncPropagator::propagate_ready_transactions(self, io, || {
-            if deadline > Instant::now() {
-                true
-            } else {
-                debug!(target: "sync", "Wasn't able to finish transaction propagation within a deadline.");
-                false
-            }
-        });
-    }
-
-    /// Broadcast consensus message to peers.
-    pub fn propagate_consensus_packet(&mut self, io: &mut dyn SyncIo, packet: Bytes) {
-        SyncPropagator::propagate_consensus_packet(self, io, packet);
-    }
-
-    /// Send consensus message to a specific peer.
-    pub fn send_consensus_packet(&mut self, io: &mut dyn SyncIo, packet: Bytes, peer_id: usize) {
-        SyncPropagator::send_consensus_packet(self, io, packet, peer_id);
     }
 }
 
