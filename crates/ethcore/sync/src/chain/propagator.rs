@@ -578,7 +578,7 @@ mod tests {
         );
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        sync.propagate_proposed_blocks(&mut sync, &mut io, &[block]);
+        sync.propagate_proposed_blocks(&mut io, &[block]);
 
         // 1 message should be sent
         assert_eq!(1, io.packets.len());

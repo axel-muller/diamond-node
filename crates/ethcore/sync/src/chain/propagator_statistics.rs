@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicI64, Ordering},
 };
 
 use stats::PrometheusMetrics;
