@@ -115,6 +115,7 @@ use parking_lot::{Mutex, RwLock, RwLockWriteGuard};
 use rand::{seq::SliceRandom, Rng};
 use rlp::{DecoderError, RlpStream};
 use snapshot::Snapshot;
+use stats::PrometheusMetrics;
 use std::{
     cmp,
     collections::{BTreeMap, HashMap, HashSet},
@@ -1762,6 +1763,12 @@ impl ChainSync {
     /// Called when a new peer is connected
     pub fn on_peer_connected(&mut self, io: &mut dyn SyncIo, peer: PeerId) {
         SyncHandler::on_peer_connected(self, io, peer);
+    }
+}
+
+impl PrometheusMetrics for ChainSync {
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        self.statistics.prometheus_metrics(registry);
     }
 }
 

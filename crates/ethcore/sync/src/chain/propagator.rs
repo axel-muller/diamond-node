@@ -17,7 +17,6 @@
 use std::{
     cmp,
     collections::HashSet,
-    sync::atomic::{AtomicBool, AtomicI64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -25,16 +24,12 @@ use bytes::Bytes;
 use ethereum_types::H256;
 use fastmap::H256FastSet;
 use network::{client_version::ClientCapabilities, PeerId};
-use parking_lot::{Mutex, RwLock};
 use rand::RngCore;
 use rlp::RlpStream;
 use sync_io::SyncIo;
 use types::{blockchain_info::BlockChainInfo, transaction::SignedTransaction, BlockNumber};
 
-use super::{
-    propagator_statistics::SyncPropagatorStatistics,
-    sync_packet::SyncPacket::{self, *},
-};
+use super::sync_packet::SyncPacket::{self, *};
 
 use super::{
     random, ChainSync, ETH_PROTOCOL_VERSION_65, MAX_PEERS_PROPAGATION, MAX_PEER_LAG_PROPAGATION,
