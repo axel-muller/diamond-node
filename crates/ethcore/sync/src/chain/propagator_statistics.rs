@@ -17,6 +17,12 @@ pub struct SyncPropagatorStatistics {
     consensus_broadcast_bytes: i64,
     consensus_broadcast_packages: i64,
 
+    transactions_propagated: i64,
+    transactions_propagated_bytes: i64,
+
+    transaction_hashes_propagated: i64,
+    transaction_hashes_propagated_bytes: i64,
+
     node_statistics: HashMap<String, SyncPropagatorNodeStatistics>,
 }
 
@@ -83,6 +89,20 @@ impl SyncPropagatorStatistics {
             self.consensus_broadcast_packages += num_peers as i64;
         }
     }
+
+    pub(crate) fn log_propagated_hashes(&mut self, sent: usize, size: usize) {
+        if self.logging_enabled {
+            self.transaction_hashes_propagated += sent as i64;
+            self.transaction_hashes_propagated_bytes += size as i64;
+        }
+    }
+
+    pub(crate) fn log_propagated_transactions(&mut self, sent: usize, size: usize) {
+        if self.logging_enabled {
+            self.transactions_propagated += sent as i64;
+            self.transactions_propagated_bytes += size as i64;
+        }
+    }
 }
 
 impl PrometheusMetrics for SyncPropagatorStatistics {
@@ -122,7 +142,29 @@ impl PrometheusMetrics for SyncPropagatorStatistics {
             self.consensus_broadcast_packages,
         );
 
-        //registry.register_counter("p2p_propagated_blocks", "", self.propagated_blocks_bytes.load(Ordering::Relaxed));
+        registry.register_counter(
+            "p2p_propagated_txs",
+            "transactions propagated",
+            self.transactions_propagated,
+        );
+
+        registry.register_counter(
+            "p2p_propagated_txs_bytes",
+            "transactions propagated (byte size)",
+            self.transactions_propagated_bytes,
+        );
+
+        registry.register_counter(
+            "p2p_propagated_hashes",
+            "transaction hashes propagated",
+            self.transaction_hashes_propagated,
+        );
+
+        registry.register_counter(
+            "p2p_propagated_hashes_bytes",
+            "transaction hashes propagated (byte size)",
+            self.transaction_hashes_propagated_bytes,
+        );
 
         self.node_statistics
             .iter()

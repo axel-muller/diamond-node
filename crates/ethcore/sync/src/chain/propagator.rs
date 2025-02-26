@@ -29,6 +29,8 @@ use rlp::RlpStream;
 use sync_io::SyncIo;
 use types::{blockchain_info::BlockChainInfo, transaction::SignedTransaction, BlockNumber};
 
+use crate::chain::propagator_statistics::SyncPropagatorStatistics;
+
 use super::sync_packet::SyncPacket::{self, *};
 
 use super::{
@@ -189,11 +191,19 @@ impl ChainSync {
         }
 
         let send_packet = |io: &mut dyn SyncIo,
+                           stats: &mut SyncPropagatorStatistics,
                            peer_id: PeerId,
                            is_hashes: bool,
                            sent: usize,
                            rlp: Bytes| {
             let size = rlp.len();
+
+            if is_hashes {
+                stats.log_propagated_hashes(sent, size);
+            } else {
+                stats.log_propagated_transactions(sent, size);
+            }
+
             ChainSync::send_packet(
                 io,
                 peer_id,
@@ -239,7 +249,14 @@ impl ChainSync {
                         all_transactions_rlp.clone()
                     }
                 };
-                send_packet(io, peer_id, is_hashes, all_transactions_hashes.len(), rlp);
+                send_packet(
+                    io,
+                    &mut self.statistics,
+                    peer_id,
+                    is_hashes,
+                    all_transactions_hashes.len(),
+                    rlp,
+                );
                 sent_to_peers.insert(peer_id);
                 max_sent = cmp::max(max_sent, all_transactions_hashes.len());
                 continue;
@@ -296,7 +313,14 @@ impl ChainSync {
                 .chain(&to_send)
                 .cloned()
                 .collect();
-            send_packet(io, peer_id, is_hashes, to_send.len(), packet.out());
+            send_packet(
+                io,
+                &mut self.statistics,
+                peer_id,
+                is_hashes,
+                to_send.len(),
+                packet.out(),
+            );
             sent_to_peers.insert(peer_id);
             max_sent = cmp::max(max_sent, to_send.len());
         }
