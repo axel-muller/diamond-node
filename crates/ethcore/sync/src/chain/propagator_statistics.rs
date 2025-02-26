@@ -1,6 +1,4 @@
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use stats::PrometheusMetrics;
 
@@ -54,11 +52,9 @@ impl SyncPropagatorStatistics {
                             propagated_blocks_bytes: 0,
                         });
 
-                    node_statistics
-                        .propagated_blocks += blocks as i64;
+                    node_statistics.propagated_blocks += blocks as i64;
 
-                    node_statistics
-                        .propagated_blocks_bytes += bytes as i64;
+                    node_statistics.propagated_blocks_bytes += bytes as i64;
                 }
             }
         }
