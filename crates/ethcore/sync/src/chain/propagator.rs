@@ -339,7 +339,7 @@ impl ChainSync {
         trace!(target: "sync", "Sending proposed blocks to {:?}", peers);
         for block in proposed {
             // todo: sometimes we get at the receiving end blocks, with missmatching total difficulty,
-            // so we ignore those blocks on import. 
+            // so we ignore those blocks on import.
             // might that be the case if we are sending more than 1 block here ?
             // more about: https://github.com/DMDcoin/diamond-node/issues/61
             let rlp = ChainSync::create_block_rlp(block, io.chain().chain_info().total_difficulty);

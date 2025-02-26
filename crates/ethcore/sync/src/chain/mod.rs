@@ -1766,6 +1766,18 @@ impl ChainSync {
     }
 }
 
+impl PrometheusMetrics for ChainSyncApi {
+    fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
+        // unfortunatly, Sync is holding the lock for quite some time,
+        // due its poor degree of parallism.
+        // since most of the metrics are counter, it should not involve a huge problem
+        // we are still trying to get the lock only for 50ms here...
+        if let Some(sync) = self.sync.try_read_for(Duration::from_millis(50)) {
+            sync.prometheus_metrics(registry);
+        }
+    }
+}
+
 impl PrometheusMetrics for ChainSync {
     fn prometheus_metrics(&self, registry: &mut stats::PrometheusRegistry) {
         self.statistics.prometheus_metrics(registry);

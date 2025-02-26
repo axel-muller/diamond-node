@@ -448,6 +448,8 @@ impl PrometheusMetrics for EthSync {
             manifest_block_num as i64,
         );
 
+        self.eth_handler.prometheus_metrics(r);
+
         self.network.prometheus_metrics(r);
     }
 }
@@ -517,6 +519,21 @@ impl SyncProtocolHandler {
                 }
             }
         }
+    }
+}
+
+impl PrometheusMetrics for SyncProtocolHandler {
+    fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
+        if let Some(cache) = self.message_cache.try_read_for(Duration::from_millis(50)) {
+            let sum = cache.iter().map(|(_, v)| v.len()).sum::<usize>();
+            r.register_gauge(
+                "consensus_message_cache",
+                "Number of cached consensus messages",
+                sum as i64,
+            );
+        }
+
+        self.sync.prometheus_metrics(r);
     }
 }
 
