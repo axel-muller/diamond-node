@@ -11,6 +11,9 @@ pub struct SyncPropagatorStatistics {
     propagated_blocks: i64,
     propagated_blocks_bytes: i64,
 
+    consensus_bytes: i64,
+    consensus_packages: i64,
+
     node_statistics: HashMap<String, SyncPropagatorNodeStatistics>,
 }
 
@@ -27,6 +30,8 @@ impl SyncPropagatorStatistics {
             logging_peer_details_enabled: true,
             propagated_blocks: 0,
             propagated_blocks_bytes: 0,
+            consensus_bytes: 0,
+            consensus_packages: 0,
             node_statistics: HashMap::new(),
         }
     }
@@ -35,7 +40,13 @@ impl SyncPropagatorStatistics {
         return self.logging_enabled;
     }
 
-    pub fn log_packet(&mut self, io: &mut dyn SyncIo, peer_id: usize, blocks: usize, bytes: usize) {
+    pub fn log_propagated_block(
+        &mut self,
+        io: &mut dyn SyncIo,
+        peer_id: usize,
+        blocks: usize,
+        bytes: usize,
+    ) {
         if self.logging_enabled() {
             self.propagated_blocks += blocks as i64;
             self.propagated_blocks_bytes += bytes as i64;
@@ -59,6 +70,13 @@ impl SyncPropagatorStatistics {
             }
         }
     }
+
+    pub(crate) fn log_consensus(&mut self, io: &mut dyn SyncIo, _peer_id: usize, bytelen: usize) {
+        if self.logging_peer_details_enabled {
+            self.consensus_bytes += bytelen as i64;
+            self.consensus_packages += 1;
+        }
+    }
 }
 
 impl PrometheusMetrics for SyncPropagatorStatistics {
@@ -73,6 +91,19 @@ impl PrometheusMetrics for SyncPropagatorStatistics {
             "block byte sent",
             self.propagated_blocks_bytes,
         );
+
+        registry.register_counter(
+            "p2p_cons_bytes",
+            "consensus bytes sent",
+            self.consensus_bytes,
+        );
+
+        registry.register_counter(
+            "p2p_cons_package",
+            "consensus packages sent",
+            self.consensus_packages,
+        );
+
         //registry.register_counter("p2p_propagated_blocks", "", self.propagated_blocks_bytes.load(Ordering::Relaxed));
 
         self.node_statistics

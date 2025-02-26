@@ -68,7 +68,7 @@ impl ChainSync {
         let mut send_packet = |io: &mut dyn SyncIo, rlp: Bytes| {
             for peer_id in peers {
                 self.statistics
-                    .log_packet(io, *peer_id, blocks.len(), rlp.len());
+                    .log_propagated_block(io, *peer_id, blocks.len(), rlp.len());
 
                 ChainSync::send_packet(io, *peer_id, NewBlockPacket, rlp.clone());
 
@@ -354,7 +354,13 @@ impl ChainSync {
         }
     }
 
-    pub(crate) fn send_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes, peer_id: usize) {
+    pub(crate) fn send_consensus_packet(
+        &mut self,
+        io: &mut dyn SyncIo,
+        packet: Bytes,
+        peer_id: usize,
+    ) {
+        self.statistics.log_consensus(io, peer_id, packet.len());
         ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
     }
 
