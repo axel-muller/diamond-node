@@ -367,7 +367,7 @@ impl ChainSync {
         packet: Bytes,
         peer_id: usize,
     ) {
-        self.statistics.log_consensus(io, peer_id, packet.len());
+        self.statistics.log_consensus(peer_id, packet.len());
         ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
     }
 
