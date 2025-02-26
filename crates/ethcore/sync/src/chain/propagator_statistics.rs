@@ -14,6 +14,9 @@ pub struct SyncPropagatorStatistics {
     consensus_bytes: i64,
     consensus_packages: i64,
 
+    consensus_broadcast_bytes: i64,
+    consensus_broadcast_packages: i64,
+
     node_statistics: HashMap<String, SyncPropagatorNodeStatistics>,
 }
 
@@ -28,11 +31,7 @@ impl SyncPropagatorStatistics {
         SyncPropagatorStatistics {
             logging_enabled: true,
             logging_peer_details_enabled: true,
-            propagated_blocks: 0,
-            propagated_blocks_bytes: 0,
-            consensus_bytes: 0,
-            consensus_packages: 0,
-            node_statistics: HashMap::new(),
+            ..Default::default()
         }
     }
 
@@ -72,9 +71,16 @@ impl SyncPropagatorStatistics {
     }
 
     pub(crate) fn log_consensus(&mut self, io: &mut dyn SyncIo, _peer_id: usize, bytelen: usize) {
-        if self.logging_peer_details_enabled {
+        if self.logging_enabled {
             self.consensus_bytes += bytelen as i64;
             self.consensus_packages += 1;
+        }
+    }
+
+    pub(crate) fn log_consensus_broadcast(&mut self, num_peers: usize, bytes_len: usize) {
+        if self.logging_enabled {
+            self.consensus_broadcast_bytes += (bytes_len * num_peers) as i64;
+            self.consensus_broadcast_packages += num_peers as i64;
         }
     }
 }
@@ -102,6 +108,18 @@ impl PrometheusMetrics for SyncPropagatorStatistics {
             "p2p_cons_package",
             "consensus packages sent",
             self.consensus_packages,
+        );
+
+        registry.register_counter(
+            "p2p_cons_broadcast_bytes",
+            "consensus bytes broadcasted",
+            self.consensus_broadcast_bytes,
+        );
+
+        registry.register_counter(
+            "p2p_cons_broadcast_packages",
+            "total number consensus packages send through broadcast",
+            self.consensus_broadcast_packages,
         );
 
         //registry.register_counter("p2p_propagated_blocks", "", self.propagated_blocks_bytes.load(Ordering::Relaxed));

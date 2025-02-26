@@ -346,9 +346,12 @@ impl ChainSync {
     }
 
     /// Broadcast consensus message to peers.
-    pub(crate) fn propagate_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes) {
+    pub(crate) fn propagate_consensus_packet(&mut self, io: &mut dyn SyncIo, packet: Bytes) {
         let lucky_peers = ChainSync::select_random_peers(&self.get_consensus_peers());
         trace!(target: "sync", "Sending consensus packet to {:?}", lucky_peers);
+
+        self.statistics
+            .log_consensus_broadcast(lucky_peers.len(), packet.len());
         for peer_id in lucky_peers {
             ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
         }
