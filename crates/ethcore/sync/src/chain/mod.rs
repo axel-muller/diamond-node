@@ -1973,7 +1973,7 @@ pub mod tests {
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
 
         let peers = sync.get_lagging_peers(&chain_info);
-        SyncPropagator::propagate_new_hashes(&mut sync, &chain_info, &mut io, &peers);
+        sync.propagate_new_hashes(&chain_info, &mut io, &peers);
 
         let data = &io.packets[0].data.clone();
         let result = SyncHandler::on_peer_new_hashes(&mut sync, &mut io, 0, &Rlp::new(data));
@@ -1993,7 +1993,7 @@ pub mod tests {
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
 
         let peers = sync.get_lagging_peers(&chain_info);
-        SyncPropagator::propagate_blocks(&mut sync, &chain_info, &mut io, &[], &peers);
+        sync.propagate_blocks(&chain_info, &mut io, &[], &peers);
 
         let data = &io.packets[0].data.clone();
         let result = SyncHandler::on_peer_new_block(&mut sync, &mut io, 0, &Rlp::new(data));

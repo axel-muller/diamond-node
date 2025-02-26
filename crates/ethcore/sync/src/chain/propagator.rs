@@ -56,7 +56,7 @@ impl ChainSync {
     // }
 
     // t_nb 11.4.3 propagates latest block to a set of peers
-    fn propagate_blocks(
+    pub(crate) fn propagate_blocks(
         &mut self,
         chain_info: &BlockChainInfo,
         io: &mut dyn SyncIo,
@@ -92,7 +92,7 @@ impl ChainSync {
     }
 
     // t_nb 11.4.2 propagates new known hashes to all peers
-    fn propagate_new_hashes(
+    pub(crate) fn propagate_new_hashes(
         &mut self,
         chain_info: &BlockChainInfo,
         io: &mut dyn SyncIo,
@@ -118,7 +118,7 @@ impl ChainSync {
     }
 
     /// propagates new transactions to all peers
-    pub fn propagate_new_ready_transactions(&mut self, io: &mut dyn SyncIo) {
+    pub(crate) fn propagate_new_ready_transactions(&mut self, io: &mut dyn SyncIo) {
         let deadline = Instant::now() + Duration::from_millis(500);
 
         self.propagate_ready_transactions(io, || {
@@ -132,7 +132,7 @@ impl ChainSync {
     }
 
     /// propagates new transactions to all peers
-    pub fn propagate_new_transactions<F: FnMut() -> bool>(
+    pub(crate) fn propagate_new_transactions<F: FnMut() -> bool>(
         &mut self,
         io: &mut dyn SyncIo,
         tx_hashes: Vec<H256>,
@@ -306,7 +306,7 @@ impl ChainSync {
     }
 
     // t_nb 11.4.1 propagate latest blocks to peers
-    pub fn propagate_latest_blocks<'a>(&mut self, io: &mut dyn SyncIo, sealed: &[H256]) {
+    pub(crate) fn propagate_latest_blocks<'a>(&mut self, io: &mut dyn SyncIo, sealed: &[H256]) {
         let chain_info = io.chain().chain_info();
         if (((chain_info.best_block_number as i64) - (self.last_sent_block_number as i64)).abs()
             as BlockNumber)
@@ -334,7 +334,7 @@ impl ChainSync {
     }
 
     // t_nb 11.4.4 Distribute valid proposed blocks to subset of current peers. (if there is any proposed)
-    pub fn propagate_proposed_blocks(&mut self, io: &mut dyn SyncIo, proposed: &[Bytes]) {
+    pub(crate) fn propagate_proposed_blocks(&mut self, io: &mut dyn SyncIo, proposed: &[Bytes]) {
         let peers = self.get_consensus_peers();
         trace!(target: "sync", "Sending proposed blocks to {:?}", peers);
         for block in proposed {
@@ -346,7 +346,7 @@ impl ChainSync {
     }
 
     /// Broadcast consensus message to peers.
-    pub fn propagate_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes) {
+    pub(crate) fn propagate_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes) {
         let lucky_peers = ChainSync::select_random_peers(&self.get_consensus_peers());
         trace!(target: "sync", "Sending consensus packet to {:?}", lucky_peers);
         for peer_id in lucky_peers {
@@ -354,7 +354,7 @@ impl ChainSync {
         }
     }
 
-    pub fn send_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes, peer_id: usize) {
+    pub(crate) fn send_consensus_packet(&self, io: &mut dyn SyncIo, packet: Bytes, peer_id: usize) {
         ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
     }
 
@@ -385,7 +385,7 @@ impl ChainSync {
     }
 
     /// Generic packet sender
-    pub fn send_packet(
+    pub(crate) fn send_packet(
         sync: &mut dyn SyncIo,
         peer_id: PeerId,
         packet_id: SyncPacket,

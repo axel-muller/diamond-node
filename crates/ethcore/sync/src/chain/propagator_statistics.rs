@@ -77,7 +77,7 @@ impl PrometheusMetrics for SyncPropagatorStatistics {
 
         self.node_statistics
             .iter()
-            .for_each(|(address, node_statistics)| {
+            .for_each(|(_, node_statistics)| {
                 registry.register_gauge_with_other_node_label(
                     "p2p_propagated_blocks_peer",
                     "# blocks to peer",
