@@ -147,9 +147,6 @@ pub trait Parity {
         self.pending_transactions(size, filter)
     }
 
-
-
-
     /// Returns all transactions from transaction queue.
     ///
     /// Some of them might not be ready to be included in a block yet.
