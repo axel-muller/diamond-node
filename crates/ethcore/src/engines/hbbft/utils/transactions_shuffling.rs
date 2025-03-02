@@ -86,21 +86,30 @@ fn deterministic_transactions_shuffling(
 mod tests {
     use super::*;
     // Convert to bytes in big-endian order.
-    fn u64_to_32_bytes_be(n: u64) -> [u8; 32] {
-        let mut result = [0u8; 32];
+
+    fn u64_to_bytes_be<const N: usize>(n: u64) -> [u8; N] {
+        // Make sure the array is large enough to hold 8 bytes.
+        assert!(N >= 8, "Target array size must be at least 8 bytes");
+        let mut result = [0u8; N];
+        // Copy the big-endian bytes into the first 8 bytes.
         result[..8].copy_from_slice(&n.to_be_bytes());
         result
     }
 
     #[test]
     fn test_address_xor_u256() {
-        let value_as_bytes = u64_to_32_bytes_be(0x1234567890abcdefu64);
-        let address = Address::from_slice(&value_as_bytes[..20]);
-        let seed = U256::from_big_endian(&value_as_bytes);
+        // TODO: Cover corner cases, preferably by using a testing crate like proptest.
+        let address_value = 0x1234567890abcdefu64;
+        let seed_value = 0x7a9e4b3d1c2f0a68u64;
+
+        let address_bytes: [u8; 20] = u64_to_bytes_be(address_value);
+        let address = Address::from_slice(&address_bytes);
+        let seed_bytes: [u8; 32] = u64_to_bytes_be(seed_value);
+        let seed = U256::from_big_endian(&seed_bytes);
         let result = address_xor_u256(&address, seed);
         assert_eq!(
             result,
-            Address::from_slice(&u64_to_32_bytes_be(0x1234567890abcdef ^ 0x1234567890abcdef)[..20])
+            Address::from_slice(&u64_to_bytes_be::<20>(address_value ^ seed_value))
         );
     }
 }
