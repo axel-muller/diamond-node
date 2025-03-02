@@ -1,16 +1,27 @@
 // Warning: Part of the Consensus protocol, changes need to produce *exactly* the same result or
 // block verification will fail. Intentional breaking changes constitute a fork.
 
-use std::collections::HashMap;
 use ethereum_types::{Address, U256};
-use rand::prelude::SliceRandom;
-use rand::thread_rng;
+use std::collections::HashMap;
 use types::transaction::SignedTransaction;
 
-/// Combining an address with a random U256 seed using XOR
-fn U256_xor_address(address: &Address, seed: U256) -> u64
-{
-    address.to_low_u64_ne() ^ seed.low_u64()
+/// Combining an address with a random U256 seed using XOR, using big-endian byte ordering always.
+fn address_xor_u256(address: &Address, seed: U256) -> Address {
+    // Address bytes are always assuming big-endian order.
+    let address_bytes = address.as_bytes();
+
+    // Explicitly convert U256 to big endian order
+    let mut seed_bytes = [0u8; 32];
+    seed.to_big_endian(&mut seed_bytes);
+
+    // Byte-wise XOR, constructing a new, big-endian array
+    let mut result = [0u8; 20];
+    for i in 0..20 {
+        result[i] = address_bytes[i] ^ seed_bytes[i];
+    }
+
+    // Construct a new Address from the big-endian array
+    Address::from(result)
 }
 
 /// transactions is expected to be free of duplicates. This is no guarantee that that transactions with the same nonce
@@ -19,8 +30,10 @@ fn U256_xor_address(address: &Address, seed: U256) -> u64
 /// Avoid using implementations not under our control, avoid adding dependencies on crates or standard library functions
 /// which may change in future versions.
 /// The implementation needs to be both portable and deterministic.6
-fn deterministic_transactions_shuffling(transactions: Vec<SignedTransaction>, seed: U256) -> Vec<SignedTransaction> {
-
+fn deterministic_transactions_shuffling(
+    transactions: Vec<SignedTransaction>,
+    seed: U256,
+) -> Vec<SignedTransaction> {
     // Group transactions by sender.
     // * Walk the transactions from first to last
     // * Add unique senders to a vector in the order they appear in the transactions list
@@ -30,7 +43,10 @@ fn deterministic_transactions_shuffling(transactions: Vec<SignedTransaction>, se
     for tx in transactions {
         let sender = tx.sender();
         let entry = txs_by_sender.entry(sender).or_insert_with(Vec::new);
-        if entry.iter().any(|existing_tx| existing_tx.tx().nonce == tx.tx().nonce) {
+        if entry
+            .iter()
+            .any(|existing_tx| existing_tx.tx().nonce == tx.tx().nonce)
+        {
             // Duplicate nonce found, ignore this transaction.
             continue;
         }
@@ -54,7 +70,7 @@ fn deterministic_transactions_shuffling(transactions: Vec<SignedTransaction>, se
     // * Add the removed sender to a new list
     // * Keep moving randomly selected senders until the original sender list is empty.
     let mut senders: Vec<_> = txs_by_sender.keys().cloned().collect();
-    senders.sort_by_key(|address| U256_xor_address(address, seed));
+    senders.sort_by_key(|address| address_xor_u256(address, seed));
 
     // Create the final transaction list by iterating over the randomly shuffled senders.
     let mut final_transactions = Vec::new();
@@ -68,19 +84,26 @@ fn deterministic_transactions_shuffling(transactions: Vec<SignedTransaction>, se
     final_transactions
 }
 
-// Write a test function to test the address_xor_U256 function with known seeds and addresses and known XOR results
+// Write a test function to test the address_xor_u256 function with known seeds and addresses and known XOR results
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethereum_types::H160;
+    // Convert to bytes in big-endian order.
+    fn u64_to_32_bytes_be(n: u64) -> [u8; 32] {
+        let mut result = [0u8; 32];
+        result[..8].copy_from_slice(&n.to_be_bytes());
+        result
+    }
 
     #[test]
-    fn test_address_xor_U256() {
-        let address = H160::from_low_u64_ne(0x1234567890abcdefu64);
-        let address_u64 = address.to_low_u64_ne();
-        let seed = U256::from(0x1234567890abcdefu64);
-        let seed_u64 = seed.low_u64();
-        let result = U256_xor_address(&address, seed);
-        assert_eq!(result, 0x1234567890abcdef ^ 0x1234567890abcdef);
+    fn test_address_xor_u256() {
+        let value_as_bytes = u64_to_32_bytes_be(0x1234567890abcdefu64);
+        let address = Address::from_slice(&value_as_bytes[..20]);
+        let seed = U256::from_big_endian(&value_as_bytes);
+        let result = address_xor_u256(&address, seed);
+        assert_eq!(
+            result,
+            Address::from_slice(&u64_to_32_bytes_be(0x1234567890abcdef ^ 0x1234567890abcdef)[..20])
+        );
     }
 }
