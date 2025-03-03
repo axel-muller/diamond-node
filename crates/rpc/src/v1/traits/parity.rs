@@ -137,6 +137,16 @@ pub trait Parity {
         _: Option<TransactionFilter>,
     ) -> Result<Vec<Transaction>>;
 
+    /// Returns all pending transactions from transaction queue.
+    #[rpc(name = "eth_pendingTransactions")]
+    fn pending_transactions_eth(
+        &self,
+        size: Option<usize>,
+        filter: Option<TransactionFilter>,
+    ) -> Result<Vec<Transaction>> {
+        self.pending_transactions(size, filter)
+    }
+
     /// Returns all transactions from transaction queue.
     ///
     /// Some of them might not be ready to be included in a block yet.
