@@ -231,7 +231,12 @@ impl ChainSync {
             let peer_info = self.peers.get_mut(&peer_id)
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
-            let is_hashes = peer_info.protocol_version >= ETH_PROTOCOL_VERSION_65.0;
+            // we would need to know the Session info of the peer in order to figure out if it is supporting hashes or not,
+            // what would require a lock. since atm this client is only compatible with other diamond-nodes, we can assume `true`here,
+            // in order to avoid the lock. (instead of: io.peer_session_info(peer_id))
+
+            //let is_hashes = peer_info.protocol_version >= ETH_PROTOCOL_VERSION_65.0; <-- this seems wrong, its comparing the xRLP version with the Peer Capability version
+            let is_hashes = true;
 
             // Send all transactions, if the peer doesn't know about anything
             if peer_info.last_sent_transactions.is_empty() {
