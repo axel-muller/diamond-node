@@ -448,8 +448,6 @@ impl PrometheusMetrics for EthSync {
             manifest_block_num as i64,
         );
 
-        self.eth_handler.prometheus_metrics(r);
-
         self.network.prometheus_metrics(r);
     }
 }
@@ -522,21 +520,6 @@ impl SyncProtocolHandler {
     }
 }
 
-impl PrometheusMetrics for SyncProtocolHandler {
-    fn prometheus_metrics(&self, r: &mut PrometheusRegistry) {
-        if let Some(cache) = self.message_cache.try_read_for(Duration::from_millis(50)) {
-            let sum = cache.iter().map(|(_, v)| v.len()).sum::<usize>();
-            r.register_gauge(
-                "consensus_message_cache",
-                "Number of cached consensus messages",
-                sum as i64,
-            );
-        }
-
-        self.sync.prometheus_metrics(r);
-    }
-}
-
 impl NetworkProtocolHandler for SyncProtocolHandler {
     fn initialize(&self, io: &dyn NetworkContext) {
         if io.subprotocol_name() != PAR_PROTOCOL {
@@ -605,7 +588,7 @@ impl NetworkProtocolHandler for SyncProtocolHandler {
             PEERS_TIMER => self.sync.write().maintain_peers(&mut io),
             MAINTAIN_SYNC_TIMER => self.sync.write().maintain_sync(&mut io),
             CONTINUE_SYNC_TIMER => self.sync.write().continue_sync(&mut io),
-            TX_TIMER => self.sync.write().propagate_new_ready_transactions(&mut io),
+            TX_TIMER => self.sync.write().propagate_new_transactions(&mut io),
             PRIORITY_TIMER => self.sync.process_priority_queue(&mut io),
             DELAYED_PROCESSING_TIMER => self.sync.process_delayed_requests(&mut io),
             CONSENSUS_SEND_RETRY_TIMER => self.try_resend_consensus_messages(nc),

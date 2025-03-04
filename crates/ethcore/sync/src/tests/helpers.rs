@@ -342,7 +342,7 @@ impl<C: FlushingBlockChainClient> Peer for EthPeer<C> {
         self.sync.write().maintain_peers(&mut io);
         self.sync.write().maintain_sync(&mut io);
         self.sync.write().continue_sync(&mut io);
-        self.sync.write().propagate_new_ready_transactions(&mut io);
+        self.sync.write().propagate_new_transactions(&mut io);
     }
 
     fn restart_sync(&self) {
