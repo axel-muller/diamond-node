@@ -156,7 +156,8 @@ impl SyncHandler {
     pub fn on_peer_connected(sync: &mut ChainSync, io: &mut dyn SyncIo, peer: PeerId) {
         let peer_version = io.peer_version(peer);
         
-        trace!(target: "sync", "== Connected {}: {} protocol: {}", peer, peer_version, io.peer_session_info(peer).map_or(0, |f| f.protocol_version));
+        
+        trace!(target: "sync", "== Connected {}: {} protocol: {}", peer, peer_version, io.peer_session_info(peer).map_or(String::new(), |f| f.peer_capabilities.iter().map(|c| format!("{}-{}", c.protocol, c.version)).collect::<Vec<String>>().join(" | ")));
 
         let whitelisted = peer_version.is_hbbft();
 
