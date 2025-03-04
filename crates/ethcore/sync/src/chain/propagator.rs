@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp,
-    collections::HashSet,
-    time::{Duration, Instant},
-};
+use std::{cmp, collections::HashSet};
 
 use bytes::Bytes;
 use ethereum_types::H256;
@@ -28,8 +24,6 @@ use rand::RngCore;
 use rlp::RlpStream;
 use sync_io::SyncIo;
 use types::{blockchain_info::BlockChainInfo, transaction::SignedTransaction, BlockNumber};
-
-use crate::chain::propagator_statistics::SyncPropagatorStatistics;
 
 use super::sync_packet::SyncPacket::{self, *};
 
@@ -43,23 +37,12 @@ use std::sync::Arc;
 const NEW_POOLED_HASHES_LIMIT: usize = 4096;
 
 /// The Chain Sync Propagator: propagates data to peers
-// pub struct SyncPropagator<'a> {
+pub struct SyncPropagator;
 
-//     //sync: ChainSync
-// }
-
-// SyncPropagator for
-impl ChainSync {
-    //  fn new( ) -> Self {
-    //     SyncPropagator {
-    //         statistics: SyncPropagatorStatistics::default(),
-    //         sync
-    //     }
-    // }
-
+impl SyncPropagator {
     // t_nb 11.4.3 propagates latest block to a set of peers
-    pub(crate) fn propagate_blocks(
-        &mut self,
+    pub fn propagate_blocks(
+        sync: &mut ChainSync,
         chain_info: &BlockChainInfo,
         io: &mut dyn SyncIo,
         blocks: &[H256],
@@ -69,12 +52,9 @@ impl ChainSync {
         let sent = peers.len();
         let mut send_packet = |io: &mut dyn SyncIo, rlp: Bytes| {
             for peer_id in peers {
-                self.statistics
-                    .log_propagated_block(io, *peer_id, blocks.len(), rlp.len());
+                SyncPropagator::send_packet(io, *peer_id, NewBlockPacket, rlp.clone());
 
-                ChainSync::send_packet(io, *peer_id, NewBlockPacket, rlp.clone());
-
-                if let Some(ref mut peer) = self.peers.get_mut(peer_id) {
+                if let Some(ref mut peer) = sync.peers.get_mut(peer_id) {
                     peer.latest_hash = chain_info.best_block_hash.clone();
                 }
             }
@@ -94,8 +74,8 @@ impl ChainSync {
     }
 
     // t_nb 11.4.2 propagates new known hashes to all peers
-    pub(crate) fn propagate_new_hashes(
-        &mut self,
+    pub fn propagate_new_hashes(
+        sync: &mut ChainSync,
         chain_info: &BlockChainInfo,
         io: &mut dyn SyncIo,
         peers: &[PeerId],
@@ -111,31 +91,17 @@ impl ChainSync {
 
         let sent = peers.len();
         for peer_id in peers {
-            if let Some(ref mut peer) = self.peers.get_mut(peer_id) {
+            if let Some(ref mut peer) = sync.peers.get_mut(peer_id) {
                 peer.latest_hash = best_block_hash;
             }
-            ChainSync::send_packet(io, *peer_id, NewBlockHashesPacket, rlp.clone());
+            SyncPropagator::send_packet(io, *peer_id, NewBlockHashesPacket, rlp.clone());
         }
         sent
     }
 
     /// propagates new transactions to all peers
-    pub(crate) fn propagate_new_ready_transactions(&mut self, io: &mut dyn SyncIo) {
-        let deadline = Instant::now() + Duration::from_millis(500);
-
-        self.propagate_ready_transactions(io, || {
-            if deadline > Instant::now() {
-                true
-            } else {
-                debug!(target: "sync", "Wasn't able to finish transaction propagation within a deadline.");
-                false
-            }
-        });
-    }
-
-    /// propagates new transactions to all peers
-    pub(crate) fn propagate_new_transactions<F: FnMut() -> bool>(
-        &mut self,
+    pub fn propagate_new_transactions<F: FnMut() -> bool>(
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         tx_hashes: Vec<H256>,
         should_continue: F,
@@ -146,20 +112,20 @@ impl ChainSync {
                 .filter_map(|hash| io.chain().transaction(hash))
                 .collect()
         };
-        self.propagate_transactions(io, transactions, true, should_continue)
+        SyncPropagator::propagate_transactions(sync, io, transactions, true, should_continue)
     }
 
-    fn propagate_ready_transactions<F: FnMut() -> bool>(
-        &mut self,
+    pub fn propagate_ready_transactions<F: FnMut() -> bool>(
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         should_continue: F,
     ) -> usize {
         let transactions = |io: &dyn SyncIo| io.chain().transactions_to_propagate();
-        self.propagate_transactions(io, transactions, false, should_continue)
+        SyncPropagator::propagate_transactions(sync, io, transactions, false, should_continue)
     }
 
     fn propagate_transactions_to_peers<F: FnMut() -> bool>(
-        &mut self,
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         peers: Vec<PeerId>,
         transactions: Vec<&SignedTransaction>,
@@ -183,28 +149,20 @@ impl ChainSync {
         let block_number = io.chain().chain_info().best_block_number;
 
         if are_new {
-            self.transactions_stats
-                .retain_new(block_number, self.new_transactions_stats_period);
+            sync.transactions_stats
+                .retain_new(block_number, sync.new_transactions_stats_period);
         } else {
-            self.transactions_stats
+            sync.transactions_stats
                 .retain_pending(&all_transactions_hashes);
         }
 
         let send_packet = |io: &mut dyn SyncIo,
-                           stats: &mut SyncPropagatorStatistics,
                            peer_id: PeerId,
                            is_hashes: bool,
                            sent: usize,
                            rlp: Bytes| {
             let size = rlp.len();
-
-            if is_hashes {
-                stats.log_propagated_hashes(sent, size);
-            } else {
-                stats.log_propagated_transactions(sent, size);
-            }
-
-            ChainSync::send_packet(
+            SyncPropagator::send_packet(
                 io,
                 peer_id,
                 if is_hashes {
@@ -227,9 +185,9 @@ impl ChainSync {
                 return sent_to_peers;
             }
 
-            let stats = &mut self.transactions_stats;
-            let peer_info = self.peers.get_mut(&peer_id)
-                .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
+            let stats = &mut sync.transactions_stats;
+            let peer_info = sync.peers.get_mut(&peer_id)
+				.expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
             let is_hashes = peer_info.protocol_version >= ETH_PROTOCOL_VERSION_65.0;
 
@@ -249,14 +207,7 @@ impl ChainSync {
                         all_transactions_rlp.clone()
                     }
                 };
-                send_packet(
-                    io,
-                    &mut self.statistics,
-                    peer_id,
-                    is_hashes,
-                    all_transactions_hashes.len(),
-                    rlp,
-                );
+                send_packet(io, peer_id, is_hashes, all_transactions_hashes.len(), rlp);
                 sent_to_peers.insert(peer_id);
                 max_sent = cmp::max(max_sent, all_transactions_hashes.len());
                 continue;
@@ -313,14 +264,7 @@ impl ChainSync {
                 .chain(&to_send)
                 .cloned()
                 .collect();
-            send_packet(
-                io,
-                &mut self.statistics,
-                peer_id,
-                is_hashes,
-                to_send.len(),
-                packet.out(),
-            );
+            send_packet(io, peer_id, is_hashes, to_send.len(), packet.out());
             sent_to_peers.insert(peer_id);
             max_sent = cmp::max(max_sent, to_send.len());
         }
@@ -330,72 +274,69 @@ impl ChainSync {
     }
 
     // t_nb 11.4.1 propagate latest blocks to peers
-    pub(crate) fn propagate_latest_blocks<'a>(&mut self, io: &mut dyn SyncIo, sealed: &[H256]) {
+    pub fn propagate_latest_blocks(sync: &mut ChainSync, io: &mut dyn SyncIo, sealed: &[H256]) {
         let chain_info = io.chain().chain_info();
-        if (((chain_info.best_block_number as i64) - (self.last_sent_block_number as i64)).abs()
+        if (((chain_info.best_block_number as i64) - (sync.last_sent_block_number as i64)).abs()
             as BlockNumber)
             < MAX_PEER_LAG_PROPAGATION
         {
-            let peers = self.get_lagging_peers(&chain_info);
+            let peers = sync.get_lagging_peers(&chain_info);
             if sealed.is_empty() {
                 // t_nb 11.4.2
-                let hashes = self.propagate_new_hashes(&chain_info, io, &peers);
+                let hashes = SyncPropagator::propagate_new_hashes(sync, &chain_info, io, &peers);
                 let peers = ChainSync::select_random_peers(&peers);
                 // t_nb 11.4.3
-                let blocks = self.propagate_blocks(&chain_info, io, sealed, &peers);
+                let blocks =
+                    SyncPropagator::propagate_blocks(sync, &chain_info, io, sealed, &peers);
                 if blocks != 0 || hashes != 0 {
                     trace!(target: "sync", "Sent latest {} blocks and {} hashes to peers.", blocks, hashes);
                 }
             } else {
                 // t_nb 11.4.3
-                self.propagate_blocks(&chain_info, io, sealed, &peers);
+                SyncPropagator::propagate_blocks(sync, &chain_info, io, sealed, &peers);
                 // t_nb 11.4.2
-                self.propagate_new_hashes(&chain_info, io, &peers);
+                SyncPropagator::propagate_new_hashes(sync, &chain_info, io, &peers);
                 trace!(target: "sync", "Sent sealed block to all peers");
             };
         }
-        self.last_sent_block_number = chain_info.best_block_number;
+        sync.last_sent_block_number = chain_info.best_block_number;
     }
 
     // t_nb 11.4.4 Distribute valid proposed blocks to subset of current peers. (if there is any proposed)
-    pub(crate) fn propagate_proposed_blocks(&mut self, io: &mut dyn SyncIo, proposed: &[Bytes]) {
-        let peers = self.get_consensus_peers();
+    pub fn propagate_proposed_blocks(
+        sync: &mut ChainSync,
+        io: &mut dyn SyncIo,
+        proposed: &[Bytes],
+    ) {
+        let peers = sync.get_consensus_peers();
         trace!(target: "sync", "Sending proposed blocks to {:?}", peers);
         for block in proposed {
-            // todo: sometimes we get at the receiving end blocks, with missmatching total difficulty,
-            // so we ignore those blocks on import.
-            // might that be the case if we are sending more than 1 block here ?
-            // more about: https://github.com/DMDcoin/diamond-node/issues/61
             let rlp = ChainSync::create_block_rlp(block, io.chain().chain_info().total_difficulty);
             for peer_id in &peers {
-                ChainSync::send_packet(io, *peer_id, NewBlockPacket, rlp.clone());
+                SyncPropagator::send_packet(io, *peer_id, NewBlockPacket, rlp.clone());
             }
         }
     }
 
     /// Broadcast consensus message to peers.
-    pub(crate) fn propagate_consensus_packet(&mut self, io: &mut dyn SyncIo, packet: Bytes) {
-        let lucky_peers = ChainSync::select_random_peers(&self.get_consensus_peers());
+    pub fn propagate_consensus_packet(sync: &mut ChainSync, io: &mut dyn SyncIo, packet: Bytes) {
+        let lucky_peers = ChainSync::select_random_peers(&sync.get_consensus_peers());
         trace!(target: "sync", "Sending consensus packet to {:?}", lucky_peers);
-
-        self.statistics
-            .log_consensus_broadcast(lucky_peers.len(), packet.len());
         for peer_id in lucky_peers {
-            ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
+            SyncPropagator::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
         }
     }
 
-    pub(crate) fn send_consensus_packet(
-        &mut self,
+    pub fn send_consensus_packet(
+        _sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         packet: Bytes,
         peer_id: usize,
     ) {
-        self.statistics.log_consensus(peer_id, packet.len());
-        ChainSync::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
+        SyncPropagator::send_packet(io, peer_id, ConsensusDataPacket, packet.clone());
     }
 
-    fn select_peers_for_transactions<F>(&self, filter: F, are_new: bool) -> Vec<PeerId>
+    fn select_peers_for_transactions<F>(sync: &ChainSync, filter: F, are_new: bool) -> Vec<PeerId>
     where
         F: Fn(&PeerId) -> bool,
     {
@@ -407,12 +348,12 @@ impl ChainSync {
             let mut random = random::new();
             // sqrt(x)/x scaled to max u32
             let fraction =
-                ((self.peers.len() as f64).powf(-0.5) * (u32::max_value() as f64).round()) as u32;
-            let small = self.peers.len() < MIN_PEERS_PROPAGATION;
+                ((sync.peers.len() as f64).powf(-0.5) * (u32::max_value() as f64).round()) as u32;
+            let small = sync.peers.len() < MIN_PEERS_PROPAGATION;
             Box::new(move |_| small || random.next_u32() < fraction)
         };
 
-        self.peers
+        sync.peers
             .keys()
             .cloned()
             .filter(filter)
@@ -422,17 +363,12 @@ impl ChainSync {
     }
 
     /// Generic packet sender
-    pub(crate) fn send_packet(
+    pub fn send_packet(
         sync: &mut dyn SyncIo,
         peer_id: PeerId,
         packet_id: SyncPacket,
         packet: Bytes,
     ) {
-        // if let Some(session) = sync.peer_session_info(peer_id) {
-
-        //     session.remote_address
-        // }
-
         if let Err(e) = sync.send(peer_id, packet_id, packet) {
             debug!(target:"sync", "Error sending packet: {:?}", e);
             sync.disconnect_peer(peer_id);
@@ -441,7 +377,7 @@ impl ChainSync {
 
     /// propagates new transactions to all peers
     fn propagate_transactions<'a, F, G>(
-        &mut self,
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         get_transactions: G,
         are_new: bool,
@@ -452,7 +388,7 @@ impl ChainSync {
         G: Fn(&dyn SyncIo) -> Vec<Arc<VerifiedTransaction>>,
     {
         // Early out if nobody to send to.
-        if self.peers.is_empty() {
+        if sync.peers.is_empty() {
             return 0;
         }
 
@@ -473,8 +409,9 @@ impl ChainSync {
         // usual transactions could be propagated to all peers
         let mut affected_peers = HashSet::new();
         if !transactions.is_empty() {
-            let peers = ChainSync::select_peers_for_transactions(self, |_| true, are_new);
-            affected_peers = self.propagate_transactions_to_peers(
+            let peers = SyncPropagator::select_peers_for_transactions(sync, |_| true, are_new);
+            affected_peers = SyncPropagator::propagate_transactions_to_peers(
+                sync,
                 io,
                 peers,
                 transactions,
@@ -484,19 +421,22 @@ impl ChainSync {
         }
 
         // most of times service_transactions will be empty
-        // => we still need to merge packets
+        // => there's no need to merge packets
         if !service_transactions.is_empty() {
-            let service_transactions_peers = self.select_peers_for_transactions(
+            let service_transactions_peers = SyncPropagator::select_peers_for_transactions(
+                sync,
                 |peer_id| io.peer_version(*peer_id).accepts_service_transaction(),
                 are_new,
             );
-            let service_transactions_affected_peers = self.propagate_transactions_to_peers(
-                io,
-                service_transactions_peers,
-                service_transactions,
-                are_new,
-                &mut should_continue,
-            );
+            let service_transactions_affected_peers =
+                SyncPropagator::propagate_transactions_to_peers(
+                    sync,
+                    io,
+                    service_transactions_peers,
+                    service_transactions,
+                    are_new,
+                    &mut should_continue,
+                );
             affected_peers.extend(&service_transactions_affected_peers);
         }
 
@@ -530,7 +470,8 @@ mod tests {
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
 
         let peers = sync.get_lagging_peers(&chain_info);
-        let peer_count = sync.propagate_new_hashes(&chain_info, &mut io, &peers);
+        let peer_count =
+            SyncPropagator::propagate_new_hashes(&mut sync, &chain_info, &mut io, &peers);
 
         // 1 message should be send
         assert_eq!(1, io.packets.len());
@@ -550,7 +491,8 @@ mod tests {
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
         let peers = sync.get_lagging_peers(&chain_info);
-        let peer_count = sync.propagate_blocks(&chain_info, &mut io, &[], &peers);
+        let peer_count =
+            SyncPropagator::propagate_blocks(&mut sync, &chain_info, &mut io, &[], &peers);
 
         // 1 message should be send
         assert_eq!(1, io.packets.len());
@@ -571,7 +513,13 @@ mod tests {
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
         let peers = sync.get_lagging_peers(&chain_info);
-        let peer_count = sync.propagate_blocks(&chain_info, &mut io, &[hash.clone()], &peers);
+        let peer_count = SyncPropagator::propagate_blocks(
+            &mut sync,
+            &chain_info,
+            &mut io,
+            &[hash.clone()],
+            &peers,
+        );
 
         // 1 message should be send
         assert_eq!(1, io.packets.len());
@@ -615,7 +563,7 @@ mod tests {
         );
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        sync.propagate_proposed_blocks(&mut io, &[block]);
+        SyncPropagator::propagate_proposed_blocks(&mut sync, &mut io, &[block]);
 
         // 1 message should be sent
         assert_eq!(1, io.packets.len());
@@ -632,13 +580,13 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_ready_transactions(&mut io, || true);
+        let peer_count = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
         // Try to propagate same transactions for the second time
-        let peer_count2 = sync.propagate_ready_transactions(&mut io, || true);
+        let peer_count2 = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
         // Even after new block transactions should not be propagated twice
         sync.chain_new_blocks(&mut io, &[], &[], &[], &[], &[], &[]);
         // Try to propagate same transactions for the third time
-        let peer_count3 = sync.propagate_ready_transactions(&mut io, || true);
+        let peer_count3 = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
 
         // 1 message should be send
         assert_eq!(1, io.packets.len());
@@ -662,7 +610,7 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_ready_transactions(&mut io, || true);
+        let peer_count = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
 
         // Currently random implementation for test returns 8 peers as result of peers selection.
         assert_eq!(8, peer_count);
@@ -683,7 +631,8 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
 
         assert_eq!(25, peer_count);
     }
@@ -704,13 +653,16 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
         // Try to propagate same transactions for the second time
-        let peer_count2 = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count2 =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
         // Even after new block transactions should not be propagated twice
         sync.chain_new_blocks(&mut io, &[], &[], &[], &[], &[], &[]);
         // Try to propagate same transactions for the third time
-        let peer_count3 = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count3 =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
 
         // 1 message should be send
         assert_eq!(1, io.packets.len());
@@ -731,7 +683,7 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_ready_transactions(&mut io, || true);
+        let peer_count = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
         io.chain.insert_transaction_to_queue();
         // New block import should not trigger propagation.
         // (we only propagate on timeout)
@@ -761,7 +713,8 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
         io.chain.insert_transaction_to_queue();
         // New block import should not trigger propagation.
         // (we only propagate on timeout)
@@ -788,12 +741,14 @@ mod tests {
         let queue = RwLock::new(VecDeque::new());
         let ss = TestSnapshotService::new();
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_ready_transactions(&mut io, || true);
-        let peer_count_new = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
+        let peer_count_new =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
         sync.chain_new_blocks(&mut io, &[], &[], &[], &[], &[], &[]);
         // Try to propagate same transactions for the second time
-        let peer_count2 = sync.propagate_ready_transactions(&mut io, || true);
-        let peer_count_new2 = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count2 = SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
+        let peer_count_new2 =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
 
         assert_eq!(0, io.packets.len());
         assert_eq!(0, peer_count);
@@ -813,7 +768,8 @@ mod tests {
         // should sent some
         {
             let mut io = TestIo::new(&mut client, &ss, &queue, None);
-            let peer_count = sync.propagate_ready_transactions(&mut io, || true);
+            let peer_count =
+                SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
             assert_eq!(1, io.packets.len());
             assert_eq!(1, peer_count);
         }
@@ -822,9 +778,11 @@ mod tests {
         let (peer_count2, peer_count3) = {
             let mut io = TestIo::new(&mut client, &ss, &queue, None);
             // Propagate new transactions
-            let peer_count2 = sync.propagate_ready_transactions(&mut io, || true);
+            let peer_count2 =
+                SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
             // And now the peer should have all transactions
-            let peer_count3 = sync.propagate_ready_transactions(&mut io, || true);
+            let peer_count3 =
+                SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
             (peer_count2, peer_count3)
         };
 
@@ -856,13 +814,13 @@ mod tests {
 
         {
             let mut io = TestIo::new(&mut client, &ss, &queue, None);
-            sync.propagate_ready_transactions(&mut io, || true);
+            SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
         }
 
         let tx_hash2 = client.insert_transaction_to_queue();
         {
             let mut io = TestIo::new(&mut client, &ss, &queue, None);
-            sync.propagate_new_transactions(&mut io, vec![tx_hash2], || true);
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash2], || true);
         }
 
         let stats = sync.pending_transactions_stats();
@@ -911,7 +869,7 @@ mod tests {
             .insert(3, "OpenEthereum/ABCDEFGH/v2.7.3/linux/rustc".to_owned());
 
         // and new service transaction is propagated to peers
-        sync.propagate_ready_transactions(&mut io, || true);
+        SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
 
         // peer#2 && peer#3 are receiving service transaction
         assert!(io
@@ -942,7 +900,7 @@ mod tests {
             .insert(1, "OpenEthereum/v2.6.0/linux/rustc".to_owned());
 
         // and service + non-service transactions are propagated to peers
-        sync.propagate_ready_transactions(&mut io, || true);
+        SyncPropagator::propagate_ready_transactions(&mut sync, &mut io, || true);
 
         // two separate packets for peer are queued:
         // 1) with non-service-transaction
@@ -990,7 +948,8 @@ mod tests {
         let ss = TestSnapshotService::new();
 
         let mut io = TestIo::new(&mut client, &ss, &queue, None);
-        let peer_count = sync.propagate_new_transactions(&mut io, vec![tx_hash], || true);
+        let peer_count =
+            SyncPropagator::propagate_new_transactions(&mut sync, &mut io, vec![tx_hash], || true);
 
         assert_eq!(1, io.packets.len());
         assert_eq!(1, peer_count);
