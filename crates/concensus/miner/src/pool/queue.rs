@@ -117,6 +117,14 @@ impl CachedPending {
         self.pending = None;
     }
 
+    /// Find transaction by hash in cached pending set.
+    /// NOTE: Linear lookup, bad performance.
+    pub fn find(&self, hash: &H256) -> Option<Arc<pool::VerifiedTransaction>> {
+        self.pending
+            .as_ref()
+            .and_then(|pending| pending.iter().find(|tx| tx.hash == *hash).cloned())
+    }
+
     /// Returns cached pending set (if any) if it's valid.
     pub fn pending(
         &self,
@@ -660,7 +668,11 @@ impl TransactionQueue {
     /// Given transaction hash looks up that transaction in the pool
     /// and returns a shared pointer to it or `None` if it's not present.
     pub fn find(&self, hash: &H256) -> Option<Arc<pool::VerifiedTransaction>> {
-        self.pool.read().find(hash)
+        self.pool
+            .read()
+            .find(hash)
+            .or(self.cached_enforced_pending.read().find(hash))
+            .or(self.cached_non_enforced_pending.read().find(hash))
     }
 
     /// Remove a set of transactions from the pool.

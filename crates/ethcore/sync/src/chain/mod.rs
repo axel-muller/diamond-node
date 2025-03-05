@@ -1346,21 +1346,6 @@ impl ChainSync {
                                 return;
                             }
                         }
-
-						// and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
-						let mut to_send = Default::default();
-						if let Some(peer) = self.peers.get_mut(&peer_id) {
-							if peer.asking_pooled_transactions.is_empty() {
-								to_send = peer.unfetched_pooled_transactions.drain().take(MAX_TRANSACTIONS_TO_REQUEST).collect::<Vec<_>>();
-								peer.asking_pooled_transactions = to_send.clone();
-							}
-						}
-
-						if !to_send.is_empty() {
-							SyncRequester::request_pooled_transactions(self, io, peer_id, &to_send);
-
-							return;
-						}
 					} else {
 						trace!(
 							target: "sync",
@@ -1370,7 +1355,27 @@ impl ChainSync {
 							peer_difficulty
 						);
 						self.deactivate_peer(io, peer_id);
+                        return;
 					}
+
+                    // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
+                    let mut to_send = Default::default();
+                    if let Some(peer) = self.peers.get_mut(&peer_id) {
+                        if peer.asking_pooled_transactions.is_empty() {
+                            // todo: we might just request the same transactions from  multiple peers here, at the same time.
+                            // we should keep track of how many replicas of a transaction we had requested.
+                            to_send = peer.unfetched_pooled_transactions.drain().take(MAX_TRANSACTIONS_TO_REQUEST).collect::<Vec<_>>();
+                            peer.asking_pooled_transactions = to_send.clone();
+                        }
+                    }
+
+                    if !to_send.is_empty() {
+                        info!(target: "trace", "requesting {} pooled transactions from {}", to_send.len(), peer_id);
+                        let bytes_sent = SyncRequester::request_pooled_transactions(self, io, peer_id, &to_send);
+                        self.statistics.log_requested_transactions_response(to_send.len(), bytes_sent);
+
+                        return;
+                    }
 				},
 				SyncState::SnapshotData => {
 					match io.snapshot_service().restoration_status() {

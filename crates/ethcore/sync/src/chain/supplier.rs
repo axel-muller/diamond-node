@@ -310,20 +310,28 @@ impl SyncSupplier {
         let mut added = 0;
         let mut rlp = RlpStream::new();
         rlp.begin_unbounded_list();
+        let mut not_found = 0;
+        let mut parse_errors = 0;
         for v in r {
             if let Ok(hash) = v.as_val::<H256>() {
+                // io.chain().transaction(hash)
+
                 if let Some(tx) = io.chain().queued_transaction(hash) {
                     tx.signed().rlp_append(&mut rlp);
                     added += 1;
                     if rlp.len() > PAYLOAD_SOFT_LIMIT {
                         break;
                     }
+                } else {
+                    not_found += 1;
                 }
+            } else {
+                parse_errors += 1;
             }
         }
         rlp.finalize_unbounded_list();
 
-        trace!(target: "sync", "{} -> GetPooledTransactions: returned {} entries", peer_id, added);
+        info!(target: "sync", "{} -> GetPooledTransactions: returned {} entries. Not found: {}. parse errors: {}", peer_id, added, not_found, parse_errors);
         Ok(Some((PooledTransactionsPacket, rlp)))
     }
 
