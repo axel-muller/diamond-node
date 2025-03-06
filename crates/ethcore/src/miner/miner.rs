@@ -1455,13 +1455,12 @@ impl miner::MinerService for Miner {
 
         if result.is_none() {
             if let Some(Some(pending)) = self.map_existing_pending_block(
-                |b| {
-
-                    b.transactions.iter().find(|t| t.hash == *hash).cloned()
-                },
+                |b| b.transactions.iter().find(|t| t.hash == *hash).cloned(),
                 0,
             ) {
-                return Some(Arc::new(pool::VerifiedTransaction::from_pending_block_transaction(pending)));   
+                return Some(Arc::new(
+                    pool::VerifiedTransaction::from_pending_block_transaction(pending),
+                ));
             }
         }
         return result;
