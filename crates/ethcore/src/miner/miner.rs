@@ -38,6 +38,7 @@ use ethcore_miner::{
 };
 use ethereum_types::{Address, H256, U256};
 use io::IoChannel;
+use itertools::Itertools;
 use miner::{
     self,
     cache::Cache,
@@ -1206,6 +1207,11 @@ impl miner::MinerService for Miner {
         transactions: Vec<UnverifiedTransaction>,
     ) -> Vec<Result<(), transaction::Error>> {
         trace!(target: "external_tx", "Importing external transactions");
+        info!(
+            "import_external_transactions {:?}",
+            transactions.iter().map(|f| f.hash).collect_vec()
+        );
+
         let client = self.pool_client(chain);
         let results = self.transaction_queue.import(
             client,
@@ -1445,7 +1451,20 @@ impl miner::MinerService for Miner {
     }
 
     fn transaction(&self, hash: &H256) -> Option<Arc<VerifiedTransaction>> {
-        self.transaction_queue.find(hash)
+        let result = self.transaction_queue.find(hash);
+
+        if result.is_none() {
+            if let Some(Some(pending)) = self.map_existing_pending_block(
+                |b| {
+
+                    b.transactions.iter().find(|t| t.hash == *hash).cloned()
+                },
+                0,
+            ) {
+                return Some(Arc::new(pool::VerifiedTransaction::from_pending_block_transaction(pending)));   
+            }
+        }
+        return result;
     }
 
     fn remove_transaction(&self, hash: &H256) -> Option<Arc<VerifiedTransaction>> {
