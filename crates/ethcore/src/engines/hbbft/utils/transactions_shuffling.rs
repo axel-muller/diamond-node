@@ -42,14 +42,17 @@ fn deterministic_transactions_shuffling(
     for tx in transactions {
         let sender = tx.sender();
         let entry = txs_by_sender.entry(sender).or_insert_with(Vec::new);
-        if entry
-            .iter()
-            .any(|existing_tx| existing_tx.tx().nonce == tx.tx().nonce)
+
+        if let Some(existing_tx) = entry
+            .iter_mut()
+            .find(|existing_tx| existing_tx.tx().nonce == tx.tx().nonce)
         {
-            // Duplicate nonce found, ignore this transaction.
-            continue;
+            if tx.tx().gas_price > existing_tx.tx().gas_price {
+                *existing_tx = tx;
+            }
+        } else {
+            entry.push(tx);
         }
-        entry.push(tx);
     }
 
     // For each sender, sort their transactions by nonce (lowest first).
