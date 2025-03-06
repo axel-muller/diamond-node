@@ -114,7 +114,7 @@ impl SyncRequester {
         peer_id: PeerId,
         hashes: &[H256],
     ) -> usize {
-        trace!(target: "sync", "{} <- GetPooledTransactions: {:?}", peer_id, hashes);
+        info!(target: "sync", "{} <- GetPooledTransactions: {:?}", peer_id, hashes);
         let mut rlp = RlpStream::new_list(hashes.len());
         for h in hashes {
             rlp.append(h);

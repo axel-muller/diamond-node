@@ -81,7 +81,7 @@ impl SyncHandler {
                     }
                     SnapshotDataPacket => SyncHandler::on_snapshot_data(sync, io, peer, &rlp),
                     _ => {
-                        debug!(target: "sync", "{}: Unknown packet {}", peer, packet_id.id());
+                        warn!(target: "sync", "{}: Unknown packet {}", peer, packet_id.id());
                         Ok(())
                     }
                 },
@@ -891,7 +891,7 @@ impl SyncHandler {
             trace!(target: "sync", "{} Peer sent us more transactions than was supposed to", peer_id);
             return Err(DownloaderImportError::Invalid);
         }
-        trace!(target: "sync", "{:02} -> PooledTransactions ({} entries)", peer_id, item_count);
+        info!(target: "sync", "{:02} -> PooledTransactions ({} entries)", peer_id, item_count);
         let mut transactions = Vec::with_capacity(item_count);
         for i in 0..item_count {
             let rlp = tx_rlp.at(i)?;
