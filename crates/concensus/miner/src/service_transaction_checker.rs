@@ -79,26 +79,12 @@ impl ServiceTransactionChecker {
     /// Refresh certified addresses cache
     pub fn refresh_cache<C: CallContract + RegistryInfo>(
         &self,
-        client: &C,
+        _client: &C,
     ) -> Result<bool, String> {
         trace!(target: "txqueue", "Refreshing certified addresses cache");
-        // replace the cache with an empty list,
-        // since it's not recent it won't be used anyway.
-        let cache = mem::replace(
-            &mut *self.certified_addresses_cache.write(),
-            HashMap::default(),
-        );
+        
+        self.certified_addresses_cache.write().clear();
 
-        let contract_address =
-            Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
-
-        let addresses: Vec<_> = cache.keys().collect();
-        let mut cache: HashMap<Address, bool> = HashMap::default();
-        for address in addresses {
-            let allowed = self.call_contract(client, contract_address, *address)?;
-            cache.insert(*address, allowed);
-        }
-        *self.certified_addresses_cache.write() = cache;
         Ok(true)
     }
 
