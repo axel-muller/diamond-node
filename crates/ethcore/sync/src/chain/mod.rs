@@ -89,6 +89,7 @@
 
 pub mod fork_filter;
 mod handler;
+mod pooled_transactions_overview;
 mod propagator;
 mod propagator_statistics;
 pub mod request_id;
@@ -97,7 +98,10 @@ mod supplier;
 pub mod sync_packet;
 
 pub use self::fork_filter::ForkFilterApi;
-use self::propagator_statistics::SyncPropagatorStatistics;
+use self::{
+    pooled_transactions_overview::PooledTransactionOverview,
+    propagator_statistics::SyncPropagatorStatistics,
+};
 use super::{SyncConfig, WarpSync};
 use api::{EthProtocolInfo as PeerInfoDigest, PriorityTask, ETH_PROTOCOL, PAR_PROTOCOL};
 use block_sync::{BlockDownloader, DownloadAction};
@@ -352,7 +356,7 @@ pub struct PeerInfo {
     /// Hashes of transactions to be requested.
     unfetched_pooled_transactions: H256FastSet,
     /// Hashes of the transactions we're requesting.
-    asking_pooled_transactions: Vec<H256>,
+    asking_pooled_transactions: H256FastSet,
     /// Holds requested snapshot chunk hash if any.
     asking_snapshot_data: Option<H256>,
     /// Request timestamp
@@ -737,6 +741,8 @@ pub struct ChainSync {
     new_transactions_stats_period: BlockNumber,
     /// Statistics of sync propagation
     statistics: SyncPropagatorStatistics,
+    /// memorizing currently pooled transaction to reduce the number of pooled transaction requests.
+    asking_pooled_transaction_overview: PooledTransactionOverview,
 }
 
 #[derive(Debug, Default)]
@@ -748,13 +754,13 @@ struct GetPooledTransactionsReport {
 
 impl GetPooledTransactionsReport {
     fn generate(
-        mut asked: Vec<H256>,
+        mut asked: H256FastSet,
         received: impl IntoIterator<Item = H256>,
     ) -> Result<Self, H256> {
         let mut out = GetPooledTransactionsReport::default();
 
         let asked_set = asked.iter().copied().collect::<H256FastSet>();
-        let mut asked_iter = asked.drain(std::ops::RangeFull);
+        let mut asked_iter = asked.drain();
         let mut txs = received.into_iter();
         let mut next_received: Option<H256> = None;
         loop {
@@ -827,6 +833,7 @@ impl ChainSync {
             eip1559_transition: config.eip1559_transition,
             new_transactions_stats_period: config.new_transactions_stats_period,
             statistics: SyncPropagatorStatistics::new(),
+            asking_pooled_transaction_overview: PooledTransactionOverview::new(),
         };
         sync.update_targets(chain);
         sync
@@ -938,7 +945,10 @@ impl ChainSync {
                 .collect();
             if *pid == peer_id {
                 match GetPooledTransactionsReport::generate(
-                    std::mem::replace(&mut peer_info.asking_pooled_transactions, Vec::new()),
+                    std::mem::replace(
+                        &mut peer_info.asking_pooled_transactions,
+                        H256FastSet::default(),
+                    ),
                     txs.iter().map(UnverifiedTransaction::hash),
                 ) {
                     Ok(report) => {
@@ -1406,16 +1416,52 @@ impl ChainSync {
             // if we got nothing to do, and the other peer os also at the same block, we are fetching unfetched pooled transactions.
             if self.state == SyncState::Idle && peer_latest != chain_info.best_block_hash {
                 // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
-                let mut to_send = Default::default();
+                let mut to_send = H256FastSet::default();
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
                     if peer.asking_pooled_transactions.is_empty() {
                         // todo: we might just request the same transactions from  multiple peers here, at the same time.
                         // we should keep track of how many replicas of a transaction we had requested.
-                        to_send = peer
-                            .unfetched_pooled_transactions
-                            .drain()
-                            .take(MAX_TRANSACTIONS_TO_REQUEST)
-                            .collect::<Vec<_>>();
+                        // to_send = peer
+                        //     .unfetched_pooled_transactions
+                        //     .drain()
+                        //     .take(MAX_TRANSACTIONS_TO_REQUEST)
+                        //     .collect::<Vec<_>>();
+
+                        for hash in peer.unfetched_pooled_transactions.iter() {
+                            if to_send.len() >= MAX_TRANSACTIONS_TO_REQUEST {
+                                break;
+                            }
+                            // we should add it,
+                            // - if it is not known to be fetched before
+                            // - if the last fetch was more than 300ms ago.
+                            let mut ask_this = true;
+                            if let Some(t) = self
+                                .asking_pooled_transaction_overview
+                                .get_last_fetched(hash)
+                            {
+                                if t.elapsed().as_millis() < 300 {
+                                    ask_this = false;
+                                }
+                            }
+
+                            if ask_this {
+                                to_send.insert(hash.clone());
+                                self.asking_pooled_transaction_overview
+                                    .report_transaction_pooling(hash);
+                            }
+                        }
+
+                        peer.unfetched_pooled_transactions
+                            .retain(|u| !to_send.contains(u));
+
+                        // peer.unfetched_pooled_transactions.difference(other)
+
+                        //to_send = peer.unfetched_pooled_transactions.iter().filter(|&h| self.asking_pooled_transaction_overview.get_num_replicas_pooled(h ) == 0).take(MAX_TRANSACTIONS_TO_REQUEST).copied().collect::<H256FastSet>();
+
+                        // apply LRU cache here to not requery the same transaction!!
+
+                        // self.asking_pooled_transactions_overall
+
                         peer.asking_pooled_transactions = to_send.clone();
                     } else {
                         info!(

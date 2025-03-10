@@ -17,6 +17,7 @@
 use block_sync::BlockRequest;
 use bytes::Bytes;
 use ethereum_types::H256;
+use fastmap::H256FastSet;
 use network::PeerId;
 use rlp::RlpStream;
 use std::time::Instant;
@@ -112,7 +113,7 @@ impl SyncRequester {
         sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         peer_id: PeerId,
-        hashes: &[H256],
+        hashes: &H256FastSet,
     ) -> usize {
         info!(target: "sync", "{} <- GetPooledTransactions: {:?}", peer_id, hashes);
         let mut rlp = RlpStream::new_list(hashes.len());
