@@ -128,7 +128,7 @@ use std::{
 };
 use sync_io::SyncIo;
 use transactions_stats::{Stats as TransactionStats, TransactionsStats};
-use types::{transaction::UnverifiedTransaction, BlockNumber};
+use types::{block_status, transaction::UnverifiedTransaction, BlockNumber};
 
 use self::{
     handler::SyncHandler,
@@ -1273,6 +1273,7 @@ impl ChainSync {
         };
         let chain_info = io.chain().chain_info();
         let syncing_difficulty = chain_info.pending_total_difficulty;
+        
         let num_active_peers = self
             .peers
             .values()
@@ -1413,19 +1414,41 @@ impl ChainSync {
 					SyncState::SnapshotWaiting => ()
 			}
         } else {
-            // if we got nothing to do, and the other peer os also at the same block, we are fetching unfetched pooled transactions.
-            if self.state == SyncState::Idle && peer_latest != chain_info.best_block_hash {
+
+            // if we got nothing to do, and the other peer is also at the same block, or is known to be just 1 behind, we are fetching unfetched pooled transactions.
+            // there is some delay of the information what block they are on.
+
+            // communicate with this peer in any case if we are on the same block.
+            let communicate_with_peer = chain_info.best_block_hash == peer_latest;
+
+
+            // on a distributed real network, 3 seconds is about they physical minimum.
+            // therefore we "accept" other nodes to be 1 block behind - usually they are not!
+            // The other way around: if they are a validator, and we are at the tip, we might be still 1 block behind, because there is already a pending block.
+            // our best_block information is always accurate, so we are not notifiying them obout our transactions, that might be already included in the block. 
+
+            // todo: Further investigation if we should or should not accept a gap in block height.
+
+            // if !communicate_with_peer {
+
+            //     // if we are not on the same block, find out if we do have a block number for their block.
+            //     io.chain().block_number(BlockId::Hash(peer_latest)).map(|block_number| {
+            //         // let other_best_block = peer_difficulty.unwrap_or_default().low_u64() as i64;
+            //         // let best_block = chain_info.best_block_number as i64;
+
+            //         if block_number == chain_info.best_block_number {
+            //             communicate_with_peer = true;
+            //         }
+            //     });
+            // }
+
+            if self.state == SyncState::Idle && communicate_with_peer {
                 // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
                 let mut to_send = H256FastSet::default();
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
                     if peer.asking_pooled_transactions.is_empty() {
                         // todo: we might just request the same transactions from  multiple peers here, at the same time.
                         // we should keep track of how many replicas of a transaction we had requested.
-                        // to_send = peer
-                        //     .unfetched_pooled_transactions
-                        //     .drain()
-                        //     .take(MAX_TRANSACTIONS_TO_REQUEST)
-                        //     .collect::<Vec<_>>();
 
                         for hash in peer.unfetched_pooled_transactions.iter() {
                             if to_send.len() >= MAX_TRANSACTIONS_TO_REQUEST {
@@ -1454,14 +1477,6 @@ impl ChainSync {
                         peer.unfetched_pooled_transactions
                             .retain(|u| !to_send.contains(u));
 
-                        // peer.unfetched_pooled_transactions.difference(other)
-
-                        //to_send = peer.unfetched_pooled_transactions.iter().filter(|&h| self.asking_pooled_transaction_overview.get_num_replicas_pooled(h ) == 0).take(MAX_TRANSACTIONS_TO_REQUEST).copied().collect::<H256FastSet>();
-
-                        // apply LRU cache here to not requery the same transaction!!
-
-                        // self.asking_pooled_transactions_overall
-
                         peer.asking_pooled_transactions = to_send.clone();
                     } else {
                         info!(
@@ -1482,7 +1497,7 @@ impl ChainSync {
                     return;
                 }
             } else {
-                info!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, self.state);
+                info!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, blochhash={:?} our_blockhash={:?} state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, peer_latest, chain_info.best_block_hash, self.state);
             }
         }
     }
