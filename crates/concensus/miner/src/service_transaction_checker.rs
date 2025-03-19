@@ -82,7 +82,7 @@ impl ServiceTransactionChecker {
         _client: &C,
     ) -> Result<bool, String> {
         trace!(target: "txqueue", "Refreshing certified addresses cache");
-        
+
         self.certified_addresses_cache.write().clear();
 
         Ok(true)

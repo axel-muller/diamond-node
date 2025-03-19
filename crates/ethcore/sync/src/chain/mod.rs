@@ -1273,7 +1273,7 @@ impl ChainSync {
         };
         let chain_info = io.chain().chain_info();
         let syncing_difficulty = chain_info.pending_total_difficulty;
-        
+
         let num_active_peers = self
             .peers
             .values()
@@ -1414,18 +1414,16 @@ impl ChainSync {
 					SyncState::SnapshotWaiting => ()
 			}
         } else {
-
             // if we got nothing to do, and the other peer is also at the same block, or is known to be just 1 behind, we are fetching unfetched pooled transactions.
             // there is some delay of the information what block they are on.
 
             // communicate with this peer in any case if we are on the same block.
             let communicate_with_peer = chain_info.best_block_hash == peer_latest;
 
-
             // on a distributed real network, 3 seconds is about they physical minimum.
             // therefore we "accept" other nodes to be 1 block behind - usually they are not!
             // The other way around: if they are a validator, and we are at the tip, we might be still 1 block behind, because there is already a pending block.
-            // our best_block information is always accurate, so we are not notifiying them obout our transactions, that might be already included in the block. 
+            // our best_block information is always accurate, so we are not notifiying them obout our transactions, that might be already included in the block.
 
             // todo: Further investigation if we should or should not accept a gap in block height.
 
