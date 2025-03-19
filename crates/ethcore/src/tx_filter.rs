@@ -52,11 +52,41 @@ mod tx_permissions {
     pub const _PRIVATE: u32 = 0b00001000;
 }
 
+pub struct PermissionCache {
+    // permission cache is only valid for one block.
+    valid_block: H256,
+    cache: LruCache<Address, u32>,
+}
+
+impl PermissionCache {
+    pub fn new(size: usize) -> Self {
+        PermissionCache {
+            cache: LruCache::new(size),
+            valid_block: H256::zero(),
+        }
+    }
+
+    pub fn refresh(&mut self, current_block: &H256) {
+        if self.valid_block != *current_block {
+            self.cache.clear();
+            self.valid_block = current_block.clone();
+        }
+    }
+
+    pub fn insert(&mut self, key: Address, value: u32) {
+        self.cache.insert(key, value);
+    }
+
+    pub fn get(&mut self, key: &Address) -> Option<u32> {
+        self.cache.get_mut(key).cloned()
+    }
+}
+
 /// Connection filter that uses a contract to manage permissions.
 pub struct TransactionFilter {
     contract_address: Address,
     transition_block: BlockNumber,
-    permission_cache: Mutex<LruCache<(H256, Address), u32>>,
+    permission_cache: Mutex<PermissionCache>,
     contract_version_cache: Mutex<LruCache<H256, Option<U256>>>,
 }
 
@@ -68,7 +98,7 @@ impl TransactionFilter {
             .map(|address| TransactionFilter {
                 contract_address: address,
                 transition_block: params.transaction_permission_contract_transition,
-                permission_cache: Mutex::new(LruCache::new(MAX_CACHE_SIZE)),
+                permission_cache: Mutex::new(PermissionCache::new(MAX_CACHE_SIZE)),
                 contract_version_cache: Mutex::new(LruCache::new(MAX_CACHE_SIZE)),
             })
     }
@@ -85,7 +115,12 @@ impl TransactionFilter {
             return true;
         }
 
+        // todo:
+        // we could work on an improved version here that holds the cache for a shorter period.
+        // the contract call is quite expensive.
+
         let mut permission_cache = self.permission_cache.lock();
+        permission_cache.refresh(parent_hash);
         let mut contract_version_cache = self.contract_version_cache.lock();
 
         let (tx_type, to) = match transaction.tx().action {
@@ -109,8 +144,8 @@ impl TransactionFilter {
         let gas_limit = transaction.tx().gas;
         let key = (*parent_hash, sender);
 
-        if let Some(permissions) = permission_cache.get_mut(&key) {
-            return *permissions & tx_type != 0;
+        if let Some(permissions) = permission_cache.get(&sender) {
+            return permissions & tx_type != 0;
         }
 
         let contract_address = self.contract_address;
@@ -204,7 +239,7 @@ impl TransactionFilter {
         };
 
         if filter_only_sender {
-            permission_cache.insert((*parent_hash, sender), permissions);
+            permission_cache.insert(sender, permissions);
         }
         trace!(target: "tx_filter", "Given transaction data: sender: {:?} to: {:?} value: {}, gas_price: {}. Permissions required: {:X}, got: {:X}", sender, to, value, gas_price, tx_type, permissions);
         permissions & tx_type != 0
