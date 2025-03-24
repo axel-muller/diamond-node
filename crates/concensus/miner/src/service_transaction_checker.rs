@@ -56,7 +56,7 @@ impl ServiceTransactionChecker {
         client: &C,
         sender: Address,
     ) -> Result<bool, String> {
-        trace!(target: "txqueue", "Checking service transaction checker contract from {}", sender);
+        trace!(target: "txqueue", "Checking service transaction checker contract for {}", sender);
         if let Some(allowed) = self
             .certified_addresses_cache
             .try_read()
@@ -67,6 +67,9 @@ impl ServiceTransactionChecker {
         }
         let x = Address::from_str("5000000000000000000000000000000000000001".into()).unwrap();
         let contract_address = x;
+
+        trace!(target: "txfilter", "Checking service transaction from contract for: {}", sender);
+
         self.call_contract(client, contract_address, sender)
             .and_then(|allowed| {
                 if let Some(mut cache) = self.certified_addresses_cache.try_write() {

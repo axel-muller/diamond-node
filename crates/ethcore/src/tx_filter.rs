@@ -80,9 +80,7 @@ impl PermissionCache {
         self.cache.push(tx_hash, value);
     }
 
-
     pub fn get(&mut self, tx_hash: &H256) -> Option<u32> {
-
         self.cache.get_mut(&tx_hash).cloned()
     }
 
@@ -90,7 +88,6 @@ impl PermissionCache {
     pub fn get_valid_block(&self) -> &H256 {
         return &self.valid_block;
     }
-
 
     // // we need a cheap method to get the key for the cache.
     // fn calc_key(address: &Address, tx_hash: &H256) -> H256 {
@@ -132,9 +129,10 @@ impl TransactionFilter {
     ) -> bool {
         if block_number < self.transition_block {
             return true;
-        }        
+        }
 
-        
+        debug!(target: "tx_filter", "Checking transaction permission for tx: {}", transaction.hash);
+
         let (tx_type, to) = match transaction.tx().action {
             Action::Create => (tx_permissions::CREATE, Address::default()),
             Action::Call(address) => {
@@ -154,8 +152,8 @@ impl TransactionFilter {
         let gas_price = transaction.tx().gas_price;
         let max_priority_fee_per_gas = transaction.max_priority_fee_per_gas();
         let gas_limit = transaction.tx().gas;
-        let key = (*parent_hash, sender);
 
+        // this scope is for holding the lock for the permission caches only for the time we need it.
         {
             let mut permission_cache = self.permission_cache.lock();
             permission_cache.refresh(parent_hash);
@@ -168,7 +166,7 @@ impl TransactionFilter {
 
         let contract_version = {
             let mut contract_version_cache = self.contract_version_cache.lock();
-            
+
             let v = contract_version_cache
                 .get_mut(parent_hash)
                 .and_then(|v| *v)
@@ -185,7 +183,7 @@ impl TransactionFilter {
             contract_version_cache.insert(*parent_hash, v);
             v
         };
-        
+
         // Check permissions in smart contract based on its version
         let (permissions, _filter_only_sender) = match contract_version {
             Some(version) => {
@@ -266,10 +264,9 @@ impl TransactionFilter {
             // it could be that cache got refreshed in the meantime by another thread.
             if parent_hash == permission_cache.get_valid_block() {
                 // we can cache every transaciton.
-                permission_cache.insert( transaction.hash.clone(),  permissions);
-            }
-            else {
-                trace!(target: "tx_filter", "did not add tx [{}] to permission cache, because block changed in the meantime.", transaction.hash);   
+                permission_cache.insert(transaction.hash.clone(), permissions);
+            } else {
+                trace!(target: "tx_filter", "did not add tx [{}] to permission cache, because block changed in the meantime.", transaction.hash);
             }
         }
 

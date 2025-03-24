@@ -539,6 +539,7 @@ impl HoneyBadgerBFT {
         if let Some(header) = client.create_pending_block_at(batch_txns, timestamp, batch.epoch) {
             let block_num = header.number();
             let hash = header.bare_hash();
+            // TODO: trace is missleading here: we already got the signature shares, we can already
             trace!(target: "consensus", "Sending signature share of {} for block {}", hash, block_num);
             let step = match self
                 .sealing
