@@ -87,6 +87,7 @@ walkdir = "2.3"
 wasm = { path = "../vm/wasm" }
 derive_more = "0.99"
 scopeguard = "1.1.0"
+fastmap = { path = "../util/fastmap"}
 
 [dev-dependencies]
 blooms-db = { path = "../db/blooms-db" }

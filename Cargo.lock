@@ -1232,6 +1232,7 @@ dependencies = [
  "ethjson",
  "ethkey",
  "evm",
+ "fastmap",
  "fetch",
  "globset",
  "hash-db 0.11.0",

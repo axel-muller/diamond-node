@@ -16,8 +16,11 @@
 
 //! Smart contract based transaction filter.
 
+use std::num::NonZeroUsize;
+
 use ethabi::FunctionOutputDecoder;
 use ethereum_types::{Address, H256, U256};
+use fastmap::{new_h256_fast_lru_map, H256FastLruMap};
 use lru_cache::LruCache;
 
 use call_contract::CallContract;
@@ -41,7 +44,7 @@ use_contract!(
 );
 use_contract!(transact_acl_1559, "res/contracts/tx_acl_1559.json");
 
-const MAX_CACHE_SIZE: usize = 4096;
+const MAX_CACHE_SIZE: usize = 40960;
 
 mod tx_permissions {
     pub const _ALL: u32 = 0xffffffff;
@@ -55,13 +58,13 @@ mod tx_permissions {
 pub struct PermissionCache {
     // permission cache is only valid for one block.
     valid_block: H256,
-    cache: LruCache<Address, u32>,
+    cache: H256FastLruMap<u32>,
 }
 
 impl PermissionCache {
     pub fn new(size: usize) -> Self {
         PermissionCache {
-            cache: LruCache::new(size),
+            cache: new_h256_fast_lru_map(NonZeroUsize::new(MAX_CACHE_SIZE).unwrap()),
             valid_block: H256::zero(),
         }
     }
@@ -73,13 +76,29 @@ impl PermissionCache {
         }
     }
 
-    pub fn insert(&mut self, key: Address, value: u32) {
-        self.cache.insert(key, value);
+    pub fn insert(&mut self, tx_hash: H256, value: u32) {
+        self.cache.push(tx_hash, value);
     }
 
-    pub fn get(&mut self, key: &Address) -> Option<u32> {
-        self.cache.get_mut(key).cloned()
+
+    pub fn get(&mut self, tx_hash: &H256) -> Option<u32> {
+
+        self.cache.get_mut(&tx_hash).cloned()
     }
+
+    /// returns the block number for which the cache is valid.
+    pub fn get_valid_block(&self) -> &H256 {
+        return &self.valid_block;
+    }
+
+
+    // // we need a cheap method to get the key for the cache.
+    // fn calc_key(address: &Address, tx_hash: &H256) -> H256 {
+
+    //     // since both, address and tx_hash are already cryptographical products,
+    //     // we can calculate the X-Or out of them to get a H256 cryptographicaly unique identifier.
+    //     return H256::from_slice(address.as_bytes()) ^ *tx_hash;
+    // }
 }
 
 /// Connection filter that uses a contract to manage permissions.
@@ -113,16 +132,9 @@ impl TransactionFilter {
     ) -> bool {
         if block_number < self.transition_block {
             return true;
-        }
+        }        
 
-        // todo:
-        // we could work on an improved version here that holds the cache for a shorter period.
-        // the contract call is quite expensive.
-
-        let mut permission_cache = self.permission_cache.lock();
-        permission_cache.refresh(parent_hash);
-        let mut contract_version_cache = self.contract_version_cache.lock();
-
+        
         let (tx_type, to) = match transaction.tx().action {
             Action::Create => (tx_permissions::CREATE, Address::default()),
             Action::Call(address) => {
@@ -144,28 +156,38 @@ impl TransactionFilter {
         let gas_limit = transaction.tx().gas;
         let key = (*parent_hash, sender);
 
-        if let Some(permissions) = permission_cache.get(&sender) {
-            return permissions & tx_type != 0;
+        {
+            let mut permission_cache = self.permission_cache.lock();
+            permission_cache.refresh(parent_hash);
+
+            if let Some(permissions) = permission_cache.get(&transaction.hash) {
+                return permissions & tx_type != 0;
+            }
         }
-
         let contract_address = self.contract_address;
-        let contract_version = contract_version_cache
-            .get_mut(parent_hash)
-            .and_then(|v| *v)
-            .or_else(|| {
-                let (data, decoder) = transact_acl::functions::contract_version::call();
-                decoder
-                    .decode(
-                        &client
-                            .call_contract(BlockId::Hash(*parent_hash), contract_address, data)
-                            .ok()?,
-                    )
-                    .ok()
-            });
-        contract_version_cache.insert(*parent_hash, contract_version);
 
+        let contract_version = {
+            let mut contract_version_cache = self.contract_version_cache.lock();
+            
+            let v = contract_version_cache
+                .get_mut(parent_hash)
+                .and_then(|v| *v)
+                .or_else(|| {
+                    let (data, decoder) = transact_acl::functions::contract_version::call();
+                    decoder
+                        .decode(
+                            &client
+                                .call_contract(BlockId::Hash(*parent_hash), contract_address, data)
+                                .ok()?,
+                        )
+                        .ok()
+                });
+            contract_version_cache.insert(*parent_hash, v);
+            v
+        };
+        
         // Check permissions in smart contract based on its version
-        let (permissions, filter_only_sender) = match contract_version {
+        let (permissions, _filter_only_sender) = match contract_version {
             Some(version) => {
                 let version_u64 = version.low_u64();
                 trace!(target: "tx_filter", "Version of tx permission contract: {}", version);
@@ -238,11 +260,21 @@ impl TransactionFilter {
             }
         };
 
-        if filter_only_sender {
-            permission_cache.insert(sender, permissions);
+        {
+            let mut permission_cache = self.permission_cache.lock();
+
+            // it could be that cache got refreshed in the meantime by another thread.
+            if parent_hash == permission_cache.get_valid_block() {
+                // we can cache every transaciton.
+                permission_cache.insert( transaction.hash.clone(),  permissions);
+            }
+            else {
+                trace!(target: "tx_filter", "did not add tx [{}] to permission cache, because block changed in the meantime.", transaction.hash);   
+            }
         }
+
         trace!(target: "tx_filter", "Given transaction data: sender: {:?} to: {:?} value: {}, gas_price: {}. Permissions required: {:X}, got: {:X}", sender, to, value, gas_price, tx_type, permissions);
-        permissions & tx_type != 0
+        return permissions & tx_type != 0;
     }
 }
 

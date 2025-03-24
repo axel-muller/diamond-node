@@ -32,6 +32,7 @@ extern crate ethcore_io as io;
 extern crate ethcore_miner;
 extern crate ethereum_types;
 extern crate ethjson;
+extern crate fastmap;
 extern crate hash_db;
 extern crate hbbft;
 extern crate itertools;
