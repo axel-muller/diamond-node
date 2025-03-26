@@ -34,8 +34,8 @@ use vm::{
     GasLeft, MessageCallResult, ParamsType, ReturnData, Schedule, TrapError, TrapKind,
 };
 
-use evm::CostType;
-use instructions::{self, Instruction, InstructionInfo};
+use crate::evm::CostType;
+use crate::instructions::{self, Instruction, InstructionInfo};
 
 pub use self::shared_cache::SharedCache;
 use self::{
