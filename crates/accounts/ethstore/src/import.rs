@@ -16,7 +16,7 @@
 
 use std::{collections::HashSet, fs, path::Path};
 
-use accounts_dir::{DiskKeyFileManager, KeyDirectory, KeyFileManager};
+use crate::accounts_dir::{DiskKeyFileManager, KeyDirectory, KeyFileManager};
 use crypto::publickey::Address;
 use crate::Error;
 

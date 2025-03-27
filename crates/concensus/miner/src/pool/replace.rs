@@ -240,7 +240,7 @@ mod tests {
     use super::*;
 
     use crypto::publickey::{Generator, KeyPair, Random};
-    use pool::{
+    use crate::pool::{
         scoring::*,
         tests::{
             client::TestClient,

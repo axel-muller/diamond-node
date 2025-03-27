@@ -21,7 +21,7 @@ use std::{fmt, sync::Arc};
 use ethereum_types::H256;
 use txpool::{self, VerifiedTransaction};
 
-use pool::VerifiedTransaction as Transaction;
+use crate::pool::VerifiedTransaction as Transaction;
 
 type Listener = Box<dyn Fn(&[H256]) + Send + Sync>;
 

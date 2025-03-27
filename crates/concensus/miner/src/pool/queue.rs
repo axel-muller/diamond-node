@@ -32,7 +32,7 @@ use parking_lot::RwLock;
 use txpool::{self, Verifier};
 use types::transaction;
 
-use pool::{
+use crate::pool::{
     self, client, listener,
     local_transactions::LocalTransactionsList,
     ready, replace, scoring,
@@ -814,7 +814,7 @@ fn convert_error<H: fmt::Debug + fmt::LowerHex>(err: txpool::Error<H>) -> transa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pool::tests::client::TestClient;
+    use crate::pool::tests::client::TestClient;
 
     #[test]
     fn should_get_pending_transactions() {

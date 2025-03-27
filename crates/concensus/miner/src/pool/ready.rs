@@ -165,7 +165,7 @@ impl<C: Fn(&Address) -> Option<U256>> txpool::Ready<VerifiedTransaction> for Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pool::tests::{
+    use crate::pool::tests::{
         client::TestClient,
         tx::{Tx, TxExt},
     };

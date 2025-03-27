@@ -22,7 +22,7 @@ use types::transaction::{
     self, SignedTransaction, Transaction, TypedTransaction, UnverifiedTransaction,
 };
 
-use pool::{self, client::AccountDetails};
+use crate::pool::{self, client::AccountDetails};
 
 const MAX_TRANSACTION_SIZE: usize = 15 * 1024;
 

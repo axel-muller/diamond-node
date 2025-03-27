@@ -27,7 +27,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use crate::Error;
-use SafeAccount;
+use crate::SafeAccount;
 
 /// Name of vault metadata file
 pub const VAULT_FILE_NAME: &'static str = "vault.json";

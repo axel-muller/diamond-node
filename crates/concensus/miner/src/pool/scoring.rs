@@ -182,7 +182,7 @@ where
 mod tests {
     use super::*;
 
-    use pool::tests::tx::{Tx, TxExt};
+    use crate::pool::tests::tx::{Tx, TxExt};
     use std::sync::Arc;
     use txpool::Scoring;
 
