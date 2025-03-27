@@ -1283,9 +1283,6 @@ mod tests {
         static ref ITERATIONS: NonZeroU32 = NonZeroU32::new(10240).expect("10240 > 0; qed");
     }
 
-    #[derive(Debug, PartialEq)]
-    struct TestPasswordReader(&'static str);
-
     fn parse(args: &[&str]) -> Configuration {
         Configuration {
             args: Args::parse_without_config(args).unwrap(),
