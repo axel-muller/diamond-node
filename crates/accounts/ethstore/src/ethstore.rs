@@ -28,7 +28,7 @@ use crypto::publickey::{
     self, Address, ExtendedKeyPair, KeyPair, Message, Public, Secret, Signature,
 };
 use ethkey::Password;
-use json::{self, OpaqueKeyFile, Uuid};
+use crate::json::{self, OpaqueKeyFile, Uuid};
 use crate::presale::PresaleWallet;
 use crate::random::Random;
 use crate::Derivation;
@@ -898,10 +898,10 @@ mod tests {
 
     use self::tempdir::TempDir;
     use super::{EthMultiStore, EthStore};
-    use accounts_dir::{KeyDirectory, MemoryDirectory, RootDiskDirectory};
+    use crate::accounts_dir::{KeyDirectory, MemoryDirectory, RootDiskDirectory};
     use crypto::publickey::{Generator, KeyPair, Random};
     use ethereum_types::H256;
-    use secret_store::{
+    use crate::secret_store::{
         Derivation, SecretStore, SecretVaultRef, SimpleSecretStore, StoreAccountRef,
     };
 
