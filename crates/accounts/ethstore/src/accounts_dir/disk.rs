@@ -19,7 +19,7 @@ use super::{
     KeyDirectory, VaultKey, VaultKeyDirectory, VaultKeyDirectoryProvider,
 };
 use ethkey::Password;
-use json::{self, Uuid};
+use crate::json::{self, Uuid};
 use std::{
     collections::HashMap,
     fs, io,
@@ -27,8 +27,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use time;
-use Error;
-use SafeAccount;
+use crate::Error;
+use crate::SafeAccount;
 
 const IGNORED_FILES: &'static [&'static str] = &[
     "thumbs.db",
@@ -419,7 +419,7 @@ mod test {
 
     use self::tempdir::TempDir;
     use super::{KeyDirectory, RootDiskDirectory, VaultKey};
-    use account::SafeAccount;
+    use crate::account::SafeAccount;
     use crypto::publickey::{Generator, Random};
     use std::{env, fs, num::NonZeroU32};
 

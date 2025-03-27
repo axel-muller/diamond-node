@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
-use account::{Aes128Ctr, Cipher, Kdf, Pbkdf2, Prf};
+use crate::account::{Aes128Ctr, Cipher, Kdf, Pbkdf2, Prf};
 use crypto::{self, publickey::Secret, Keccak256};
 use ethkey::Password;
-use json;
-use random::Random;
+use crate::json;
+use crate::random::Random;
 use smallvec::SmallVec;
 use std::{num::NonZeroU32, str};
-use Error;
+use crate::Error;
 
 /// Encrypted data
 #[derive(Debug, PartialEq, Clone)]

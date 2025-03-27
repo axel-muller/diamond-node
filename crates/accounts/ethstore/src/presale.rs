@@ -20,9 +20,9 @@ use crypto::{
     Keccak256,
 };
 use ethkey::Password;
-use json;
+use crate::json;
 use std::{fs, num::NonZeroU32, path::Path};
-use Error;
+use crate::Error;
 
 /// Pre-sale wallet.
 pub struct PresaleWallet {
@@ -87,7 +87,7 @@ impl PresaleWallet {
 #[cfg(test)]
 mod tests {
     use super::PresaleWallet;
-    use json;
+    use crate::json;
 
     #[test]
     fn test() {

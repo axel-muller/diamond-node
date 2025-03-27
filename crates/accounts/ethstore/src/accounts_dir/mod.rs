@@ -18,7 +18,7 @@
 
 use ethkey::Password;
 use std::{num::NonZeroU32, path::PathBuf};
-use Error;
+use crate::Error;
 use SafeAccount;
 
 mod disk;
