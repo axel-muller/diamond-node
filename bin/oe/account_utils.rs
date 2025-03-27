@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use crypto::publickey;
+use crate::crypto::publickey;
 use dir::Directories;
 use ethereum_types::{Address, H160};
 use ethkey::Password;

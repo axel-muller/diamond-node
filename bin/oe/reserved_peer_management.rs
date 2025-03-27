@@ -100,13 +100,13 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use network::{NetworkContext, ProtocolId};
+    use crate::network::{NetworkContext, ProtocolId};
     use std::{
         net::{Ipv4Addr, SocketAddrV4},
         ops::RangeInclusive,
         sync::Arc,
     };
-    use sync::ManageNetwork;
+    use crate::sync::ManageNetwork;
 
     pub struct TestManageNetwork;
 

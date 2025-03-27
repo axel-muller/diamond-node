@@ -24,7 +24,7 @@ use crate::{
 };
 use ansi_term::Colour;
 
-use crypto::publickey::{Public, Secret};
+use crate::crypto::publickey::{Public, Secret};
 use ethcore::{
     client::VMType,
     miner::{stratum, MinerOptions},
