@@ -74,7 +74,7 @@ impl SharedCache {
 
         let d = Self::find_jump_and_sub_destinations(code);
 
-        if let Some(ref code_hash) = code_hash {
+        if let Some(code_hash) = code_hash {
             self.jump_destinations.lock().insert(*code_hash, d.clone());
         }
 
