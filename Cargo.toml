@@ -111,6 +111,7 @@ deadlock_detection = ["parking_lot/deadlock_detection"]
 # `valgrind --tool=massif /path/to/parity <parity params>`
 # and `massif-visualizer` for visualization
 memory_profiling = []
+secretstore = []
 
 [lib]
 path = "bin/oe/lib.rs"
