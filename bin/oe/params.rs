@@ -37,7 +37,9 @@ use parity_version::version_data;
 use crate::configuration;
 
 #[derive(Debug, PartialEq)]
+#[derive(Default)]
 pub enum SpecType {
+    #[default]
     Foundation,
     Poanet,
     Xdai,
@@ -58,11 +60,6 @@ pub enum SpecType {
     Custom(String),
 }
 
-impl Default for SpecType {
-    fn default() -> Self {
-        SpecType::Foundation
-    }
-}
 
 impl str::FromStr for SpecType {
     type Err = String;
@@ -156,16 +153,13 @@ impl SpecType {
 }
 
 #[derive(Debug, PartialEq)]
+#[derive(Default)]
 pub enum Pruning {
     Specific(Algorithm),
+    #[default]
     Auto,
 }
 
-impl Default for Pruning {
-    fn default() -> Self {
-        Pruning::Auto
-    }
-}
 
 impl str::FromStr for Pruning {
     type Err = String;
@@ -215,8 +209,8 @@ impl str::FromStr for ResealPolicy {
         };
 
         let reseal = ResealPolicy {
-            own: own,
-            external: external,
+            own,
+            external,
         };
 
         Ok(reseal)
@@ -276,8 +270,8 @@ impl GasPricerConfig {
                 ref api_endpoint,
             } => GasPricer::new_calibrated(GasPriceCalibrator::new(
                 GasPriceCalibratorOptions {
-                    usd_per_tx: usd_per_tx,
-                    recalibration_period: recalibration_period,
+                    usd_per_tx,
+                    recalibration_period,
                 },
                 fetch,
                 p,
@@ -312,20 +306,17 @@ impl Default for MinerExtras {
 
 /// 3-value enum.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub enum Switch {
     /// True.
     On,
     /// False.
     Off,
     /// Auto.
+    #[default]
     Auto,
 }
 
-impl Default for Switch {
-    fn default() -> Self {
-        Switch::Auto
-    }
-}
 
 impl str::FromStr for Switch {
     type Err = String;
@@ -357,13 +348,13 @@ pub fn fatdb_switch_to_bool(
     user_defaults: &UserDefaults,
     _algorithm: Algorithm,
 ) -> Result<bool, String> {
-    let result = match (user_defaults.is_first_launch, switch, user_defaults.fat_db) {
+    
+    match (user_defaults.is_first_launch, switch, user_defaults.fat_db) {
         (false, Switch::On, false) => Err("FatDB resync required".into()),
         (_, Switch::On, _) => Ok(true),
         (_, Switch::Off, _) => Ok(false),
         (_, Switch::Auto, def) => Ok(def),
-    };
-    result
+    }
 }
 
 pub fn mode_switch_to_bool(

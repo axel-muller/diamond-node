@@ -166,7 +166,7 @@ impl ChainSyncing for SyncProviderWrapper {
     fn is_syncing(&self) -> bool {
         match self.sync_provider.upgrade() {
             Some(sync_arc) => {
-                return sync_arc.status().state != SyncState::Idle;
+                sync_arc.status().state != SyncState::Idle
             }
             // We also indicate the "syncing" state when the SyncProvider has already been destroyed.
             None => true,
@@ -227,7 +227,7 @@ pub fn execute(
 
     // create dirs used by parity
     cmd.dirs.create_dirs(
-        cmd.acc_conf.unlocked_accounts.len() == 0,
+        cmd.acc_conf.unlocked_accounts.is_empty(),
         cmd.secretstore_conf.enabled,
     )?;
 
@@ -486,7 +486,7 @@ pub fn execute(
     let (sync_provider, manage_network, chain_notify, priority_tasks, new_transaction_hashes) =
         modules::sync(
             sync_config,
-            net_conf.clone().into(),
+            net_conf.clone(),
             client.clone(),
             forks,
             snapshot_service.clone(),
@@ -519,7 +519,7 @@ pub fn execute(
         {
             for hash in hashes {
                 new_transaction_hashes
-                    .send(hash.clone())
+                    .send(*hash)
                     .expect("new_transaction_hashes receiving side is disconnected");
             }
             let task =
@@ -540,7 +540,7 @@ pub fn execute(
     let signer_service = Arc::new(signer::new_service(&cmd.ws_conf, &cmd.logger_config));
 
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
-        signer_service: signer_service,
+        signer_service,
         snapshot: snapshot_service.clone(),
         client: client.clone(),
         sync: sync_provider.clone(),

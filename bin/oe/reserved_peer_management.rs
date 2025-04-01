@@ -43,18 +43,18 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
                         // this remove should never fail, because we check just before
                         self.current_reserved_peers.remove(peer);
                     }
-                    return remove_result
-                        .map_err(|_e| format!("remove_reserved_peer failed for peer: {peer}"));
+                    remove_result
+                        .map_err(|_e| format!("remove_reserved_peer failed for peer: {peer}"))
                 }
                 None => {
                     warn!("ManageNetwork instance not available.");
-                    return Err("ManageNetwork instance not available.".to_string());
+                    Err("ManageNetwork instance not available.".to_string())
                 }
             }
         } else {
-            return Err(format!(
+            Err(format!(
                 "Cannot remove reserved Peer: Peer not reserved: {peer}"
-            ));
+            ))
         }
     }
 
@@ -82,7 +82,7 @@ impl ReservedPeersManagement for ReservedPeersWrapper {
             }
         }
 
-        return disconnected;
+        disconnected
     }
 
     /// Returns the devp2p network endpoint IP and Port information that is used to communicate with other peers.

@@ -320,7 +320,7 @@ impl SnapshotCommand {
             }
         });
 
-        if let Err(e) = service.client().take_snapshot(writer, block_at, &*progress) {
+        if let Err(e) = service.client().take_snapshot(writer, block_at, &progress) {
             let _ = ::std::fs::remove_file(&file_path);
             return Err(format!(
                 "Encountered fatal error while creating snapshot: {}",

@@ -100,8 +100,10 @@ impl FromStr for Api {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub enum ApiSet {
     // Unsafe context (like jsonrpc over http)
+    #[default]
     UnsafeContext,
     // All possible APIs (safe context like token-protected WS interface)
     All,
@@ -113,11 +115,6 @@ pub enum ApiSet {
     List(HashSet<Api>),
 }
 
-impl Default for ApiSet {
-    fn default() -> Self {
-        ApiSet::UnsafeContext
-    }
-}
 
 impl PartialEq for ApiSet {
     fn eq(&self, other: &Self) -> bool {
@@ -265,7 +262,7 @@ impl FullDependencies {
                     handler.extend_with(DebugClient::new(self.client.clone()).to_delegate());
                 }
                 Api::Web3 => {
-                    handler.extend_with(Web3Client::default().to_delegate());
+                    handler.extend_with(Web3Client.to_delegate());
                 }
                 Api::Net => {
                     handler.extend_with(NetClient::new(&self.sync).to_delegate());
@@ -411,7 +408,7 @@ impl FullDependencies {
                 }
                 Api::Traces => handler.extend_with(TracesClient::new(&self.client).to_delegate()),
                 Api::Rpc => {
-                    let modules = to_modules(&apis);
+                    let modules = to_modules(apis);
                     handler.extend_with(RpcClient::new(modules).to_delegate());
                 }
                 Api::SecretStore => {
