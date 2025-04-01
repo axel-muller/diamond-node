@@ -42,8 +42,8 @@ pub fn to_duration(s: &str) -> Result<Duration, String> {
 }
 
 fn clean_0x(s: &str) -> &str {
-    if s.starts_with("0x") {
-        &s[2..]
+    if let Some(stripped) = s.strip_prefix("0x") {
+        stripped
     } else {
         s
     }
