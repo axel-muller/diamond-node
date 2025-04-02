@@ -20,8 +20,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 
 use super::KeyDirectory;
-use crate::Error;
-use crate::SafeAccount;
+use crate::{Error, SafeAccount};
 
 /// Accounts in-memory storage.
 #[derive(Default)]

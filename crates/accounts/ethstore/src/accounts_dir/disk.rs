@@ -18,8 +18,11 @@ use super::{
     vault::{VaultDiskDirectory, VAULT_FILE_NAME},
     KeyDirectory, VaultKey, VaultKeyDirectory, VaultKeyDirectoryProvider,
 };
+use crate::{
+    json::{self, Uuid},
+    Error, SafeAccount,
+};
 use ethkey::Password;
-use crate::json::{self, Uuid};
 use std::{
     collections::HashMap,
     fs, io,
@@ -27,8 +30,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use time;
-use crate::Error;
-use crate::SafeAccount;
 
 const IGNORED_FILES: &'static [&'static str] = &[
     "thumbs.db",

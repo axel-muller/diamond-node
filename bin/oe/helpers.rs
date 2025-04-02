@@ -355,7 +355,9 @@ pub fn password_prompt() -> Result<Password, String> {
 pub fn password_from_file(path: String) -> Result<Password, String> {
     let passwords = passwords_from_files(&[path])?;
     // use only first password from the file
-    passwords.first().cloned()
+    passwords
+        .first()
+        .cloned()
         .ok_or_else(|| "Password file seems to be empty.".to_owned())
 }
 
@@ -415,10 +417,7 @@ mod tests {
             to_duration("daily").unwrap(),
             Duration::from_secs(24 * 60 * 60)
         );
-        assert_eq!(
-            to_duration("1hour").unwrap(),
-            Duration::from_secs(60 * 60)
-        );
+        assert_eq!(to_duration("1hour").unwrap(), Duration::from_secs(60 * 60));
         assert_eq!(
             to_duration("2hours").unwrap(),
             Duration::from_secs(2 * 60 * 60)

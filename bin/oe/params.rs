@@ -36,8 +36,7 @@ use parity_version::version_data;
 
 use crate::configuration;
 
-#[derive(Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, PartialEq, Default)]
 pub enum SpecType {
     #[default]
     Foundation,
@@ -59,7 +58,6 @@ pub enum SpecType {
     Dev,
     Custom(String),
 }
-
 
 impl str::FromStr for SpecType {
     type Err = String;
@@ -152,14 +150,12 @@ impl SpecType {
     }
 }
 
-#[derive(Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, PartialEq, Default)]
 pub enum Pruning {
     Specific(Algorithm),
     #[default]
     Auto,
 }
-
 
 impl str::FromStr for Pruning {
     type Err = String;
@@ -208,10 +204,7 @@ impl str::FromStr for ResealPolicy {
             x => return Err(format!("Invalid reseal value: {}", x)),
         };
 
-        let reseal = ResealPolicy {
-            own,
-            external,
-        };
+        let reseal = ResealPolicy { own, external };
 
         Ok(reseal)
     }
@@ -305,8 +298,7 @@ impl Default for MinerExtras {
 }
 
 /// 3-value enum.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Switch {
     /// True.
     On,
@@ -316,7 +308,6 @@ pub enum Switch {
     #[default]
     Auto,
 }
-
 
 impl str::FromStr for Switch {
     type Err = String;
@@ -348,7 +339,6 @@ pub fn fatdb_switch_to_bool(
     user_defaults: &UserDefaults,
     _algorithm: Algorithm,
 ) -> Result<bool, String> {
-    
     match (user_defaults.is_first_launch, switch, user_defaults.fat_db) {
         (false, Switch::On, false) => Err("FatDB resync required".into()),
         (_, Switch::On, _) => Ok(true),

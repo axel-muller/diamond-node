@@ -19,9 +19,11 @@ use ethereum_types::{Address, BigEndianHash, U256};
 use std::cmp;
 
 use super::stack::VecStack;
-use crate::evm;
-use crate::instructions::{self, Instruction, InstructionInfo};
-use crate::interpreter::stack::Stack;
+use crate::{
+    evm,
+    instructions::{self, Instruction, InstructionInfo},
+    interpreter::stack::Stack,
+};
 use vm::{self, Schedule};
 
 macro_rules! overflowing {

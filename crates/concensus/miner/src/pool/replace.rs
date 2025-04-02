@@ -239,7 +239,6 @@ where
 mod tests {
     use super::*;
 
-    use crypto::publickey::{Generator, KeyPair, Random};
     use crate::pool::{
         scoring::*,
         tests::{
@@ -248,6 +247,7 @@ mod tests {
         },
         PrioritizationStrategy, VerifiedTransaction,
     };
+    use crypto::publickey::{Generator, KeyPair, Random};
     use std::sync::Arc;
     use txpool::{scoring::Choice::*, ShouldReplace};
 

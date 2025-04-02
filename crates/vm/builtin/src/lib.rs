@@ -923,8 +923,6 @@ impl Implementation for Ripemd160 {
 fn modexp(mut base: BigUint, exp: Vec<u8>, modulus: BigUint) -> BigUint {
     const BITS_PER_DIGIT: usize = 8;
 
-    
-    
     // n^m % 0 || n^m % 1
     if modulus <= BigUint::from(1 as usize) {
         return BigUint::from(0 as usize);
@@ -935,7 +933,6 @@ fn modexp(mut base: BigUint, exp: Vec<u8>, modulus: BigUint) -> BigUint {
 
     // n^0 % m
     if exp.peek().is_none() {
-        
         return BigUint::from(1 as usize);
     }
 
@@ -1529,29 +1526,40 @@ mod tests {
     fn modexp_func() {
         // n^0 % m == 1
 
-        
         let mut base = BigUint::parse_bytes(b"12345", 10).unwrap();
         let mut exp = BigUint::from(0 as usize);
         let mut modulus = BigUint::parse_bytes(b"789", 10).unwrap();
-        assert_eq!(me(base, exp.to_bytes_be(), modulus), BigUint::from(1 as usize));
+        assert_eq!(
+            me(base, exp.to_bytes_be(), modulus),
+            BigUint::from(1 as usize)
+        );
 
         // 0^n % m == 0
         base = BigUint::from(0 as usize);
         exp = BigUint::parse_bytes(b"12345", 10).unwrap();
         modulus = BigUint::parse_bytes(b"789", 10).unwrap();
-        assert_eq!(me(base, exp.to_bytes_be(), modulus), BigUint::from(0 as usize));
+        assert_eq!(
+            me(base, exp.to_bytes_be(), modulus),
+            BigUint::from(0 as usize)
+        );
 
         // n^m % 1 == 0
         base = BigUint::parse_bytes(b"12345", 10).unwrap();
         exp = BigUint::parse_bytes(b"789", 10).unwrap();
         modulus = BigUint::from(1 as usize);
-        assert_eq!(me(base, exp.to_bytes_be(), modulus), BigUint::from(0 as usize));
+        assert_eq!(
+            me(base, exp.to_bytes_be(), modulus),
+            BigUint::from(0 as usize)
+        );
 
         // if n % d == 0, then n^m % d == 0
         base = BigUint::parse_bytes(b"12345", 10).unwrap();
         exp = BigUint::parse_bytes(b"789", 10).unwrap();
         modulus = BigUint::parse_bytes(b"15", 10).unwrap();
-        assert_eq!(me(base, exp.to_bytes_be(), modulus), BigUint::from(0 as usize));
+        assert_eq!(
+            me(base, exp.to_bytes_be(), modulus),
+            BigUint::from(0 as usize)
+        );
 
         // others
         base = BigUint::parse_bytes(b"12345", 10).unwrap();

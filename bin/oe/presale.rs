@@ -15,10 +15,10 @@
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::{
+    crypto::publickey,
     helpers::{password_from_file, password_prompt},
     params::SpecType,
 };
-use crate::crypto::publickey;
 
 use ethkey::Password;
 use ethstore::PresaleWallet;

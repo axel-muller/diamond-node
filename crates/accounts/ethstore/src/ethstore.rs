@@ -22,22 +22,19 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::account::SafeAccount;
-use crate::accounts_dir::{KeyDirectory, SetKeyError, VaultKey, VaultKeyDirectory};
+use crate::{
+    account::SafeAccount,
+    accounts_dir::{KeyDirectory, SetKeyError, VaultKey, VaultKeyDirectory},
+    json::{self, OpaqueKeyFile, Uuid},
+    presale::PresaleWallet,
+    random::Random,
+    Derivation, Error, OpaqueSecret, SecretStore, SecretVaultRef, SimpleSecretStore,
+    StoreAccountRef,
+};
 use crypto::publickey::{
     self, Address, ExtendedKeyPair, KeyPair, Message, Public, Secret, Signature,
 };
 use ethkey::Password;
-use crate::json::{self, OpaqueKeyFile, Uuid};
-use crate::presale::PresaleWallet;
-use crate::random::Random;
-use crate::Derivation;
-use crate::Error;
-use crate::OpaqueSecret;
-use crate::SecretStore;
-use crate::SecretVaultRef;
-use crate::SimpleSecretStore;
-use crate::StoreAccountRef;
 
 lazy_static! {
     static ref KEY_ITERATIONS: NonZeroU32 =
@@ -898,12 +895,14 @@ mod tests {
 
     use self::tempdir::TempDir;
     use super::{EthMultiStore, EthStore};
-    use crate::accounts_dir::{KeyDirectory, MemoryDirectory, RootDiskDirectory};
+    use crate::{
+        accounts_dir::{KeyDirectory, MemoryDirectory, RootDiskDirectory},
+        secret_store::{
+            Derivation, SecretStore, SecretVaultRef, SimpleSecretStore, StoreAccountRef,
+        },
+    };
     use crypto::publickey::{Generator, KeyPair, Random};
     use ethereum_types::H256;
-    use crate::secret_store::{
-        Derivation, SecretStore, SecretVaultRef, SimpleSecretStore, StoreAccountRef,
-    };
 
     fn keypair() -> KeyPair {
         Random.generate()

@@ -14,15 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenEthereum.  If not, see <http://www.gnu.org/licenses/>.
 
+use crate::{json, Error};
 use crypto::{
     self, pbkdf2,
     publickey::{Address, KeyPair, Secret},
     Keccak256,
 };
 use ethkey::Password;
-use crate::json;
 use std::{fs, num::NonZeroU32, path::Path};
-use crate::Error;
 
 /// Pre-sale wallet.
 pub struct PresaleWallet {

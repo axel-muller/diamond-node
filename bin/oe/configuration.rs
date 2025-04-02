@@ -457,9 +457,7 @@ impl Configuration {
             gas_range_target: (floor, ceil),
             engine_signer: self.engine_signer()?,
             work_notify: self.work_notify(),
-            local_accounts: HashSet::from_iter(
-                to_addresses(&self.args.arg_tx_queue_locals)?,
-            ),
+            local_accounts: HashSet::from_iter(to_addresses(&self.args.arg_tx_queue_locals)?),
         };
 
         Ok(extras)

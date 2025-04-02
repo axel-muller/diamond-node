@@ -255,7 +255,8 @@ impl<T: InformantData> Informant<T> {
         let snapshot_sync = sync_info.as_ref().is_some_and(|s| s.snapshot_sync)
             && self
                 .snapshot
-                .as_ref().is_some_and(|s| match s.restoration_status() {
+                .as_ref()
+                .is_some_and(|s| match s.restoration_status() {
                     RestorationStatus::Ongoing { .. } | RestorationStatus::Initializing { .. } => {
                         true
                     }
