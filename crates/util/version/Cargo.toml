@@ -8,6 +8,7 @@ authors = [
 	"Parity Technologies <admin@parity.io>"
 ]
 build = "build.rs"
+edition = "2015"
 
 [package.metadata]
 
