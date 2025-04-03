@@ -151,7 +151,7 @@ mod test {
         atomic::{AtomicBool, Ordering},
         Arc,
     };
-    use Client;
+    use crate::Client;
 
     fn price_info_ok(response: &str, executor: Executor) -> Client<FakeFetch<String>> {
         Client::new(
