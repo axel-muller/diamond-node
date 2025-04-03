@@ -259,7 +259,7 @@ mod tests {
     use txpool::Listener;
     use types::transaction;
 
-    use pool;
+    use crate::pool;
 
     #[test]
     fn should_add_transaction_as_pending() {
