@@ -15,7 +15,7 @@ jobs:
           - ubuntu-22.04
         #  - macos-latest
         toolchain:
-          -  1.75
+          -  1.85
     runs-on:                    ${{ matrix.platform }}
     steps:
       - name:                   Checkout sources
