@@ -64,7 +64,7 @@ pub struct PermissionCache {
 impl PermissionCache {
     pub fn new(size: usize) -> Self {
         PermissionCache {
-            cache: new_h256_fast_lru_map(NonZeroUsize::new(MAX_CACHE_SIZE).unwrap()),
+            cache: new_h256_fast_lru_map(NonZeroUsize::new(size).unwrap()),
             valid_block: H256::zero(),
         }
     }
