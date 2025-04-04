@@ -34,7 +34,7 @@ use crate::chain::propagator_statistics::SyncPropagatorStatistics;
 use super::sync_packet::SyncPacket::{self, *};
 
 use super::{
-    random, ChainSync, ETH_PROTOCOL_VERSION_65, MAX_PEERS_PROPAGATION, MAX_PEER_LAG_PROPAGATION,
+    random, ChainSync, MAX_PEERS_PROPAGATION, MAX_PEER_LAG_PROPAGATION,
     MAX_TRANSACTION_PACKET_SIZE, MIN_PEERS_PROPAGATION,
 };
 use ethcore_miner::pool::VerifiedTransaction;
