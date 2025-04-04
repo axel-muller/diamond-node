@@ -318,12 +318,12 @@ impl SyncProvider for EthSync {
 
                         Some(PeerInfo {
                             id: session_info.id.map(|id| format!("{:x}", id)),
-                            client_version: session_info.client_version,
                             capabilities: session_info
-                                .peer_capabilities
-                                .into_iter()
+                                .peer_capabilities()
+                                .iter()
                                 .map(|c| c.to_string())
                                 .collect(),
+                            client_version: session_info.client_version,
                             remote_address: session_info.remote_address,
                             local_address: session_info.local_address,
                             eth_info: peer_info,

@@ -235,18 +235,20 @@ impl ChainSync {
             let peer_info = self.peers.get_mut(&peer_id)
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
-            // we would need to know the Session info of the peer in order to figure out if it is supporting hashes or not,
-            // what would require a lock. since atm this client is only compatible with other diamond-nodes, we can assume `true`here,
-            // in order to avoid the lock. (instead of: io.peer_session_info(peer_id))
+            warn!(target: "sync", "peer_info.protocol_version: {:?}", peer_info.protocol_version);
 
-            //let is_hashes = peer_info.protocol_version >= ETH_PROTOCOL_VERSION_65.0; <-- this seems wrong, its comparing the xRLP version with the Peer Capability version
-            let is_hashes = true;
+            let mut id: Option<ethereum_types::H512> = None;
+            let mut is_hashes = false;
+
+            if let Some(session_info) = io.peer_session_info(peer_id) {
+                is_hashes = session_info.is_pooled_transactions_capable();
+                id = session_info.id;
+            }
 
             // Send all transactions, if the peer doesn't know about anything
             if peer_info.last_sent_transactions.is_empty() {
                 // update stats
                 for hash in &all_transactions_hashes {
-                    let id = io.peer_session_info(peer_id).and_then(|info| info.id);
                     stats.propagated(hash, are_new, id, block_number);
                 }
                 peer_info.last_sent_transactions = all_transactions_hashes.clone();
@@ -312,7 +314,6 @@ impl ChainSync {
             };
 
             // Update stats.
-            let id = io.peer_session_info(peer_id).and_then(|info| info.id);
             for hash in &to_send {
                 stats.propagated(hash, are_new, id, block_number);
             }
@@ -437,11 +438,6 @@ impl ChainSync {
         packet_id: SyncPacket,
         packet: Bytes,
     ) {
-        // if let Some(session) = sync.peer_session_info(peer_id) {
-
-        //     session.remote_address
-        // }
-
         if let Err(e) = sync.send(peer_id, packet_id, packet) {
             debug!(target:"sync", "Error sending packet: {:?}", e);
             sync.disconnect_peer(peer_id);
@@ -780,8 +776,14 @@ mod tests {
         assert_eq!(1, io.packets.len());
         // 1 peer should receive the message
         assert_eq!(1, peer_count);
+
+        // depending on ETH_PROTOCOL_VERSION_65.0, it sends here either TRANSACTION_PACK or NewPooledTransactionHashesPacket
+        // as for diamond Node
         // TRANSACTIONS_PACKET
-        assert_eq!(0x02, io.packets[0].packet_id);
+        assert!(
+            io.packets[0].packet_id == SyncPacket::NewPooledTransactionHashesPacket as u8
+                || io.packets[0].packet_id == SyncPacket::TransactionsPacket as u8
+        );
     }
 
     #[test]

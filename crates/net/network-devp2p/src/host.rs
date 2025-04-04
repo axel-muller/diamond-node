@@ -928,7 +928,7 @@ impl Host {
                             let (min_peers, mut max_peers, reserved_only, self_id) = {
                                 let info = self.info.read();
                                 let mut max_peers = info.config.max_peers;
-                                for cap in &s.info.capabilities {
+                                for cap in s.info.capabilities() {
                                     if let Some(num) =
                                         info.config.reserved_protocols.get(&cap.protocol)
                                     {
