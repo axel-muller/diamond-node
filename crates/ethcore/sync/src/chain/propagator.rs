@@ -170,7 +170,6 @@ impl ChainSync {
             .iter()
             .map(|tx| tx.hash())
             .collect::<H256FastSet>();
-         
 
         let block_number = io.chain().chain_info().best_block_number;
 
@@ -247,13 +246,15 @@ impl ChainSync {
 
                 let rlp = {
                     if is_hashes {
-                        rlp::encode_list(&all_transactions_hashes.iter().copied().collect::<Vec<_>>())
+                        rlp::encode_list(
+                            &all_transactions_hashes.iter().copied().collect::<Vec<_>>(),
+                        )
                     } else {
                         let mut packet = RlpStream::new_list(transactions.len());
                         for tx in &transactions {
                             tx.rlp_append(&mut packet);
                         }
-                        packet.out()    
+                        packet.out()
                     }
                 };
                 send_packet(
