@@ -160,7 +160,7 @@ impl SessionInfo {
 
         // ETH_PROTOCOL_VERSION_65
         self.is_pooled_transactions_capable = self
-            .capabilities
+            .peer_capabilities
             .iter()
             .any(|x| x.protocol.low_u64() == 0x657468 /* hex for "eth" */ && x.version == 65);
     }
