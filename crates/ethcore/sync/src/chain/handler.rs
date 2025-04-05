@@ -873,7 +873,7 @@ impl SyncHandler {
 
     /// Called when peer sends us a list of pooled transactions
     pub fn on_peer_pooled_transactions(
-        sync: &ChainSync,
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         peer_id: PeerId,
         tx_rlp: &Rlp,
@@ -904,6 +904,9 @@ impl SyncHandler {
             transactions.push(tx);
         }
         io.chain().queue_transactions(transactions, peer_id);
+
+        sync.reset_peer_asking(peer_id, PeerAsking::PooledTransactions);
+
         Ok(())
     }
 
