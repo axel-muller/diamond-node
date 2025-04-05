@@ -960,8 +960,9 @@ impl ChainSync {
                             .copied()
                             .collect();
                     }
-                    Err(_unknown_tx) => {
+                    Err(unknown_tx) => {
                         // punish peer?
+                        warn!(target: "sync", "Peer {} sent unknown transaction {}", peer_id, unknown_tx);
                     }
                 }
 
@@ -1452,20 +1453,12 @@ impl ChainSync {
                             if to_send.len() >= MAX_TRANSACTIONS_TO_REQUEST {
                                 break;
                             }
-                            // we should add it,
-                            // - if it is not known to be fetched before
-                            // - if the last fetch was more than 300ms ago.
-                            let mut ask_this = true;
-                            if let Some(t) = self
+
+                            if self
                                 .asking_pooled_transaction_overview
                                 .get_last_fetched(hash)
+                                .map_or(false, |t| t.elapsed().as_millis() > 300)
                             {
-                                if t.elapsed().as_millis() < 300 {
-                                    ask_this = false;
-                                }
-                            }
-
-                            if ask_this {
                                 to_send.insert(hash.clone());
                                 self.asking_pooled_transaction_overview
                                     .report_transaction_pooling(hash);
