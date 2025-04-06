@@ -1258,7 +1258,7 @@ impl ChainSync {
         let (peer_latest, peer_difficulty, peer_snapshot_number, peer_snapshot_hash) = {
             if let Some(peer) = self.peers.get_mut(&peer_id) {
                 if peer.asking != PeerAsking::Nothing || !peer.can_sync() {
-                    info!(target: "sync", "Skipping busy peer {} asking: {:?}", peer_id, peer.asking);
+                    debug!(target: "sync", "Skipping busy peer {} asking: {:?}", peer_id, peer.asking);
                     return;
                 }
                 (
@@ -1338,7 +1338,6 @@ impl ChainSync {
 				},
 				SyncState::Idle | SyncState::Blocks | SyncState::NewBlocks => {
 
-                    info!("doing sync");
 					if io.chain().queue_info().is_full() {
 						self.pause_sync();
 						return;
@@ -1365,7 +1364,7 @@ impl ChainSync {
 					if force || equal_or_higher_difficulty {
 						if ancient_block_fullness < 0.8 {
                             if let Some(request) = self.old_blocks.as_mut().and_then(|d| d.request_blocks(peer_id, io, num_active_peers)) {
-                                info!("requesting old blocks from: {}", peer_id);
+                                debug!("requesting old blocks from: {}", peer_id);
                                 SyncRequester::request_blocks(self, io, peer_id, request, BlockSet::OldBlocks);
                                 return;
                             }
@@ -1418,7 +1417,8 @@ impl ChainSync {
             // if we got nothing to do, and the other peer is also at the same block, or is known to be just 1 behind, we are fetching unfetched pooled transactions.
             // there is some delay of the information what block they are on.
 
-            // communicate with this peer in any case if we are on the same block.
+            // communicate with this peer in any case if we are on the same block. 
+            // more about: https://github.com/DMDcoin/diamond-node/issues/173
             let communicate_with_peer = chain_info.best_block_hash == peer_latest;
 
             // on a distributed real network, 3 seconds is about they physical minimum.
@@ -1445,6 +1445,9 @@ impl ChainSync {
                 // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
                 let mut to_send = H256FastSet::default();
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
+
+                    // info: this check should do nothing, if everything is tracked correctly,
+                    
                     if peer.asking_pooled_transactions.is_empty() {
                         // todo: we might just request the same transactions from  multiple peers here, at the same time.
                         // we should keep track of how many replicas of a transaction we had requested.
