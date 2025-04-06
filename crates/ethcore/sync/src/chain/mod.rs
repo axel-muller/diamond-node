@@ -1417,7 +1417,7 @@ impl ChainSync {
             // if we got nothing to do, and the other peer is also at the same block, or is known to be just 1 behind, we are fetching unfetched pooled transactions.
             // there is some delay of the information what block they are on.
 
-            // communicate with this peer in any case if we are on the same block. 
+            // communicate with this peer in any case if we are on the same block.
             // more about: https://github.com/DMDcoin/diamond-node/issues/173
             let communicate_with_peer = chain_info.best_block_hash == peer_latest;
 
@@ -1445,9 +1445,8 @@ impl ChainSync {
                 // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
                 let mut to_send = H256FastSet::default();
                 if let Some(peer) = self.peers.get_mut(&peer_id) {
-
                     // info: this check should do nothing, if everything is tracked correctly,
-                    
+
                     if peer.asking_pooled_transactions.is_empty() {
                         // todo: we might just request the same transactions from  multiple peers here, at the same time.
                         // we should keep track of how many replicas of a transaction we had requested.
