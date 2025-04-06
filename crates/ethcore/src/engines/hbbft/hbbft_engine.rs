@@ -266,7 +266,7 @@ impl IoHandler<()> for TransitionHandler {
         // io.register_timer_once(ENGINE_DELAYED_UNITL_SYNCED_TOKEN, Duration::from_secs(10))
         //     .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_DELAYED_UNITL_SYNCED_TOKEN Timer failed: {}.", e));
 
-        io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(120))
+        io.register_timer(ENGINE_VALIDATOR_CANDIDATE_ACTIONS, Duration::from_secs(30))
             .unwrap_or_else(|e| warn!(target: "consensus", "ENGINE_VALIDATOR_CANDIDATE_ACTIONS Timer failed: {}.", e));
     }
 
@@ -539,6 +539,7 @@ impl HoneyBadgerBFT {
         if let Some(header) = client.create_pending_block_at(batch_txns, timestamp, batch.epoch) {
             let block_num = header.number();
             let hash = header.bare_hash();
+            // TODO: trace is missleading here: we already got the signature shares, we can already
             trace!(target: "consensus", "Sending signature share of {} for block {}", hash, block_num);
             let step = match self
                 .sealing

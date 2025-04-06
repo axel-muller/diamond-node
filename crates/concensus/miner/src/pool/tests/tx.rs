@@ -22,7 +22,7 @@ use types::transaction::{
     UnverifiedTransaction,
 };
 
-use pool::{verifier, VerifiedTransaction};
+use crate::pool::{verifier, VerifiedTransaction};
 
 #[derive(Clone)]
 pub struct Tx {

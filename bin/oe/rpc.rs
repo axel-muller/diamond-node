@@ -33,7 +33,7 @@ pub use parity_rpc::{HttpServer, IpcServer};
 //pub use parity_rpc::ws::Server as WsServer;
 pub use parity_rpc::ws::{ws, Server as WsServer};
 
-pub const DAPPS_DOMAIN: &'static str = "web3.site";
+pub const DAPPS_DOMAIN: &str = "web3.site";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HttpConfiguration {
@@ -195,8 +195,8 @@ pub fn new_ws<D: rpc_apis::Dependencies>(
         allowed_origins,
         allowed_hosts,
         conf.max_connections,
-        rpc::WsExtractor::new(path.clone()),
-        rpc::WsExtractor::new(path.clone()),
+        rpc::WsExtractor::new(path),
+        rpc::WsExtractor::new(path),
         rpc::WsStats::new(deps.stats.clone()),
         conf.max_payload,
     );
@@ -275,7 +275,7 @@ pub fn new_ipc<D: rpc_apis::Dependencies>(
     // Windows pipe paths are not on the FS.
     if !cfg!(windows) {
         if let Some(dir) = path.parent() {
-            ::std::fs::create_dir_all(&dir).map_err(|err| {
+            ::std::fs::create_dir_all(dir).map_err(|err| {
                 format!(
                     "Unable to create IPC directory at {}: {}",
                     dir.display(),
@@ -314,7 +314,7 @@ fn with_domain(
                     items.insert(host.to_string());
                     items.insert(host.replace("127.0.0.1", "localhost"));
                     items.insert(format!("http://*.{}", domain)); //proxypac
-                    if let Some(port) = extract_port(&*host) {
+                    if let Some(port) = extract_port(&host) {
                         items.insert(format!("http://*.{}:{}", domain, port));
                     }
                 }

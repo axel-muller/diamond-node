@@ -24,7 +24,7 @@ use ansi_term::Colour::White;
 use ethcore_logger::Config as LogConfig;
 use parity_rpc;
 
-pub const CODES_FILENAME: &'static str = "authcodes";
+pub const CODES_FILENAME: &str = "authcodes";
 
 pub struct NewToken {
     pub token: String,
@@ -91,7 +91,7 @@ fn generate_new_token(path: &Path, logger_config_color: bool) -> io::Result<Stri
         "New key code created: {}",
         match logger_config_color {
             true => format!("{}", White.bold().paint(&code[..])),
-            false => format!("{}", &code[..]),
+            false => code[..].to_string(),
         }
     );
     Ok(code)

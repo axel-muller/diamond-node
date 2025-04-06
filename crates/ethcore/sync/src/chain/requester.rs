@@ -17,6 +17,7 @@
 use block_sync::BlockRequest;
 use bytes::Bytes;
 use ethereum_types::H256;
+use fastmap::H256FastSet;
 use network::PeerId;
 use rlp::RlpStream;
 use std::time::Instant;
@@ -107,26 +108,27 @@ impl SyncRequester {
     }
 
     /// Request pooled transactions from a peer
+    /// @return number of bytes sent
     pub fn request_pooled_transactions(
         sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         peer_id: PeerId,
-        hashes: &[H256],
-    ) {
-        trace!(target: "sync", "{} <- GetPooledTransactions: {:?}", peer_id, hashes);
+        hashes: &H256FastSet,
+    ) -> usize {
+        info!(target: "sync", "{} <- GetPooledTransactions: {:?}", peer_id, hashes);
         let mut rlp = RlpStream::new_list(hashes.len());
         for h in hashes {
             rlp.append(h);
         }
 
-        SyncRequester::send_request(
+        return SyncRequester::send_request(
             sync,
             io,
             peer_id,
             PeerAsking::PooledTransactions,
             GetPooledTransactionsPacket,
             rlp.out(),
-        )
+        );
     }
 
     /// Find some headers or blocks to download for a peer.
@@ -238,7 +240,7 @@ impl SyncRequester {
         asking: PeerAsking,
         packet_id: SyncPacket,
         packet: Bytes,
-    ) {
+    ) -> usize {
         if let Some(ref mut peer) = sync.peers.get_mut(&peer_id) {
             if peer.asking != PeerAsking::Nothing {
                 warn!(target:"sync", "Asking {:?} while requesting {:?}", peer.asking, asking);
@@ -247,13 +249,16 @@ impl SyncRequester {
             peer.ask_time = Instant::now();
 
             let (packet, _) = generate_request_id(packet, peer, packet_id);
-
+            let packet_bytes = packet.len();
             let result = io.send(peer_id, packet_id, packet);
 
             if let Err(e) = result {
                 debug!(target:"sync", "Error sending request: {:?}", e);
                 io.disconnect_peer(peer_id);
+                return 0;
             }
+            return packet_bytes;
         }
+        return 0;
     }
 }

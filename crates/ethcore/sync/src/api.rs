@@ -318,12 +318,12 @@ impl SyncProvider for EthSync {
 
                         Some(PeerInfo {
                             id: session_info.id.map(|id| format!("{:x}", id)),
-                            client_version: session_info.client_version,
                             capabilities: session_info
-                                .peer_capabilities
-                                .into_iter()
+                                .peer_capabilities()
+                                .iter()
                                 .map(|c| c.to_string())
                                 .collect(),
+                            client_version: session_info.client_version,
                             remote_address: session_info.remote_address,
                             local_address: session_info.local_address,
                             eth_info: peer_info,
@@ -588,7 +588,7 @@ impl NetworkProtocolHandler for SyncProtocolHandler {
     fn disconnected(&self, io: &dyn NetworkContext, peer: &PeerId) {
         trace_time!("sync::disconnected");
         if io.is_reserved_peer(*peer) {
-            trace!(target: "sync", "Disconnected from reserved peer peerID: {} {}",peer,  io.session_info(*peer).expect("").id.map_or("".to_string(), |f| format!("{:?}", f)));
+            warn!(target: "sync", "Disconnected from reserved peer peerID: {} {}",peer,  io.session_info(*peer).expect("").id.map_or("".to_string(), |f| format!("{:?}", f)));
         }
         if io.subprotocol_name() != PAR_PROTOCOL {
             self.sync.write().on_peer_aborting(

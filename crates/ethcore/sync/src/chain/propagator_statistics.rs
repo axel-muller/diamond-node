@@ -23,6 +23,9 @@ pub struct SyncPropagatorStatistics {
     transaction_hashes_propagated: i64,
     transaction_hashes_propagated_bytes: i64,
 
+    responded_transactions_bytes: i64,
+    responded_transactions: i64,
+
     node_statistics: HashMap<String, SyncPropagatorNodeStatistics>,
 }
 
@@ -103,6 +106,17 @@ impl SyncPropagatorStatistics {
             self.transactions_propagated_bytes += size as i64;
         }
     }
+
+    pub(crate) fn log_requested_transactions_response(
+        &mut self,
+        num_txs: usize,
+        bytes_sent: usize,
+    ) {
+        if self.logging_enabled {
+            self.responded_transactions_bytes += bytes_sent as i64;
+            self.responded_transactions += num_txs as i64;
+        }
+    }
 }
 
 impl PrometheusMetrics for SyncPropagatorStatistics {
@@ -164,6 +178,18 @@ impl PrometheusMetrics for SyncPropagatorStatistics {
             "p2p_propagated_hashes_bytes",
             "transaction hashes propagated (byte size)",
             self.transaction_hashes_propagated_bytes,
+        );
+
+        registry.register_counter(
+            "p2p_responded_transactions",
+            "number of responded transactions",
+            self.responded_transactions,
+        );
+
+        registry.register_counter(
+            "p2p_responded_transactions_bytes",
+            "bytes of responded transactions",
+            self.responded_transactions_bytes,
         );
 
         self.node_statistics

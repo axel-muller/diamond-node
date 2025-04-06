@@ -18,9 +18,9 @@
 
 use std::{fmt, sync::Arc};
 
+use crate::pool::{ScoredTransaction, VerifiedTransaction as Transaction};
 use ethereum_types::H256;
 use linked_hash_map::LinkedHashMap;
-use pool::{ScoredTransaction, VerifiedTransaction as Transaction};
 use txpool::{self, VerifiedTransaction};
 
 /// Status of local transaction.
@@ -259,7 +259,7 @@ mod tests {
     use txpool::Listener;
     use types::transaction;
 
-    use pool;
+    use crate::pool;
 
     #[test]
     fn should_add_transaction_as_pending() {

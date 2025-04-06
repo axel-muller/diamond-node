@@ -206,7 +206,7 @@ impl<C, S, V> Verifier<C, S, V> {
 }
 
 impl<C: Client> txpool::Verifier<Transaction>
-    for Verifier<C, ::pool::scoring::NonceAndGasPrice, VerifiedTransaction>
+    for Verifier<C, crate::pool::scoring::NonceAndGasPrice, VerifiedTransaction>
 {
     type Error = transaction::Error;
     type VerifiedTransaction = VerifiedTransaction;

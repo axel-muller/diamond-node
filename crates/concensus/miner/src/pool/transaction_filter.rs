@@ -20,7 +20,7 @@
 
 use ethereum_types::{Address, U256};
 
-use pool::VerifiedTransaction;
+use crate::pool::VerifiedTransaction;
 use types::transaction::Action;
 
 #[allow(non_camel_case_types)]

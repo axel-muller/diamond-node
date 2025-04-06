@@ -115,6 +115,7 @@ fn to_toml(
     base_port: u16,
     base_rpc_port: u16,
     base_ws_port: u16,
+    logging: Option<&str>,
 ) -> Value {
     let mut parity = Map::new();
 
@@ -258,7 +259,10 @@ fn to_toml(
     // Value::String("txqueue=trace,consensus=debug,engine=trace,own_tx=trace,miner=trace,tx_filter=trace".into())
     misc.insert(
         "logging".into(),
-        Value::String("txqueue=info,consensus=debug,engine=debug,tx_own=trace".into()),
+        Value::String(
+            logging.unwrap_or("txqueue=trace,consensus=debug,engine=debug,own_tx=trace,tx_filter=trace,sync=trace")
+                .into(),
+        ),
     );
     misc.insert("log_file".into(), Value::String("diamond-node.log".into()));
 
@@ -414,6 +418,12 @@ fn main() {
                 .required(false)
                 .default_value("9540")
                 .takes_value(true),
+        ).arg(
+            Arg::with_name("logging")
+                .long("log definition string")
+                .help("example: txqueue=trace,consensus=debug,engine=debug,own_tx=trace,tx_filter=trace,sync=trace")
+                .required(false)
+                .takes_value(true),
         )
         .get_matches();
 
@@ -476,6 +486,8 @@ fn main() {
     std::println!("metrics_port_base: {:?}", metrics_port_base);
 
     let metrics_interface = matches.value_of("metrics_interface");
+
+    let logging_string = matches.value_of("logging");
 
     assert!(
         num_nodes_total >= num_nodes_validators,
@@ -542,6 +554,7 @@ fn main() {
             port_base,
             port_base_rpc.unwrap(),
             port_base_ws.unwrap(),
+            logging_string,
         ))
         .expect("TOML string generation should succeed");
         fs::write(file_name, toml_string).expect("Unable to write config file");
@@ -583,6 +596,7 @@ fn main() {
         port_base,
         port_base_rpc.unwrap(),
         port_base_ws.unwrap(),
+        logging_string,
     ))
     .expect("TOML string generation should succeed");
     fs::write("rpc_node.toml", rpc_string).expect("Unable to write rpc config file");

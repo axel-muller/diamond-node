@@ -9,6 +9,7 @@ authors = [
 	"OpenEthereum developers",
 	"Parity Technologies <admin@parity.io>"
 ]
+edition = "2015"
 
 [dependencies]
 blooms-db = { path = "crates/db/blooms-db" }
@@ -111,6 +112,7 @@ deadlock_detection = ["parking_lot/deadlock_detection"]
 # `valgrind --tool=massif /path/to/parity <parity params>`
 # and `massif-visualizer` for visualization
 memory_profiling = []
+secretstore = []
 
 [lib]
 path = "bin/oe/lib.rs"

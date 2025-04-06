@@ -35,7 +35,7 @@ use ethcore::{
     spec::Spec,
 };
 
-use Error;
+use crate::Error;
 
 /// Client service setup. Creates and registers client and network services with the IO subsystem.
 pub struct ClientService {

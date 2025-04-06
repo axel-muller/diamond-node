@@ -436,8 +436,8 @@ fn execute_export_state(cmd: ExportState) -> Result<(), String> {
             let balance = client
                 .balance(&account, at.into())
                 .unwrap_or_else(U256::zero);
-            if cmd.min_balance.map_or(false, |m| balance < m)
-                || cmd.max_balance.map_or(false, |m| balance > m)
+            if cmd.min_balance.is_some_and(|m| balance < m)
+                || cmd.max_balance.is_some_and(|m| balance > m)
             {
                 last = Some(account);
                 continue; //filtered out

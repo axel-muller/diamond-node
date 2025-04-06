@@ -418,6 +418,7 @@ impl EthereumMachine {
     ) -> Result<(), transaction::Error> {
         if let Some(ref filter) = self.tx_filter.as_ref() {
             if !filter.transaction_allowed(&parent.hash(), parent.number() + 1, t, client) {
+                trace!(target: "txqueue", "transaction {} not allowed by filter", t.hash);
                 return Err(transaction::Error::NotAllowed.into());
             }
         }

@@ -108,7 +108,7 @@ pub fn open_database(
     fs::create_dir_all(&blooms_path)?;
     fs::create_dir_all(&trace_blooms_path)?;
 
-    let db = Database::open(&config, client_path)?;
+    let db = Database::open(config, client_path)?;
     let db_with_metrics = ethcore_db::DatabaseWithMetrics::new(db);
 
     let db = AppDB {

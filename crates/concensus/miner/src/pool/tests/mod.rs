@@ -19,7 +19,7 @@ use hash::KECCAK_EMPTY;
 use txpool;
 use types::transaction::{self, PendingTransaction};
 
-use pool::{
+use crate::pool::{
     transaction_filter::TransactionFilter, verifier, PendingOrdering, PendingSettings,
     PrioritizationStrategy, TransactionQueue,
 };

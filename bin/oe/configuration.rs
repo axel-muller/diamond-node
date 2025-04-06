@@ -24,7 +24,7 @@ use crate::{
 };
 use ansi_term::Colour;
 
-use crypto::publickey::{Public, Secret};
+use crate::crypto::publickey::{Public, Secret};
 use ethcore::{
     client::VMType,
     miner::{stratum, MinerOptions},
@@ -146,7 +146,7 @@ impl Configuration {
         let mode = match self.args.arg_mode.as_ref() {
             "last" => None,
             mode => Some(to_mode(
-                &mode,
+                mode,
                 self.args.arg_mode_timeout,
                 self.args.arg_mode_alarm,
             )?),
@@ -168,7 +168,7 @@ impl Configuration {
         let format = self.format()?;
         let metrics_conf = self.metrics_config()?;
         let keys_iterations = NonZeroU32::new(self.args.arg_keys_iterations)
-            .ok_or_else(|| "--keys-iterations must be non-zero")?;
+            .ok_or("--keys-iterations must be non-zero")?;
 
         let cmd = if self.args.flag_version {
             Cmd::Version
@@ -182,23 +182,23 @@ impl Configuration {
                     .accounts_config()?
                     .password_files
                     .first()
-                    .map(|pwfile| PathBuf::from(pwfile));
+                    .map(PathBuf::from);
                 Cmd::SignerSign {
                     id: self.args.arg_signer_sign_id,
-                    pwfile: pwfile,
+                    pwfile,
                     port: ws_conf.port,
-                    authfile: authfile,
+                    authfile,
                 }
             } else if self.args.cmd_signer_reject {
                 Cmd::SignerReject {
                     id: self.args.arg_signer_reject_id,
                     port: ws_conf.port,
-                    authfile: authfile,
+                    authfile,
                 }
             } else if self.args.cmd_signer_list {
                 Cmd::SignerList {
                     port: ws_conf.port,
-                    authfile: authfile,
+                    authfile,
                 }
             } else {
                 unreachable!();
@@ -220,16 +220,16 @@ impl Configuration {
             }))
         } else if self.args.cmd_db && self.args.cmd_db_kill {
             Cmd::Blockchain(BlockchainCmd::Kill(KillBlockchain {
-                spec: spec,
-                dirs: dirs,
-                pruning: pruning,
+                spec,
+                dirs,
+                pruning,
             }))
         } else if self.args.cmd_account {
             let account_cmd = if self.args.cmd_account_new {
                 let new_acc = NewAccount {
                     iterations: keys_iterations,
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                     password_file: self
                         .accounts_config()?
                         .password_files
@@ -240,7 +240,7 @@ impl Configuration {
             } else if self.args.cmd_account_list {
                 let list_acc = ListAccounts {
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                 };
                 AccountCmd::List(list_acc)
             } else if self.args.cmd_account_import {
@@ -251,7 +251,7 @@ impl Configuration {
                         .expect("CLI argument is required; qed")
                         .clone(),
                     to: dirs.keys,
-                    spec: spec,
+                    spec,
                 };
                 AccountCmd::Import(import_acc)
             } else {
@@ -262,7 +262,7 @@ impl Configuration {
             let presale_cmd = ImportWallet {
                 iterations: keys_iterations,
                 path: dirs.keys,
-                spec: spec,
+                spec,
                 wallet_path: self.args.arg_wallet_import_path.clone().unwrap(),
                 password_file: self
                     .accounts_config()?
@@ -273,18 +273,18 @@ impl Configuration {
             Cmd::ImportPresaleWallet(presale_cmd)
         } else if self.args.cmd_import {
             let import_cmd = ImportBlockchain {
-                spec: spec,
-                cache_config: cache_config,
-                dirs: dirs,
+                spec,
+                cache_config,
+                dirs,
                 file_path: self.args.arg_import_file.clone(),
-                format: format,
-                pruning: pruning,
-                pruning_history: pruning_history,
+                format,
+                pruning,
+                pruning_history,
                 pruning_memory: self.args.arg_pruning_memory,
-                compaction: compaction,
-                tracing: tracing,
-                fat_db: fat_db,
-                vm_type: vm_type,
+                compaction,
+                tracing,
+                fat_db,
+                vm_type,
                 check_seal: !self.args.flag_no_seal_check,
                 with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
@@ -294,17 +294,17 @@ impl Configuration {
         } else if self.args.cmd_export {
             if self.args.cmd_export_blocks {
                 let export_cmd = ExportBlockchain {
-                    spec: spec,
-                    cache_config: cache_config,
-                    dirs: dirs,
+                    spec,
+                    cache_config,
+                    dirs,
                     file_path: self.args.arg_export_blocks_file.clone(),
-                    format: format,
-                    pruning: pruning,
-                    pruning_history: pruning_history,
+                    format,
+                    pruning,
+                    pruning_history,
                     pruning_memory: self.args.arg_pruning_memory,
-                    compaction: compaction,
-                    tracing: tracing,
-                    fat_db: fat_db,
+                    compaction,
+                    tracing,
+                    fat_db,
                     from_block: to_block_id(&self.args.arg_export_blocks_from)?,
                     to_block: to_block_id(&self.args.arg_export_blocks_to)?,
                     check_seal: !self.args.flag_no_seal_check,
@@ -313,17 +313,17 @@ impl Configuration {
                 Cmd::Blockchain(BlockchainCmd::Export(export_cmd))
             } else if self.args.cmd_export_state {
                 let export_cmd = ExportState {
-                    spec: spec,
-                    cache_config: cache_config,
-                    dirs: dirs,
+                    spec,
+                    cache_config,
+                    dirs,
                     file_path: self.args.arg_export_state_file.clone(),
-                    format: format,
-                    pruning: pruning,
-                    pruning_history: pruning_history,
+                    format,
+                    pruning,
+                    pruning_history,
                     pruning_memory: self.args.arg_pruning_memory,
-                    compaction: compaction,
-                    tracing: tracing,
-                    fat_db: fat_db,
+                    compaction,
+                    tracing,
+                    fat_db,
                     at: to_block_id(&self.args.arg_export_state_at)?,
                     storage: !self.args.flag_export_state_no_storage,
                     code: !self.args.flag_export_state_no_code,
@@ -343,38 +343,38 @@ impl Configuration {
             }
         } else if self.args.cmd_snapshot {
             let snapshot_cmd = SnapshotCommand {
-                cache_config: cache_config,
-                dirs: dirs,
-                spec: spec,
-                pruning: pruning,
-                pruning_history: pruning_history,
+                cache_config,
+                dirs,
+                spec,
+                pruning,
+                pruning_history,
                 pruning_memory: self.args.arg_pruning_memory,
-                tracing: tracing,
-                fat_db: fat_db,
-                compaction: compaction,
+                tracing,
+                fat_db,
+                compaction,
                 file_path: self.args.arg_snapshot_file.clone(),
                 kind: snapshot::Kind::Take,
                 block_at: to_block_id(&self.args.arg_snapshot_at)?,
                 max_round_blocks_to_import: self.args.arg_max_round_blocks_to_import,
-                snapshot_conf: snapshot_conf,
+                snapshot_conf,
             };
             Cmd::Snapshot(snapshot_cmd)
         } else if self.args.cmd_restore {
             let restore_cmd = SnapshotCommand {
-                cache_config: cache_config,
-                dirs: dirs,
-                spec: spec,
-                pruning: pruning,
-                pruning_history: pruning_history,
+                cache_config,
+                dirs,
+                spec,
+                pruning,
+                pruning_history,
                 pruning_memory: self.args.arg_pruning_memory,
-                tracing: tracing,
-                fat_db: fat_db,
-                compaction: compaction,
+                tracing,
+                fat_db,
+                compaction,
                 file_path: self.args.arg_restore_file.clone(),
                 kind: snapshot::Kind::Restore,
                 block_at: to_block_id("latest")?, // unimportant.
                 max_round_blocks_to_import: self.args.arg_max_round_blocks_to_import,
-                snapshot_conf: snapshot_conf,
+                snapshot_conf,
             };
             Cmd::Snapshot(restore_cmd)
         } else {
@@ -392,44 +392,44 @@ impl Configuration {
             let verifier_settings = self.verifier_settings();
 
             let run_cmd = RunCmd {
-                cache_config: cache_config,
-                dirs: dirs,
-                spec: spec,
-                pruning: pruning,
-                pruning_history: pruning_history,
+                cache_config,
+                dirs,
+                spec,
+                pruning,
+                pruning_history,
                 pruning_memory: self.args.arg_pruning_memory,
-                daemon: daemon,
+                daemon,
                 logger_config: logger_config.clone(),
                 miner_options: self.miner_options()?,
                 gas_price_percentile: self.args.arg_gas_price_percentile,
                 poll_lifetime: self.args.arg_poll_lifetime,
-                ws_conf: ws_conf,
-                snapshot_conf: snapshot_conf,
-                http_conf: http_conf,
-                ipc_conf: ipc_conf,
-                net_conf: net_conf,
-                network_id: network_id,
+                ws_conf,
+                snapshot_conf,
+                http_conf,
+                ipc_conf,
+                net_conf,
+                network_id,
                 acc_conf: self.accounts_config()?,
                 gas_pricer_conf: self.gas_pricer_config()?,
                 miner_extras: self.miner_extras()?,
                 stratum: self.stratum_options()?,
                 allow_missing_blocks: self.args.flag_jsonrpc_allow_missing_blocks,
-                mode: mode,
-                tracing: tracing,
-                fat_db: fat_db,
-                compaction: compaction,
-                vm_type: vm_type,
-                warp_sync: warp_sync,
+                mode,
+                tracing,
+                fat_db,
+                compaction,
+                vm_type,
+                warp_sync,
                 warp_barrier: self.args.arg_warp_barrier,
                 experimental_rpcs,
                 net_settings: self.network_settings()?,
-                secretstore_conf: secretstore_conf,
+                secretstore_conf,
                 name: self.args.arg_identity,
                 custom_bootnodes: self.args.arg_bootnodes.is_some(),
                 check_seal: !self.args.flag_no_seal_check,
                 download_old_blocks: !self.args.flag_no_ancient_blocks,
                 new_transactions_stats_period: self.args.arg_new_transactions_stats_period,
-                verifier_settings: verifier_settings,
+                verifier_settings,
                 no_persistent_txqueue: self.args.flag_no_persistent_txqueue,
                 max_round_blocks_to_import: self.args.arg_max_round_blocks_to_import,
                 metrics_conf,
@@ -440,7 +440,7 @@ impl Configuration {
 
         Ok(Execute {
             logger: logger_config,
-            cmd: cmd,
+            cmd,
         })
     }
 
@@ -457,9 +457,7 @@ impl Configuration {
             gas_range_target: (floor, ceil),
             engine_signer: self.engine_signer()?,
             work_notify: self.work_notify(),
-            local_accounts: HashSet::from_iter(
-                to_addresses(&self.args.arg_tx_queue_locals)?.into_iter(),
-            ),
+            local_accounts: HashSet::from_iter(to_addresses(&self.args.arg_tx_queue_locals)?),
         };
 
         Ok(extras)
@@ -512,7 +510,7 @@ impl Configuration {
     }
 
     fn chain(&self) -> Result<SpecType, String> {
-        Ok(self.args.arg_chain.parse()?)
+        self.args.arg_chain.parse()
     }
 
     fn is_dev_chain(&self) -> Result<bool, String> {
@@ -555,7 +553,7 @@ impl Configuration {
 
     fn accounts_config(&self) -> Result<AccountsConfig, String> {
         let keys_iterations = NonZeroU32::new(self.args.arg_keys_iterations)
-            .ok_or_else(|| "--keys-iterations must be non-zero")?;
+            .ok_or("--keys-iterations must be non-zero")?;
         let cfg = AccountsConfig {
             iterations: keys_iterations,
             refresh_time: self.args.arg_accounts_refresh,
@@ -700,7 +698,7 @@ impl Configuration {
 
         if "auto" == self.args.arg_usd_per_eth {
             Ok(GasPricerConfig::Calibrated {
-                usd_per_tx: usd_per_tx,
+                usd_per_tx,
                 recalibration_period: to_duration(self.args.arg_price_update_period.as_str())?,
                 api_endpoint: ETHERSCAN_ETH_PRICE_ENDPOINT.to_string(),
             })
@@ -718,7 +716,7 @@ impl Configuration {
             Ok(GasPricerConfig::Fixed(wei_per_gas))
         } else {
             Ok(GasPricerConfig::Calibrated {
-                usd_per_tx: usd_per_tx,
+                usd_per_tx,
                 recalibration_period: to_duration(self.args.arg_price_update_period.as_str())?,
                 api_endpoint: self.args.arg_usd_per_eth.clone(),
             })
@@ -936,7 +934,7 @@ impl Configuration {
             },
             processing_threads: self.args.arg_jsonrpc_threads,
             max_payload: match self.args.arg_jsonrpc_max_payload {
-                Some(max) if max > 0 => max as usize,
+                Some(max) if max > 0 => max,
                 _ => 5usize,
             },
             keep_alive: !self.args.flag_jsonrpc_no_keep_alive,
@@ -1008,7 +1006,7 @@ impl Configuration {
             .args
             .arg_base_path
             .as_ref()
-            .map_or_else(|| default_data_path(), |s| s.clone());
+            .map_or_else(default_data_path, |s| s.clone());
         let data_path = replace_home("", &base_path);
         let is_using_base_path = self.args.arg_base_path.is_some();
         // If base_path is set and db_path is not we default to base path subdir instead of LOCAL.
@@ -1018,7 +1016,7 @@ impl Configuration {
             self.args
                 .arg_db_path
                 .as_ref()
-                .map_or(dir::CHAINS_PATH, |s| &s)
+                .map_or(dir::CHAINS_PATH, |s| s)
         };
         let cache_path = if is_using_base_path {
             "$BASE/cache"
@@ -1026,7 +1024,7 @@ impl Configuration {
             dir::CACHE_PATH
         };
 
-        let db_path = replace_home_and_local(&data_path, &local_path, &base_db_path);
+        let db_path = replace_home_and_local(&data_path, &local_path, base_db_path);
         let cache_path = replace_home_and_local(&data_path, &local_path, cache_path);
         let keys_path = replace_home(&data_path, &self.args.arg_keys_path);
         let secretstore_path = replace_home(&data_path, &self.args.arg_secretstore_path);
@@ -1090,7 +1088,7 @@ impl Configuration {
 			#[cfg(feature = "accounts")]
 			Some(ref s) if s.len() == 40 => Ok(Some(NodeSecretKey::KeyStore(s.parse()
 				.map_err(|e| format!("Invalid secret store secret address: {}. Error: {:?}", s, e))?))),
-			Some(_) => Err(format!("Invalid secret store secret. Must be either existing account address, or hex-encoded private key")),
+			Some(_) => Err("Invalid secret store secret. Must be either existing account address, or hex-encoded private key".to_string()),
 			None => Ok(None),
 		}
     }
@@ -1282,9 +1280,6 @@ mod tests {
     lazy_static! {
         static ref ITERATIONS: NonZeroU32 = NonZeroU32::new(10240).expect("10240 > 0; qed");
     }
-
-    #[derive(Debug, PartialEq)]
-    struct TestPasswordReader(&'static str);
 
     fn parse(args: &[&str]) -> Configuration {
         Configuration {
@@ -1721,10 +1716,10 @@ mod tests {
             Cmd::Run(c) => {
                 assert_eq!(c.net_conf.min_peers, 50);
                 assert_eq!(c.net_conf.max_peers, 100);
-                assert_eq!(c.ipc_conf.enabled, false);
-                assert_eq!(c.miner_options.force_sealing, true);
-                assert_eq!(c.miner_options.reseal_on_external_tx, true);
-                assert_eq!(c.miner_options.reseal_on_own_tx, true);
+                assert!(!c.ipc_conf.enabled);
+                assert!(c.miner_options.force_sealing);
+                assert!(c.miner_options.reseal_on_external_tx);
+                assert!(c.miner_options.reseal_on_own_tx);
                 assert_eq!(
                     c.miner_options.reseal_min_period,
                     Duration::from_millis(4000)

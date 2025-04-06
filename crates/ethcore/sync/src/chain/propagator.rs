@@ -34,7 +34,7 @@ use crate::chain::propagator_statistics::SyncPropagatorStatistics;
 use super::sync_packet::SyncPacket::{self, *};
 
 use super::{
-    random, ChainSync, ETH_PROTOCOL_VERSION_65, MAX_PEERS_PROPAGATION, MAX_PEER_LAG_PROPAGATION,
+    random, ChainSync, MAX_PEERS_PROPAGATION, MAX_PEER_LAG_PROPAGATION,
     MAX_TRANSACTION_PACKET_SIZE, MIN_PEERS_PROPAGATION,
 };
 use ethcore_miner::pool::VerifiedTransaction;
@@ -170,15 +170,6 @@ impl ChainSync {
             .iter()
             .map(|tx| tx.hash())
             .collect::<H256FastSet>();
-        let all_transactions_rlp = {
-            let mut packet = RlpStream::new_list(transactions.len());
-            for tx in &transactions {
-                tx.rlp_append(&mut packet);
-            }
-            packet.out()
-        };
-        let all_transactions_hashes_rlp =
-            rlp::encode_list(&all_transactions_hashes.iter().copied().collect::<Vec<_>>());
 
         let block_number = io.chain().chain_info().best_block_number;
 
@@ -189,6 +180,10 @@ impl ChainSync {
             self.transactions_stats
                 .retain_pending(&all_transactions_hashes);
         }
+
+        info!(target: "sync", "Propagating {} transactions to {} peers", transactions.len(), peers.len());
+
+        info!(target: "sync", "Propagating {:?}", all_transactions_hashes);
 
         let send_packet = |io: &mut dyn SyncIo,
                            stats: &mut SyncPropagatorStatistics,
@@ -231,22 +226,35 @@ impl ChainSync {
             let peer_info = self.peers.get_mut(&peer_id)
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
-            let is_hashes = peer_info.protocol_version >= ETH_PROTOCOL_VERSION_65.0;
+            warn!(target: "sync", "peer_info.protocol_version: {:?}", peer_info.protocol_version);
+
+            let mut id: Option<ethereum_types::H512> = None;
+            let mut is_hashes = false;
+
+            if let Some(session_info) = io.peer_session_info(peer_id) {
+                is_hashes = session_info.is_pooled_transactions_capable();
+                id = session_info.id;
+            }
 
             // Send all transactions, if the peer doesn't know about anything
             if peer_info.last_sent_transactions.is_empty() {
                 // update stats
                 for hash in &all_transactions_hashes {
-                    let id = io.peer_session_info(peer_id).and_then(|info| info.id);
                     stats.propagated(hash, are_new, id, block_number);
                 }
                 peer_info.last_sent_transactions = all_transactions_hashes.clone();
 
                 let rlp = {
                     if is_hashes {
-                        all_transactions_hashes_rlp.clone()
+                        rlp::encode_list(
+                            &all_transactions_hashes.iter().copied().collect::<Vec<_>>(),
+                        )
                     } else {
-                        all_transactions_rlp.clone()
+                        let mut packet = RlpStream::new_list(transactions.len());
+                        for tx in &transactions {
+                            tx.rlp_append(&mut packet);
+                        }
+                        packet.out()
                     }
                 };
                 send_packet(
@@ -303,7 +311,6 @@ impl ChainSync {
             };
 
             // Update stats.
-            let id = io.peer_session_info(peer_id).and_then(|info| info.id);
             for hash in &to_send {
                 stats.propagated(hash, are_new, id, block_number);
             }
@@ -428,11 +435,6 @@ impl ChainSync {
         packet_id: SyncPacket,
         packet: Bytes,
     ) {
-        // if let Some(session) = sync.peer_session_info(peer_id) {
-
-        //     session.remote_address
-        // }
-
         if let Err(e) = sync.send(peer_id, packet_id, packet) {
             debug!(target:"sync", "Error sending packet: {:?}", e);
             sync.disconnect_peer(peer_id);
@@ -771,8 +773,14 @@ mod tests {
         assert_eq!(1, io.packets.len());
         // 1 peer should receive the message
         assert_eq!(1, peer_count);
+
+        // depending on ETH_PROTOCOL_VERSION_65.0, it sends here either TRANSACTION_PACK or NewPooledTransactionHashesPacket
+        // as for diamond Node
         // TRANSACTIONS_PACKET
-        assert_eq!(0x02, io.packets[0].packet_id);
+        assert!(
+            io.packets[0].packet_id == SyncPacket::NewPooledTransactionHashesPacket as u8
+                || io.packets[0].packet_id == SyncPacket::TransactionsPacket as u8
+        );
     }
 
     #[test]

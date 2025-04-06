@@ -37,7 +37,7 @@ use crate::{
     },
     reserved_peer_management::ReservedPeersWrapper,
     rpc, rpc_apis, secretstore, signer,
-    sync::{self, SyncConfig, SyncProvider},
+    sync::{self, SyncConfig, SyncProvider, SyncState},
     user_defaults::UserDefaults,
 };
 use ansi_term::Colour;
@@ -59,7 +59,6 @@ use node_filter::NodeFilter;
 use parity_rpc::{informant, is_major_importing, NetworkSettings};
 use parity_runtime::Runtime;
 use parity_version::version;
-use sync::SyncState;
 
 // How often we attempt to take a snapshot: only snapshot on blocknumbers that are multiples of this.
 const SNAPSHOT_PERIOD: u64 = 20000;
@@ -165,9 +164,7 @@ impl ChainSyncing for SyncProviderWrapper {
     /// are we syncing in any means ?
     fn is_syncing(&self) -> bool {
         match self.sync_provider.upgrade() {
-            Some(sync_arc) => {
-                return sync_arc.status().state != SyncState::Idle;
-            }
+            Some(sync_arc) => sync_arc.status().state != SyncState::Idle,
             // We also indicate the "syncing" state when the SyncProvider has already been destroyed.
             None => true,
         }
@@ -227,7 +224,7 @@ pub fn execute(
 
     // create dirs used by parity
     cmd.dirs.create_dirs(
-        cmd.acc_conf.unlocked_accounts.len() == 0,
+        cmd.acc_conf.unlocked_accounts.is_empty(),
         cmd.secretstore_conf.enabled,
     )?;
 
@@ -486,7 +483,7 @@ pub fn execute(
     let (sync_provider, manage_network, chain_notify, priority_tasks, new_transaction_hashes) =
         modules::sync(
             sync_config,
-            net_conf.clone().into(),
+            net_conf.clone(),
             client.clone(),
             forks,
             snapshot_service.clone(),
@@ -519,7 +516,7 @@ pub fn execute(
         {
             for hash in hashes {
                 new_transaction_hashes
-                    .send(hash.clone())
+                    .send(*hash)
                     .expect("new_transaction_hashes receiving side is disconnected");
             }
             let task =
@@ -540,7 +537,7 @@ pub fn execute(
     let signer_service = Arc::new(signer::new_service(&cmd.ws_conf, &cmd.logger_config));
 
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
-        signer_service: signer_service,
+        signer_service,
         snapshot: snapshot_service.clone(),
         client: client.clone(),
         sync: sync_provider.clone(),

@@ -89,6 +89,7 @@
 
 pub mod fork_filter;
 mod handler;
+mod pooled_transactions_overview;
 mod propagator;
 mod propagator_statistics;
 pub mod request_id;
@@ -97,7 +98,10 @@ mod supplier;
 pub mod sync_packet;
 
 pub use self::fork_filter::ForkFilterApi;
-use self::propagator_statistics::SyncPropagatorStatistics;
+use self::{
+    pooled_transactions_overview::PooledTransactionOverview,
+    propagator_statistics::SyncPropagatorStatistics,
+};
 use super::{SyncConfig, WarpSync};
 use api::{EthProtocolInfo as PeerInfoDigest, PriorityTask, ETH_PROTOCOL, PAR_PROTOCOL};
 use block_sync::{BlockDownloader, DownloadAction};
@@ -124,7 +128,7 @@ use std::{
 };
 use sync_io::SyncIo;
 use transactions_stats::{Stats as TransactionStats, TransactionsStats};
-use types::{transaction::UnverifiedTransaction, BlockNumber};
+use types::{block_status, transaction::UnverifiedTransaction, BlockNumber};
 
 use self::{
     handler::SyncHandler,
@@ -352,7 +356,7 @@ pub struct PeerInfo {
     /// Hashes of transactions to be requested.
     unfetched_pooled_transactions: H256FastSet,
     /// Hashes of the transactions we're requesting.
-    asking_pooled_transactions: Vec<H256>,
+    asking_pooled_transactions: H256FastSet,
     /// Holds requested snapshot chunk hash if any.
     asking_snapshot_data: Option<H256>,
     /// Request timestamp
@@ -737,6 +741,8 @@ pub struct ChainSync {
     new_transactions_stats_period: BlockNumber,
     /// Statistics of sync propagation
     statistics: SyncPropagatorStatistics,
+    /// memorizing currently pooled transaction to reduce the number of pooled transaction requests.
+    asking_pooled_transaction_overview: PooledTransactionOverview,
 }
 
 #[derive(Debug, Default)]
@@ -748,13 +754,13 @@ struct GetPooledTransactionsReport {
 
 impl GetPooledTransactionsReport {
     fn generate(
-        mut asked: Vec<H256>,
+        mut asked: H256FastSet,
         received: impl IntoIterator<Item = H256>,
     ) -> Result<Self, H256> {
         let mut out = GetPooledTransactionsReport::default();
 
         let asked_set = asked.iter().copied().collect::<H256FastSet>();
-        let mut asked_iter = asked.drain(std::ops::RangeFull);
+        let mut asked_iter = asked.drain();
         let mut txs = received.into_iter();
         let mut next_received: Option<H256> = None;
         loop {
@@ -827,6 +833,7 @@ impl ChainSync {
             eip1559_transition: config.eip1559_transition,
             new_transactions_stats_period: config.new_transactions_stats_period,
             statistics: SyncPropagatorStatistics::new(),
+            asking_pooled_transaction_overview: PooledTransactionOverview::new(),
         };
         sync.update_targets(chain);
         sync
@@ -925,6 +932,9 @@ impl ChainSync {
 
     /// Updates transactions were received by a peer
     pub fn transactions_received(&mut self, txs: &[UnverifiedTransaction], peer_id: PeerId) {
+        info!(target: "sync", "Received {} transactions from peer {}", txs.len(), peer_id);
+        info!(target: "sync", "Received {:?}", txs.iter().map(|t| t.hash).map(|t| t.0).collect::<Vec<_>>());
+
         // Remove imported txs from all request queues
         let imported = txs.iter().map(|tx| tx.hash()).collect::<H256FastSet>();
         for (pid, peer_info) in &mut self.peers {
@@ -935,7 +945,10 @@ impl ChainSync {
                 .collect();
             if *pid == peer_id {
                 match GetPooledTransactionsReport::generate(
-                    std::mem::replace(&mut peer_info.asking_pooled_transactions, Vec::new()),
+                    std::mem::replace(
+                        &mut peer_info.asking_pooled_transactions,
+                        H256FastSet::default(),
+                    ),
                     txs.iter().map(UnverifiedTransaction::hash),
                 ) {
                     Ok(report) => {
@@ -947,8 +960,9 @@ impl ChainSync {
                             .copied()
                             .collect();
                     }
-                    Err(_unknown_tx) => {
+                    Err(unknown_tx) => {
                         // punish peer?
+                        warn!(target: "sync", "Peer {} sent unknown transaction {}", peer_id, unknown_tx);
                     }
                 }
 
@@ -993,6 +1007,7 @@ impl ChainSync {
         // Reactivate peers only if some progress has been made
         // since the last sync round of if starting fresh.
         self.active_peers = self.peers.keys().cloned().collect();
+        info!("resetting sync state to {:?}", self.state);
     }
 
     /// Add a request for later processing
@@ -1232,6 +1247,10 @@ impl ChainSync {
 
     /// Find something to do for a peer. Called for a new peer or when a peer is done with its task.
     fn sync_peer(&mut self, io: &mut dyn SyncIo, peer_id: PeerId, force: bool) {
+        info!(
+            "sync_peer: {} force {} state: {:?}",
+            peer_id, force, self.state
+        );
         if !self.active_peers.contains(&peer_id) {
             trace!(target: "sync", "Skipping deactivated peer {}", peer_id);
             return;
@@ -1239,7 +1258,7 @@ impl ChainSync {
         let (peer_latest, peer_difficulty, peer_snapshot_number, peer_snapshot_hash) = {
             if let Some(peer) = self.peers.get_mut(&peer_id) {
                 if peer.asking != PeerAsking::Nothing || !peer.can_sync() {
-                    trace!(target: "sync", "Skipping busy peer {}", peer_id);
+                    debug!(target: "sync", "Skipping busy peer {} asking: {:?}", peer_id, peer.asking);
                     return;
                 }
                 (
@@ -1249,11 +1268,13 @@ impl ChainSync {
                     peer.snapshot_hash.as_ref().cloned(),
                 )
             } else {
+                info!(target: "sync", "peer info not found for {}", peer_id);
                 return;
             }
         };
         let chain_info = io.chain().chain_info();
         let syncing_difficulty = chain_info.pending_total_difficulty;
+
         let num_active_peers = self
             .peers
             .values()
@@ -1316,6 +1337,7 @@ impl ChainSync {
 					self.maybe_start_snapshot_sync(io);
 				},
 				SyncState::Idle | SyncState::Blocks | SyncState::NewBlocks => {
+
 					if io.chain().queue_info().is_full() {
 						self.pause_sync();
 						return;
@@ -1342,25 +1364,11 @@ impl ChainSync {
 					if force || equal_or_higher_difficulty {
 						if ancient_block_fullness < 0.8 {
                             if let Some(request) = self.old_blocks.as_mut().and_then(|d| d.request_blocks(peer_id, io, num_active_peers)) {
+                                debug!("requesting old blocks from: {}", peer_id);
                                 SyncRequester::request_blocks(self, io, peer_id, request, BlockSet::OldBlocks);
                                 return;
                             }
                         }
-
-						// and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
-						let mut to_send = Default::default();
-						if let Some(peer) = self.peers.get_mut(&peer_id) {
-							if peer.asking_pooled_transactions.is_empty() {
-								to_send = peer.unfetched_pooled_transactions.drain().take(MAX_TRANSACTIONS_TO_REQUEST).collect::<Vec<_>>();
-								peer.asking_pooled_transactions = to_send.clone();
-							}
-						}
-
-						if !to_send.is_empty() {
-							SyncRequester::request_pooled_transactions(self, io, peer_id, &to_send);
-
-							return;
-						}
 					} else {
 						trace!(
 							target: "sync",
@@ -1369,8 +1377,12 @@ impl ChainSync {
 							syncing_difficulty,
 							peer_difficulty
 						);
+                        info!("deactivate_peer: {}", peer_id);
 						self.deactivate_peer(io, peer_id);
+                        return;
 					}
+
+
 				},
 				SyncState::SnapshotData => {
 					match io.snapshot_service().restoration_status() {
@@ -1402,7 +1414,84 @@ impl ChainSync {
 					SyncState::SnapshotWaiting => ()
 			}
         } else {
-            trace!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, self.state);
+            // if we got nothing to do, and the other peer is also at the same block, or is known to be just 1 behind, we are fetching unfetched pooled transactions.
+            // there is some delay of the information what block they are on.
+
+            // communicate with this peer in any case if we are on the same block.
+            // more about: https://github.com/DMDcoin/diamond-node/issues/173
+            let communicate_with_peer = chain_info.best_block_hash == peer_latest;
+
+            // on a distributed real network, 3 seconds is about they physical minimum.
+            // therefore we "accept" other nodes to be 1 block behind - usually they are not!
+            // The other way around: if they are a validator, and we are at the tip, we might be still 1 block behind, because there is already a pending block.
+            // our best_block information is always accurate, so we are not notifiying them obout our transactions, that might be already included in the block.
+
+            // todo: Further investigation if we should or should not accept a gap in block height.
+
+            // if !communicate_with_peer {
+
+            //     // if we are not on the same block, find out if we do have a block number for their block.
+            //     io.chain().block_number(BlockId::Hash(peer_latest)).map(|block_number| {
+            //         // let other_best_block = peer_difficulty.unwrap_or_default().low_u64() as i64;
+            //         // let best_block = chain_info.best_block_number as i64;
+
+            //         if block_number == chain_info.best_block_number {
+            //             communicate_with_peer = true;
+            //         }
+            //     });
+            // }
+
+            if self.state == SyncState::Idle && communicate_with_peer {
+                // and if we have nothing else to do, get the peer to give us at least some of announced but unfetched transactions
+                let mut to_send = H256FastSet::default();
+                if let Some(peer) = self.peers.get_mut(&peer_id) {
+                    // info: this check should do nothing, if everything is tracked correctly,
+
+                    if peer.asking_pooled_transactions.is_empty() {
+                        // todo: we might just request the same transactions from  multiple peers here, at the same time.
+                        // we should keep track of how many replicas of a transaction we had requested.
+
+                        for hash in peer.unfetched_pooled_transactions.iter() {
+                            if to_send.len() >= MAX_TRANSACTIONS_TO_REQUEST {
+                                break;
+                            }
+
+                            if self
+                                .asking_pooled_transaction_overview
+                                .get_last_fetched(hash)
+                                .map_or(false, |t| t.elapsed().as_millis() > 300)
+                            {
+                                to_send.insert(hash.clone());
+                                self.asking_pooled_transaction_overview
+                                    .report_transaction_pooling(hash);
+                            }
+                        }
+
+                        peer.unfetched_pooled_transactions
+                            .retain(|u| !to_send.contains(u));
+
+                        peer.asking_pooled_transactions = to_send.clone();
+                    } else {
+                        info!(
+                            "we are already asking from peer {}: {} transactions",
+                            peer_id,
+                            peer.asking_pooled_transactions.len()
+                        );
+                    }
+                }
+
+                if !to_send.is_empty() {
+                    info!(target: "sync", "requesting {} pooled transactions from {}", to_send.len(), peer_id);
+                    let bytes_sent =
+                        SyncRequester::request_pooled_transactions(self, io, peer_id, &to_send);
+                    self.statistics
+                        .log_requested_transactions_response(to_send.len(), bytes_sent);
+
+                    return;
+                }
+            } else {
+                info!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, blochhash={:?} our_blockhash={:?} state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, peer_latest, chain_info.best_block_hash, self.state);
+            }
         }
     }
 

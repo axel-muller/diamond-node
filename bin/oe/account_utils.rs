@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use crypto::publickey;
+use crate::crypto::publickey;
 use dir::Directories;
 use ethereum_types::{Address, H160};
 use ethkey::Password;
@@ -230,8 +230,8 @@ mod accounts {
             match account_provider.insert_account(secret, &Password::from(String::new())) {
                 Err(e) => warn!("Unable to add development account: {}", e),
                 Ok(address) => {
-                    let _ = account_provider
-                        .set_account_name(address.clone(), "Development Account".into());
+                    let _ =
+                        account_provider.set_account_name(address, "Development Account".into());
                     let _ = account_provider.set_account_meta(
                         address,
                         ::serde_json::to_string(

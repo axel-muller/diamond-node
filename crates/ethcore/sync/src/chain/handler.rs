@@ -81,7 +81,7 @@ impl SyncHandler {
                     }
                     SnapshotDataPacket => SyncHandler::on_snapshot_data(sync, io, peer, &rlp),
                     _ => {
-                        debug!(target: "sync", "{}: Unknown packet {}", peer, packet_id.id());
+                        warn!(target: "sync", "{}: Unknown packet {}", peer, packet_id.id());
                         Ok(())
                     }
                 },
@@ -155,7 +155,8 @@ impl SyncHandler {
     /// Called when a new peer is connected
     pub fn on_peer_connected(sync: &mut ChainSync, io: &mut dyn SyncIo, peer: PeerId) {
         let peer_version = io.peer_version(peer);
-        trace!(target: "sync", "== Connected {}: {}", peer, peer_version);
+
+        trace!(target: "sync", "== Connected {}: {} protocol: {}", peer, peer_version, io.peer_session_info(peer).map_or(String::new(), |f| f.peer_capabilities().iter().map(|c| format!("{}-{}", c.protocol, c.version)).collect::<Vec<String>>().join(" | ")));
 
         let whitelisted = peer_version.is_hbbft();
 
@@ -872,7 +873,7 @@ impl SyncHandler {
 
     /// Called when peer sends us a list of pooled transactions
     pub fn on_peer_pooled_transactions(
-        sync: &ChainSync,
+        sync: &mut ChainSync,
         io: &mut dyn SyncIo,
         peer_id: PeerId,
         tx_rlp: &Rlp,
@@ -890,7 +891,7 @@ impl SyncHandler {
             trace!(target: "sync", "{} Peer sent us more transactions than was supposed to", peer_id);
             return Err(DownloaderImportError::Invalid);
         }
-        trace!(target: "sync", "{:02} -> PooledTransactions ({} entries)", peer_id, item_count);
+        info!(target: "sync", "{:02} -> PooledTransactions ({} entries)", peer_id, item_count);
         let mut transactions = Vec::with_capacity(item_count);
         for i in 0..item_count {
             let rlp = tx_rlp.at(i)?;
@@ -903,6 +904,9 @@ impl SyncHandler {
             transactions.push(tx);
         }
         io.chain().queue_transactions(transactions, peer_id);
+
+        sync.reset_peer_asking(peer_id, PeerAsking::PooledTransactions);
+
         Ok(())
     }
 
