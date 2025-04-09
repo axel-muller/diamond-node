@@ -65,6 +65,9 @@ impl ChainSync {
         blocks: &[H256],
         peers: &[PeerId],
     ) -> usize {
+        if peers.len() == 0 {
+            return 0;
+        }
         trace!(target: "sync", "Sending NewBlocks to {:?}", peers);
         let sent = peers.len();
         let mut send_packet = |io: &mut dyn SyncIo, rlp: Bytes| {
@@ -100,6 +103,9 @@ impl ChainSync {
         io: &mut dyn SyncIo,
         peers: &[PeerId],
     ) -> usize {
+        if peers.len() == 0 {
+            return 0;
+        }
         trace!(target: "sync", "Sending NewHashes to {:?}", peers);
         let last_parent = *io.chain().best_block_header().parent_hash();
         let best_block_hash = chain_info.best_block_hash;
@@ -226,7 +232,6 @@ impl ChainSync {
             let peer_info = self.peers.get_mut(&peer_id)
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
-            warn!(target: "sync", "peer_info.protocol_version: {:?}", peer_info.protocol_version);
 
             let mut id: Option<ethereum_types::H512> = None;
             let mut is_hashes = false;
@@ -234,6 +239,9 @@ impl ChainSync {
             if let Some(session_info) = io.peer_session_info(peer_id) {
                 is_hashes = session_info.is_pooled_transactions_capable();
                 id = session_info.id;
+            } else {
+                warn!(target: "sync", "no peer session info available: could not detect if peer is capable of eip-2464 transaction gossiping");
+                continue;
             }
 
             // Send all transactions, if the peer doesn't know about anything
