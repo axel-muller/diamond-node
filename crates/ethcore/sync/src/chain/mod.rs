@@ -1419,7 +1419,10 @@ impl ChainSync {
 
             // communicate with this peer in any case if we are on the same block.
             // more about: https://github.com/DMDcoin/diamond-node/issues/173
-            let communicate_with_peer = chain_info.best_block_hash == peer_latest;
+            
+            //let communicate_with_peer = chain_info.best_block_hash == peer_latest;
+            
+            let communicate_with_peer = true;
 
             // on a distributed real network, 3 seconds is about they physical minimum.
             // therefore we "accept" other nodes to be 1 block behind - usually they are not!
@@ -1459,7 +1462,7 @@ impl ChainSync {
                             if self
                                 .asking_pooled_transaction_overview
                                 .get_last_fetched(hash)
-                                .map_or(false, |t| t.elapsed().as_millis() > 300)
+                                .map_or(true, |t| t.elapsed().as_millis() > 300)
                             {
                                 to_send.insert(hash.clone());
                                 self.asking_pooled_transaction_overview
@@ -1467,10 +1470,19 @@ impl ChainSync {
                             }
                         }
 
-                        peer.unfetched_pooled_transactions
-                            .retain(|u| !to_send.contains(u));
+                        if !to_send.is_empty() {
+                            peer.unfetched_pooled_transactions
+                                .retain(|u| !to_send.contains(u));
 
-                        peer.asking_pooled_transactions = to_send.clone();
+                            // trace!(
+                            //     target: "sync",
+                            //     "Asking {} pooled transactions from peer {}: {:?}",
+                            //     to_send.len(),
+                            //     peer_id,
+                            //     to_send
+                            // );
+                            peer.asking_pooled_transactions = to_send.clone();
+                        }
                     } else {
                         info!(
                             "we are already asking from peer {}: {} transactions",
