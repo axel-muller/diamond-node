@@ -232,7 +232,6 @@ impl ChainSync {
             let peer_info = self.peers.get_mut(&peer_id)
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
-
             let mut id: Option<ethereum_types::H512> = None;
             let mut is_hashes = false;
 

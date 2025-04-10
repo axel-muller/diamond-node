@@ -1419,9 +1419,9 @@ impl ChainSync {
 
             // communicate with this peer in any case if we are on the same block.
             // more about: https://github.com/DMDcoin/diamond-node/issues/173
-            
+
             //let communicate_with_peer = chain_info.best_block_hash == peer_latest;
-            
+
             let communicate_with_peer = true;
 
             // on a distributed real network, 3 seconds is about they physical minimum.
