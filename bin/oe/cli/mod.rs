@@ -1053,52 +1053,59 @@ mod tests {
         Account, Args, ArgsError, Config, Footprint, Ipc, Metrics, Mining, Misc, Network,
         Operating, Rpc, SecretStore, Snapshots, Ws,
     };
+    use crate::NODE_SOFTWARE_NAME;
     use clap::ErrorKind as ClapErrorKind;
     use toml;
 
     #[test]
     fn should_accept_any_argument_order() {
-        let args = Args::parse(&["openethereum", "--no-warp", "account", "list"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--no-warp", "account", "list"]).unwrap();
         assert!(args.flag_no_warp);
 
-        let args = Args::parse(&["openethereum", "account", "list", "--no-warp"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "account", "list", "--no-warp"]).unwrap();
         assert!(args.flag_no_warp);
 
-        let args = Args::parse(&["openethereum", "--chain=dev", "account", "list"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--chain=dev", "account", "list"]).unwrap();
         assert_eq!(args.arg_chain, "dev");
 
-        let args = Args::parse(&["openethereum", "account", "list", "--chain=dev"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "account", "list", "--chain=dev"]).unwrap();
         assert_eq!(args.arg_chain, "dev");
     }
 
     #[test]
     fn should_reject_invalid_values() {
-        let args = Args::parse(&["openethereum", "--jsonrpc-port=8545"]);
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--jsonrpc-port=8545"]);
         assert!(args.is_ok());
 
-        let args = Args::parse(&["openethereum", "--jsonrpc-port=asd"]);
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--jsonrpc-port=asd"]);
         assert!(args.is_err());
     }
 
     #[test]
     fn should_parse_args_and_flags() {
-        let args = Args::parse(&["openethereum", "--no-warp"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--no-warp"]).unwrap();
         assert!(args.flag_no_warp);
 
-        let args = Args::parse(&["openethereum", "--pruning", "archive"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--pruning", "archive"]).unwrap();
         assert_eq!(args.arg_pruning, "archive");
 
-        let args = Args::parse(&["openethereum", "export", "state", "--no-storage"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "export", "state", "--no-storage"]).unwrap();
         assert!(args.flag_export_state_no_storage);
 
-        let args =
-            Args::parse(&["openethereum", "export", "state", "--min-balance", "123"]).unwrap();
+        let args = Args::parse(&[
+            NODE_SOFTWARE_NAME,
+            "export",
+            "state",
+            "--min-balance",
+            "123",
+        ])
+        .unwrap();
         assert_eq!(args.arg_export_state_min_balance, Some("123".to_string()));
     }
 
     #[test]
     fn should_exit_gracefully_on_unknown_argument() {
-        let result = Args::parse(&["openethereum", "--please-exit-gracefully"]);
+        let result = Args::parse(&[NODE_SOFTWARE_NAME, "--please-exit-gracefully"]);
         assert!(match result {
             Err(ArgsError::Clap(ref clap_error))
                 if clap_error.kind == ClapErrorKind::UnknownArgument =>
@@ -1109,39 +1116,40 @@ mod tests {
 
     #[test]
     fn should_use_subcommand_arg_default() {
-        let args = Args::parse(&["openethereum", "export", "state", "--at", "123"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "export", "state", "--at", "123"]).unwrap();
         assert_eq!(args.arg_export_state_at, "123");
         assert_eq!(args.arg_snapshot_at, "latest");
 
-        let args = Args::parse(&["openethereum", "snapshot", "--at", "123", "file.dump"]).unwrap();
+        let args =
+            Args::parse(&[NODE_SOFTWARE_NAME, "snapshot", "--at", "123", "file.dump"]).unwrap();
         assert_eq!(args.arg_snapshot_at, "123");
         assert_eq!(args.arg_export_state_at, "latest");
 
-        let args = Args::parse(&["openethereum", "export", "state"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "export", "state"]).unwrap();
         assert_eq!(args.arg_snapshot_at, "latest");
         assert_eq!(args.arg_export_state_at, "latest");
 
-        let args = Args::parse(&["openethereum", "snapshot", "file.dump"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "snapshot", "file.dump"]).unwrap();
         assert_eq!(args.arg_snapshot_at, "latest");
         assert_eq!(args.arg_export_state_at, "latest");
     }
 
     #[test]
     fn should_parse_multiple_values() {
-        let args = Args::parse(&["openethereum", "account", "import", "~/1", "~/2"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "account", "import", "~/1", "~/2"]).unwrap();
         assert_eq!(
             args.arg_account_import_path,
             Some(vec!["~/1".to_owned(), "~/2".to_owned()])
         );
 
-        let args = Args::parse(&["openethereum", "account", "import", "~/1,ext"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "account", "import", "~/1,ext"]).unwrap();
         assert_eq!(
             args.arg_account_import_path,
             Some(vec!["~/1,ext".to_owned()])
         );
 
         let args = Args::parse(&[
-            "openethereum",
+            NODE_SOFTWARE_NAME,
             "--secretstore-nodes",
             "abc@127.0.0.1:3333,cde@10.10.10.10:4444",
         ])
@@ -1152,7 +1160,7 @@ mod tests {
         );
 
         let args = Args::parse(&[
-            "openethereum",
+            NODE_SOFTWARE_NAME,
             "--password",
             "~/.safe/1",
             "--password",
@@ -1164,7 +1172,7 @@ mod tests {
             vec!["~/.safe/1".to_owned(), "~/.safe/2".to_owned()]
         );
 
-        let args = Args::parse(&["openethereum", "--password", "~/.safe/1,~/.safe/2"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--password", "~/.safe/1,~/.safe/2"]).unwrap();
         assert_eq!(
             args.arg_password,
             vec!["~/.safe/1".to_owned(), "~/.safe/2".to_owned()]
@@ -1173,7 +1181,7 @@ mod tests {
 
     #[test]
     fn should_parse_global_args_with_subcommand() {
-        let args = Args::parse(&["openethereum", "--chain", "dev", "account", "list"]).unwrap();
+        let args = Args::parse(&[NODE_SOFTWARE_NAME, "--chain", "dev", "account", "list"]).unwrap();
         assert_eq!(args.arg_chain, "dev".to_owned());
     }
 
@@ -1201,7 +1209,8 @@ mod tests {
         config.parity = Some(operating);
 
         // when
-        let args = Args::parse_with_config(&["openethereum", "--chain", "xyz"], config).unwrap();
+        let args =
+            Args::parse_with_config(&[NODE_SOFTWARE_NAME, "--chain", "xyz"], config).unwrap();
 
         // then
         assert_eq!(args.arg_chain, "xyz".to_owned());
@@ -1227,7 +1236,8 @@ mod tests {
         let config = toml::from_str(include_str!("./tests/config.full.toml")).unwrap();
 
         // when
-        let args = Args::parse_with_config(&["openethereum", "--chain", "xyz"], config).unwrap();
+        let args =
+            Args::parse_with_config(&[NODE_SOFTWARE_NAME, "--chain", "xyz"], config).unwrap();
 
         // then
         assert_eq!(
@@ -1656,7 +1666,7 @@ mod tests {
 
     #[test]
     fn should_not_accept_min_peers_bigger_than_max_peers() {
-        match Args::parse(&["openethereum", "--max-peers=39", "--min-peers=40"]) {
+        match Args::parse(&[NODE_SOFTWARE_NAME, "--max-peers=39", "--min-peers=40"]) {
             Err(ArgsError::PeerConfiguration) => (),
             _ => assert_eq!(false, true),
         }
@@ -1664,7 +1674,7 @@ mod tests {
 
     #[test]
     fn should_accept_max_peers_equal_or_bigger_than_min_peers() {
-        Args::parse(&["openethereum", "--max-peers=40", "--min-peers=40"]).unwrap();
-        Args::parse(&["openethereum", "--max-peers=100", "--min-peers=40"]).unwrap();
+        Args::parse(&[NODE_SOFTWARE_NAME, "--max-peers=40", "--min-peers=40"]).unwrap();
+        Args::parse(&[NODE_SOFTWARE_NAME, "--max-peers=100", "--min-peers=40"]).unwrap();
     }
 }
