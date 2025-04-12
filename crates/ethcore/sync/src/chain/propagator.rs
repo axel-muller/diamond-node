@@ -233,7 +233,10 @@ impl ChainSync {
                 .expect("peer_id is form peers; peers is result of select_peers_for_transactions; select_peers_for_transactions selects peers from self.peers; qed");
 
             let (id, is_hashes) = if let Some(session_info) = io.peer_session_info(peer_id) {
-                (session_info.id, session_info.is_pooled_transactions_capable())
+                (
+                    session_info.id,
+                    session_info.is_pooled_transactions_capable(),
+                )
             } else {
                 warn!(target: "sync", "no peer session info available: could not detect if peer is capable of eip-2464 transaction gossiping");
                 continue;
