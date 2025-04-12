@@ -861,6 +861,9 @@ impl SyncHandler {
                 .as_val::<H256>()
                 .map_err(|_| DownloaderImportError::Invalid)?;
 
+            // todo: what if the Transaction is not new, and already in the chain?
+            // see: https://github.com/DMDcoin/diamond-node/issues/196
+
             if io.chain().queued_transaction(hash).is_none() {
                 sync.peers
                     .get_mut(&peer_id)
