@@ -107,6 +107,7 @@ use api::{EthProtocolInfo as PeerInfoDigest, PriorityTask, ETH_PROTOCOL, PAR_PRO
 use block_sync::{BlockDownloader, DownloadAction};
 use bytes::Bytes;
 use derive_more::Display;
+use env_logger::Target;
 use ethcore::{
     client::{BlockChainClient, BlockChainInfo, BlockId, BlockQueueInfo, BlockStatus},
     snapshot::RestorationStatus,
@@ -932,8 +933,8 @@ impl ChainSync {
 
     /// Updates transactions were received by a peer
     pub fn transactions_received(&mut self, txs: &[UnverifiedTransaction], peer_id: PeerId) {
-        info!(target: "sync", "Received {} transactions from peer {}", txs.len(), peer_id);
-        info!(target: "sync", "Received {:?}", txs.iter().map(|t| t.hash).map(|t| t.0).collect::<Vec<_>>());
+        debug!(target: "sync", "Received {} transactions from peer {}", txs.len(), peer_id);
+        trace!(target: "sync", "Received {:?}", txs.iter().map(|t| t.hash).map(|t| t.0).collect::<Vec<_>>());
 
         // Remove imported txs from all request queues
         let imported = txs.iter().map(|tx| tx.hash()).collect::<H256FastSet>();
@@ -1007,7 +1008,7 @@ impl ChainSync {
         // Reactivate peers only if some progress has been made
         // since the last sync round of if starting fresh.
         self.active_peers = self.peers.keys().cloned().collect();
-        info!("resetting sync state to {:?}", self.state);
+        info!(target: "sync", "resetting sync state to {:?}", self.state);
     }
 
     /// Add a request for later processing
@@ -1247,8 +1248,7 @@ impl ChainSync {
 
     /// Find something to do for a peer. Called for a new peer or when a peer is done with its task.
     fn sync_peer(&mut self, io: &mut dyn SyncIo, peer_id: PeerId, force: bool) {
-        debug!(
-            "sync_peer: {} force {} state: {:?}",
+        debug!(target: "sync", "sync_peer: {} force {} state: {:?}",
             peer_id, force, self.state
         );
         if !self.active_peers.contains(&peer_id) {
@@ -1288,37 +1288,13 @@ impl ChainSync {
         // the system get's stuck.
         let is_other_block = peer_latest != chain_info.best_block_hash;
 
-        if higher_difficulty && !is_other_block {
-            if peer_difficulty.is_some() {
-                // NetworkContext session_info
-                let session_info = io.peer_session_info(peer_id);
-
-                match session_info {
-                    Some(s) => {
-                        //only warn if the other peer has provided a difficulty level.
-                        warn!(target: "sync", "protected from hang. peer {}, did send wrong information ( td={:?}, our td={}) for blockhash latest={}  {} originated by us: {}. client_version: {}, protocol version: {}",
-							peer_id, peer_difficulty, syncing_difficulty, peer_latest, s.remote_address, s.originated, s.client_version, s.protocol_version);
-
-                        // todo: temporary disabled peer deactivation.
-                        // we are just returning now.
-                        // will we see this problem in sequences now, but less disconnects ?
-                        // io.disable_peer(peer_id);
-                        // self.deactivate_peer(io, peer_id);
-
-                        return;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         if self.old_blocks.is_some() {
             info!(target: "sync", "syncing old blocks from peer: {} ", peer_id);
             let session_info = io.peer_session_info(peer_id);
 
             match session_info {
                 Some(s) => {
-                    warn!(target: "sync", "old blocks peer: {} {} originated by us: {}", peer_id, s.remote_address, s.originated);
+                    debug!(target: "sync", "old blocks peer: {} {} originated by us: {}", peer_id, s.remote_address, s.originated);
                 }
                 _ => {}
             }
@@ -1364,20 +1340,19 @@ impl ChainSync {
 					if force || equal_or_higher_difficulty {
 						if ancient_block_fullness < 0.8 {
                             if let Some(request) = self.old_blocks.as_mut().and_then(|d| d.request_blocks(peer_id, io, num_active_peers)) {
-                                debug!("requesting old blocks from: {}", peer_id);
+                                debug!(target:"sync", "requesting old blocks from: {}", peer_id);
                                 SyncRequester::request_blocks(self, io, peer_id, request, BlockSet::OldBlocks);
                                 return;
                             }
                         }
 					} else {
-						trace!(
+						debug!(
 							target: "sync",
 							"peer {:?} is not suitable for requesting old blocks, syncing_difficulty={:?}, peer_difficulty={:?}",
 							peer_id,
 							syncing_difficulty,
 							peer_difficulty
 						);
-                        info!("deactivate_peer: {}", peer_id);
 						self.deactivate_peer(io, peer_id);
                         return;
 					}
@@ -1484,7 +1459,8 @@ impl ChainSync {
                             peer.asking_pooled_transactions = to_send.clone();
                         }
                     } else {
-                        info!(
+                        debug!(
+                            target: "sync",
                             "we are already asking from peer {}: {} transactions",
                             peer_id,
                             peer.asking_pooled_transactions.len()
@@ -1493,7 +1469,7 @@ impl ChainSync {
                 }
 
                 if !to_send.is_empty() {
-                    info!(target: "sync", "requesting {} pooled transactions from {}", to_send.len(), peer_id);
+                    debug!(target: "sync", "requesting {} pooled transactions from {}", to_send.len(), peer_id);
                     let bytes_sent =
                         SyncRequester::request_pooled_transactions(self, io, peer_id, &to_send);
                     self.statistics
@@ -1502,7 +1478,7 @@ impl ChainSync {
                     return;
                 }
             } else {
-                info!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, blochhash={:?} our_blockhash={:?} state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, peer_latest, chain_info.best_block_hash, self.state);
+                debug!(target: "sync", "Skipping peer {}, force={}, td={:?}, our td={}, blochhash={:?} our_blockhash={:?} state={:?}", peer_id, force, peer_difficulty, syncing_difficulty, peer_latest, chain_info.best_block_hash, self.state);
             }
         }
     }
