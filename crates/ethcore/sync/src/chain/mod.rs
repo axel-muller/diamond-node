@@ -107,7 +107,6 @@ use api::{EthProtocolInfo as PeerInfoDigest, PriorityTask, ETH_PROTOCOL, PAR_PRO
 use block_sync::{BlockDownloader, DownloadAction};
 use bytes::Bytes;
 use derive_more::Display;
-use env_logger::Target;
 use ethcore::{
     client::{BlockChainClient, BlockChainInfo, BlockId, BlockQueueInfo, BlockStatus},
     snapshot::RestorationStatus,
