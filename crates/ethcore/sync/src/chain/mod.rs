@@ -1247,7 +1247,7 @@ impl ChainSync {
 
     /// Find something to do for a peer. Called for a new peer or when a peer is done with its task.
     fn sync_peer(&mut self, io: &mut dyn SyncIo, peer_id: PeerId, force: bool) {
-        info!(
+        debug!(
             "sync_peer: {} force {} state: {:?}",
             peer_id, force, self.state
         );
