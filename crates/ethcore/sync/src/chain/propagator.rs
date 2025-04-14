@@ -187,9 +187,8 @@ impl ChainSync {
                 .retain_pending(&all_transactions_hashes);
         }
 
-        info!(target: "sync", "Propagating {} transactions to {} peers", transactions.len(), peers.len());
-
-        info!(target: "sync", "Propagating {:?}", all_transactions_hashes);
+        debug!(target: "sync", "Propagating {:?}", all_transactions_hashes);
+        trace!(target: "sync", "Propagating {} transactions to {} peers", transactions.len(), peers.len());
 
         let send_packet = |io: &mut dyn SyncIo,
                            stats: &mut SyncPropagatorStatistics,
