@@ -41,7 +41,7 @@ use std::{
 use tiny_keccak::Keccak;
 
 const ENCRYPTED_HEADER_LEN: usize = 32;
-const RECEIVE_PAYLOAD: Duration = Duration::from_secs(60);
+const RECEIVE_PAYLOAD: Duration = Duration::from_secs(600);
 pub const MAX_PAYLOAD_SIZE: usize = (1 << 28) - 1;
 
 /// Network responses should try not to go over this limit.
