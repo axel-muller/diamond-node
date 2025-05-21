@@ -179,6 +179,7 @@ impl ClientCapabilities for ClientVersion {
 fn is_parity(client_id: &str) -> bool {
     client_id.starts_with(LEGACY_CLIENT_ID_PREFIX)
         || client_id.starts_with(CURRENT_CLIENT_ID_PREFIX)
+        || client_id.starts_with("diamond-node") // forward compatibilitiy for realease 0.11.x
 }
 
 fn is_nethermind(client_id: &str) -> bool {
