@@ -222,10 +222,26 @@ impl HbbftState {
         }
 
         if sks.is_none() {
-            info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            info!(target: "engine", "We are not part of the HoneyBadger validator set - Running as regular node.");
             peers_service
                 .send_message(HbbftConnectToPeersMessage::DisconnectAllValidators)
                 .ok()?;
+
+            if self.is_validator() {
+                if client
+                    .as_full_client()
+                    .expect("full client")
+                    .is_major_syncing()
+                {
+                    debug!(target: "engine", "Node was a validator, and became regular node, but we are syncing, not shutting down Node as defined inhttps://github.com/DMDcoin/diamond-node/issues/322.");
+                } else {
+                    info!(target: "engine", "Node was a validator, and became regular node. shutting down Node as defined in https://github.com/DMDcoin/diamond-node/issues/322.");
+                    // for unit tests no problem, demand shutddown wont to anything if its a unit test.
+                    // e2e tests needs adaption.
+                    // this gracefully shuts down a node, if it was a validator before, but now it is not anymore.
+                    client.demand_shutdown();
+                }
+            }
             return Some(());
         }
 
