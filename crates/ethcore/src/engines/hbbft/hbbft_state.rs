@@ -228,16 +228,19 @@ impl HbbftState {
                 .ok()?;
 
             if self.is_validator() {
-                if client
-                    .as_full_client()
-                    .expect("full client")
-                    .is_major_syncing()
-                {
-                    debug!(target: "engine", "Node was a validator, and became regular node, but we are syncing, not shutting down Node as defined inhttps://github.com/DMDcoin/diamond-node/issues/322.");
+                let is_syncing = if let Some(full) = client.as_full_client() {
+                    full.is_major_syncing()
+                } else {
+                    info!(target: "engine", "Node was a validator: cannot be determinated, because client is not a full client. (https://github.com/DMDcoin/diamond-node/issues/322.)");
+                    return Some(());
+                };
+
+                if is_syncing {
+                    debug!(target: "engine", "Node was a validator, and became regular node, but we are syncing, not shutting down Node as defined in https://github.com/DMDcoin/diamond-node/issues/322.");
                 } else {
                     info!(target: "engine", "Node was a validator, and became regular node. shutting down Node as defined in https://github.com/DMDcoin/diamond-node/issues/322.");
-                    // for unit tests no problem, demand shutddown wont to anything if its a unit test.
-                    // e2e tests needs adaption.
+                    // for unit tests no problem, demand shutddown won't to anything if its a unit test.
+                    // e2e tests needs adaptation.
                     // this gracefully shuts down a node, if it was a validator before, but now it is not anymore.
                     client.demand_shutdown();
                 }
