@@ -112,7 +112,7 @@ impl HbbftEarlyEpochEndManager {
             signing_address: signing_address.clone(),
         };
 
-        info!(target: "engine", "early-epoch-end: HbbftEarlyEpochEndManager created. start_time {now:?}, start_block: {epoch_start_block}");
+        trace!(target: "engine", "early-epoch-end: HbbftEarlyEpochEndManager created. start_time {now:?}, start_block: {epoch_start_block}");
 
         return Some(result);
     }
