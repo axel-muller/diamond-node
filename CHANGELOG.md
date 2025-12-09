@@ -2,8 +2,9 @@
 
 OPTIONAL Update
 
-New behavior for validator nodes as main feature
+New behavior for validator nodes
 - [Autoshutdown if a Node becomes a regular Node](https://github.com/DMDcoin/diamond-node/issues/322)
+- [Remove empty blocks during key gen phases behaviour](https://github.com/DMDcoin/diamond-node/issues/327)
 
 Further stability improvements
 - [FIXED: received transactions are getting pooled, if announced by another peer](https://github.com/DMDcoin/diamond-node/issues/304)
