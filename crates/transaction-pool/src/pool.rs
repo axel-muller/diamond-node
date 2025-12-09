@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Parity.  If not, see <http://www.gnu.org/licenses/>.
 
-use log::{trace, warn};
+use log::{info, trace, warn};
 use std::{
     collections::{hash_map, BTreeSet, HashMap},
     slice,
@@ -233,6 +233,44 @@ where
                 self.listener.rejected(&new, &error);
                 return Err(error);
             }
+        }
+    }
+
+    /// Performs garbage collection of the pool for free service transactions.
+    /// Removes transaction that are not valid anymore.
+    /// The process executes listener calls.
+    pub fn garbage_collect<F: Fn(&T) -> bool>(&mut self, service_transaction_check: F) {
+        if self.best_transactions.is_empty() {
+            return;
+        }
+
+        let mut txs_to_remove = Vec::<T::Hash>::new();
+
+        for sender in self.transactions.iter() {
+            for tx in sender.1.iter_transactions() {
+                if tx.transaction.has_zero_gas_price() {
+                    if service_transaction_check(&tx.transaction) {
+                        txs_to_remove.push(tx.hash().clone());
+                    }
+                } else {
+                    // if the next transaction has not zero gas price,
+                    // we are not continuing.
+                    break;
+                };
+            }
+        }
+
+        if txs_to_remove.is_empty() {
+            return;
+        }
+
+        info!(
+            "Garbage collection: removing invalid {} service transactions from pool.",
+            txs_to_remove.len()
+        );
+
+        for tx in txs_to_remove.iter() {
+            self.remove(tx, true);
         }
     }
 

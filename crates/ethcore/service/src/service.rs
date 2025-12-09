@@ -233,7 +233,9 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
             ClientIoMessage::Execute(ref exec) => {
                 (*exec.0)(&self.client);
             }
-            _ => {} // ignore other messages
+            ClientIoMessage::NewChainHead => {
+                self.client.garbage_collect_in_queue();
+            }
         }
     }
 }

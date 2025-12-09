@@ -842,6 +842,13 @@ impl Importer {
             warn!("Failed to prune ancient state data: {}", e);
         }
 
+        client.schedule_garbage_collect_in_queue();
+
+        //self.on_block_commit_finalized();
+
+        //client.miner().g
+        //client.check_garbage();.garbage_collect(Duration::from_secs(1));
+
         route
     }
 
@@ -1537,6 +1544,34 @@ impl Client {
         self.check_garbage();
         if !prevent_sleep {
             self.check_snooze();
+        }
+    }
+
+    /// Schedule garbage collection of invalid service transactions from the transaction queue based on the given block hash.
+    pub fn schedule_garbage_collect_in_queue(&self) {
+        let m = ClientIoMessage::execute(|c| c.garbage_collect_in_queue());
+        if let Err(e) = self.io_channel.read().send(m) {
+            error!(target: "client", "Failed to schedule garbage collection in transaction queue for block {:?}", e);
+        }
+    }
+
+    /// Garbage collect invalid  servive transactions from the transaction queue based on the given block header.
+    pub fn garbage_collect_in_queue(&self) {
+        let machine = self.engine().machine();
+
+        //todo!("do not gc for blocks that are already gc or old.");
+        match &self.block_header_decoded(BlockId::Latest) {
+            Some(block_header) => {
+                self.importer.miner.collect_garbage(|tx|
+                    match machine.verify_transaction(tx.signed(), block_header, self) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            info!(target: "client", "collected garbage transaction from {:?}: {:?} reason: {:?}", tx.signed().sender(), tx.signed().hash, e);                   
+                            false
+                        },
+                    });
+            }
+            None => {}
         }
     }
 
