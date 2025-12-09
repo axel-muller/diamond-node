@@ -51,7 +51,6 @@ use super::{
     NodeId,
     contracts::{
         keygen_history::{all_parts_acks_available, initialize_synckeygen},
-        staking::start_time_of_next_phase_transition,
         validator_set::{ValidatorType, get_pending_validators, is_pending_validator},
     },
     contribution::{unix_now_millis, unix_now_secs},
