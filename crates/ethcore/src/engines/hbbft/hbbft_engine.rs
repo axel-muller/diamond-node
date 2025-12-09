@@ -329,8 +329,6 @@ impl TransitionHandler {
 
         // If the minimum block time has passed we are ready to trigger new blocks.
         if timer_duration == Duration::from_secs(0) {
-            // Always create blocks if we are in the keygen phase.
-            self.engine.start_hbbft_epoch_if_next_phase();
 
             // If the maximum block time has been reached we trigger a new block in any case.
             if self.max_block_time_remaining(client.clone()) == Duration::from_secs(0) {
@@ -1102,27 +1100,6 @@ impl HoneyBadgerBFT {
 
     fn client_arc(&self) -> Option<Arc<dyn EngineClient>> {
         self.client.read().as_ref().and_then(Weak::upgrade)
-    }
-
-    fn start_hbbft_epoch_if_next_phase(&self) {
-        // experimental deactivation of empty blocks.
-        // see: https://github.com/DMDcoin/diamond-node/issues/160
-
-        match self.client_arc() {
-            None => return,
-            Some(client) => {
-                // Get the next phase start time
-                let genesis_transition_time = match start_time_of_next_phase_transition(&*client) {
-                    Ok(time) => time,
-                    Err(_) => return,
-                };
-
-                // If current time larger than phase start time, start a new block.
-                if genesis_transition_time.as_u64() < unix_now_secs() {
-                    self.start_hbbft_epoch(client);
-                }
-            }
-        }
     }
 
     fn replay_cached_messages(&self) -> Option<()> {
