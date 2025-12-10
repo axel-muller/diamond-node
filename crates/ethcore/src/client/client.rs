@@ -1560,7 +1560,7 @@ impl Client {
         }
     }
 
-    /// Garbage collect invalid servive transactions from the transaction queue based on the given block header.
+    /// Garbage collect invalid service transactions from the transaction queue based on the given block header.
     pub fn garbage_collect_in_queue(&self) {
         let machine = self.engine().machine();
 
@@ -1589,7 +1589,7 @@ impl Client {
                     match machine.verify_transaction(tx.signed(), block_header, self) {
                         Ok(_) => true,
                         Err(e) => {
-                            info!(target: "client", "collected garbage transaction from {:?}: {:?} reason: {:?}", tx.signed().sender(), tx.signed().hash, e);                   
+                            trace!(target: "client", "collected garbage transaction from {:?}: {:?} reason: {:?}", tx.signed().sender(), tx.signed().hash, e);                   
                             false
                         },
                     });
