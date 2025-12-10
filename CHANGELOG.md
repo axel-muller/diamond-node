@@ -9,11 +9,12 @@
 ### RPC
 - [Gas price from contracts](https://github.com/DMDcoin/diamond-node/issues/159)
 
-### Further stability improvements
+### Further improvements
 - [FIXED: received transactions are getting pooled, if announced by another peer](https://github.com/DMDcoin/diamond-node/issues/304)
 - [FIXED: dropped transactions are getting pooled](https://github.com/DMDcoin/diamond-node/issues/303)
 - [FIXED: key generation can panic if faulty validators write malicious parts](https://github.com/DMDcoin/diamond-node/issues/100)
 - [FIXED: already included transactions are refretched from peers](https://github.com/DMDcoin/diamond-node/issues/196)
+- [FIXED:not staked nodes write log entries about service transactions](https://github.com/DMDcoin/diamond-node/issues/323)
 - [Gracefull Node Shutdown: increase to 15 seconds](https://github.com/DMDcoin/diamond-node/issues/321)
 
 
