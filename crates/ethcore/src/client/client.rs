@@ -306,6 +306,10 @@ pub struct Client {
 
     shutdown: Arc<ShutdownManager>,
 
+    /// block number and block has of latest gc.
+    /// this information is used to avoid double garbage collection.
+    garbage_collect_latest_block: Mutex<(u64, H256)>,
+
     statistics: ClientStatistics,
 }
 
@@ -1114,6 +1118,7 @@ impl Client {
             importer,
             config,
             shutdown,
+            garbage_collect_latest_block: Mutex::new((0, H256::zero())),
             statistics,
         });
 
@@ -1555,13 +1560,31 @@ impl Client {
         }
     }
 
-    /// Garbage collect invalid  servive transactions from the transaction queue based on the given block header.
+    /// Garbage collect invalid servive transactions from the transaction queue based on the given block header.
     pub fn garbage_collect_in_queue(&self) {
         let machine = self.engine().machine();
 
-        //todo!("do not gc for blocks that are already gc or old.");
         match &self.block_header_decoded(BlockId::Latest) {
             Some(block_header) => {
+                {
+                    // scope for mutex.
+                    let mut last_gc = self.garbage_collect_latest_block.lock();
+
+                    if block_header.number() == last_gc.0 && block_header.hash() == last_gc.1 {
+                        // already gced for this block, or gc is ongoing.
+                        // we can return here.
+                        return;
+                    }
+
+                    // we treat ongoing gc as DONE, to avoid blocking of the message channel
+                    last_gc.0 = block_header.number();
+                    last_gc.1 = block_header.hash();
+                }
+
+                // here hides an accepted race condition.
+                // latest block could change during loing ongoing GCs.
+                // this could be avoided developing a more complex GC logic.
+                // but the GC blocks the tx queue, so it has to be placing fast.
                 self.importer.miner.collect_garbage(|tx|
                     match machine.verify_transaction(tx.signed(), block_header, self) {
                         Ok(_) => true,
