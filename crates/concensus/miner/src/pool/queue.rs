@@ -41,6 +41,8 @@ use crate::pool::{
     verifier, PendingOrdering, PendingSettings, PrioritizationStrategy,
 };
 
+use super::VerifiedTransaction;
+
 type Listener = (
     LocalTransactionsList,
     (listener::Notifier, listener::Logger),
@@ -411,6 +413,17 @@ impl TransactionQueue {
             .unordered_pending(ready, Default::default())
             .map(|tx| tx.hash)
             .collect()
+    }
+
+    /// Performs garbage collection of the pool of this transactionqueue for free service transactions.
+    /// Removes transaction that are not valid anymore.
+    /// The process executes listener calls.
+    pub fn garbage_collect<F: Fn(&VerifiedTransaction) -> bool>(
+        &self,
+        service_transaction_check: F,
+    ) {
+        let mut pool = self.pool.write();
+        pool.garbage_collect(service_transaction_check);
     }
 
     /// Computes unordered set of pending hashes.

@@ -1,14 +1,21 @@
 ## Diamond Node Software 4.0.2
 
-OPTIONAL Update
 
-New behavior for validator nodes as main feature
+### New behavior for validator nodes
 - [Autoshutdown if a Node becomes a regular Node](https://github.com/DMDcoin/diamond-node/issues/322)
+- [Remove empty blocks during key gen phases behaviour](https://github.com/DMDcoin/diamond-node/issues/327)
+- [Service Transaction cleanup (garbage collect)](https://github.com/DMDcoin/diamond-node/issues/172) 
 
-Further stability improvements
+### RPC
+- [Gas price from contracts](https://github.com/DMDcoin/diamond-node/issues/159)
+
+### Further stability improvements
 - [FIXED: received transactions are getting pooled, if announced by another peer](https://github.com/DMDcoin/diamond-node/issues/304)
 - [FIXED: dropped transactions are getting pooled](https://github.com/DMDcoin/diamond-node/issues/303)
 - [FIXED: key generation can panic if faulty validators write malicious parts](https://github.com/DMDcoin/diamond-node/issues/100)
+- [FIXED: already included transactions are refretched from peers](https://github.com/DMDcoin/diamond-node/issues/196)
+- [Gracefull Node Shutdown: increase to 15 seconds](https://github.com/DMDcoin/diamond-node/issues/321)
+
 
 ## Diamond Node Software 4.0.1
 

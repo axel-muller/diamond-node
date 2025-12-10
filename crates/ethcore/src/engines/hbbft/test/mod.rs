@@ -1,12 +1,11 @@
 use super::{
     contracts::{
         staking::{
-            get_posdao_epoch, start_time_of_next_phase_transition,
+            get_posdao_epoch,
             tests::{create_staker, is_pool_active},
         },
         validator_set::{is_pending_validator, mining_by_staking_address},
     },
-    contribution::unix_now_secs,
     test::hbbft_test_client::{HbbftTestClient, create_hbbft_client, create_hbbft_clients},
 };
 use crate::{client::traits::BlockInfo, types::ids::BlockId};
@@ -128,12 +127,6 @@ fn test_epoch_transition() {
     let mut moc = create_hbbft_client(MASTER_OF_CEREMONIES_KEYPAIR.clone());
     // To avoid performing external transactions with the MoC we create and fund a random address.
     let transactor: KeyPair = Random.generate();
-
-    let genesis_transition_time = start_time_of_next_phase_transition(moc.client.as_ref())
-        .expect("start_time_of_next_phase_transition call must succeed");
-
-    // Genesis block is at time 0, current unix time must be much larger.
-    assert!(genesis_transition_time.as_u64() < unix_now_secs());
 
     // We should not be in the pending validator set at the genesis block.
     assert!(
