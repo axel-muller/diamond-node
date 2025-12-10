@@ -1212,8 +1212,10 @@ impl HoneyBadgerBFT {
                 }
 
                 if self.is_staked() {
-                    self.hbbft_peers_service.send_message(HbbftConnectToPeersMessage::AnnounceAvailability)?;
-                    self.hbbft_peers_service.send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
+                    self.hbbft_peers_service
+                        .send_message(HbbftConnectToPeersMessage::AnnounceAvailability)?;
+                    self.hbbft_peers_service
+                        .send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
                 }
 
                 if self.should_connect_to_validator_set() {
