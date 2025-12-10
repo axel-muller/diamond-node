@@ -328,7 +328,6 @@ impl TransitionHandler {
 
         // If the minimum block time has passed we are ready to trigger new blocks.
         if timer_duration == Duration::from_secs(0) {
-
             // If the maximum block time has been reached we trigger a new block in any case.
             if self.max_block_time_remaining(client.clone()) == Duration::from_secs(0) {
                 self.engine.start_hbbft_epoch(client);
