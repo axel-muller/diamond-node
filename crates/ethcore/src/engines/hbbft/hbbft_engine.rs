@@ -1211,12 +1211,10 @@ impl HoneyBadgerBFT {
                     return Ok(());
                 }
 
-                self.hbbft_peers_service
-                    .channel()
-                    .send(HbbftConnectToPeersMessage::AnnounceAvailability)?;
-
-                self.hbbft_peers_service
-                    .send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
+                if self.is_staked() {
+                    self.hbbft_peers_service.send_message(HbbftConnectToPeersMessage::AnnounceAvailability)?;
+                    self.hbbft_peers_service.send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
+                }
 
                 if self.should_connect_to_validator_set() {
                     // we just keep those variables here, because we need them in the early_epoch_end_manager.
