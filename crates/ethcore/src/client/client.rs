@@ -1589,7 +1589,7 @@ impl Client {
                     match machine.verify_transaction(tx.signed(), block_header, self) {
                         Ok(_) => true,
                         Err(e) => {
-                            info!(target: "client", "collected garbage transaction from {:?}: {:?} reason: {:?}", tx.signed().sender(), tx.signed().hash, e);                   
+                            trace!(target: "client", "collected garbage transaction from {:?}: {:?} reason: {:?}", tx.signed().sender(), tx.signed().hash, e);                   
                             false
                         },
                     });
