@@ -1560,7 +1560,7 @@ impl Client {
         }
     }
 
-    /// Garbage collect invalid servive transactions from the transaction queue based on the given block header.
+    /// Garbage collect invalid service transactions from the transaction queue based on the given block header.
     pub fn garbage_collect_in_queue(&self) {
         let machine = self.engine().machine();
 

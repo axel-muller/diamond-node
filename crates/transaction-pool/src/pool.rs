@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Parity.  If not, see <http://www.gnu.org/licenses/>.
 
-use log::{info, trace, warn};
+use log::{debug, trace, warn};
 use std::{
     collections::{hash_map, BTreeSet, HashMap},
     slice,
@@ -236,11 +236,12 @@ where
         }
     }
 
-    /// Performs garbage collection of the pool for free service transactions.
-    /// Removes transaction that are not valid anymore.
-    /// The process executes listener calls.
-    pub fn garbage_collect<F: Fn(&T) -> bool>(&mut self, service_transaction_check: F) {
-        if self.best_transactions.is_empty() {
+    /// Performs garbage collection of the pool for free service transactions (zero gas transactions).
+    /// Only checks lowest nonce.
+    /// inject "should_keep_function" to decide.
+    /// The process executes listener calls for invalid transactions.
+    pub fn garbage_collect<F: Fn(&T) -> bool>(&mut self, should_keep_function: F) {
+        if self.transactions.is_empty() {
             return;
         }
 
@@ -249,7 +250,7 @@ where
         for sender in self.transactions.iter() {
             for tx in sender.1.iter_transactions() {
                 if tx.transaction.has_zero_gas_price() {
-                    if service_transaction_check(&tx.transaction) {
+                    if !should_keep_function(&tx.transaction) {
                         txs_to_remove.push(tx.hash().clone());
                     }
                 } else {
@@ -264,7 +265,7 @@ where
             return;
         }
 
-        info!(
+        debug!(
             "Garbage collection: removing invalid {} service transactions from pool.",
             txs_to_remove.len()
         );
