@@ -415,8 +415,8 @@ impl TransactionQueue {
             .collect()
     }
 
-    /// Performs garbage collection of the pool of this transactionqueue for free service transactions.
-    /// Removes transaction that are not valid anymore.
+    /// Performs garbage collection on the pool of this `TransactionQueue` for free service transactions.
+    /// Removes transactions that are not valid anymore.
     /// The process executes listener calls.
     pub fn garbage_collect<F: Fn(&VerifiedTransaction) -> bool>(
         &self,
