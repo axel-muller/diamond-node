@@ -848,11 +848,6 @@ impl Importer {
 
         client.schedule_garbage_collect_in_queue();
 
-        //self.on_block_commit_finalized();
-
-        //client.miner().g
-        //client.check_garbage();.garbage_collect(Duration::from_secs(1));
-
         route
     }
 
