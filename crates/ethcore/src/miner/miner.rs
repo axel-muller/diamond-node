@@ -421,7 +421,7 @@ impl Miner {
     }
 
     /// Performs garbage collection of the pool for free service transactions.
-    /// Removes transaction that are not valid anymore.
+    /// Removes transactions that are not valid anymore.
     /// The process executes listener calls.
     pub fn collect_garbage<F: Fn(&VerifiedTransaction) -> bool>(
         &self,

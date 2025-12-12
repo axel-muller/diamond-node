@@ -306,7 +306,7 @@ pub struct Client {
 
     shutdown: Arc<ShutdownManager>,
 
-    /// block number and block has of latest gc.
+    /// block number and block hash of latest gc.
     /// this information is used to avoid double garbage collection.
     garbage_collect_latest_block: Mutex<(u64, H256)>,
 
@@ -1577,9 +1577,9 @@ impl Client {
                 }
 
                 // here hides an accepted race condition.
-                // latest block could change during loing ongoing GCs.
+                // latest block could change during long ongoing GCs.
                 // this could be avoided developing a more complex GC logic.
-                // but the GC blocks the tx queue, so it has to be placing fast.
+                // but the GC blocks the tx queue, so it has to be blazing fast.
                 self.importer.miner.collect_garbage(|tx|
                     match machine.verify_transaction(tx.signed(), block_header, self) {
                         Ok(_) => true,
