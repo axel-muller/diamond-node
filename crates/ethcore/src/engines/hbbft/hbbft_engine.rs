@@ -51,7 +51,6 @@ use super::{
     NodeId,
     contracts::{
         keygen_history::{all_parts_acks_available, initialize_synckeygen},
-        staking::start_time_of_next_phase_transition,
         validator_set::{ValidatorType, get_pending_validators, is_pending_validator},
     },
     contribution::{unix_now_millis, unix_now_secs},
@@ -329,9 +328,6 @@ impl TransitionHandler {
 
         // If the minimum block time has passed we are ready to trigger new blocks.
         if timer_duration == Duration::from_secs(0) {
-            // Always create blocks if we are in the keygen phase.
-            self.engine.start_hbbft_epoch_if_next_phase();
-
             // If the maximum block time has been reached we trigger a new block in any case.
             if self.max_block_time_remaining(client.clone()) == Duration::from_secs(0) {
                 self.engine.start_hbbft_epoch(client);
@@ -1104,27 +1100,6 @@ impl HoneyBadgerBFT {
         self.client.read().as_ref().and_then(Weak::upgrade)
     }
 
-    fn start_hbbft_epoch_if_next_phase(&self) {
-        // experimental deactivation of empty blocks.
-        // see: https://github.com/DMDcoin/diamond-node/issues/160
-
-        match self.client_arc() {
-            None => return,
-            Some(client) => {
-                // Get the next phase start time
-                let genesis_transition_time = match start_time_of_next_phase_transition(&*client) {
-                    Ok(time) => time,
-                    Err(_) => return,
-                };
-
-                // If current time larger than phase start time, start a new block.
-                if genesis_transition_time.as_u64() < unix_now_secs() {
-                    self.start_hbbft_epoch(client);
-                }
-            }
-        }
-    }
-
     fn replay_cached_messages(&self) -> Option<()> {
         let client = self.client_arc()?;
 
@@ -1236,12 +1211,12 @@ impl HoneyBadgerBFT {
                     return Ok(());
                 }
 
-                self.hbbft_peers_service
-                    .channel()
-                    .send(HbbftConnectToPeersMessage::AnnounceAvailability)?;
-
-                self.hbbft_peers_service
-                    .send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
+                if self.is_staked() {
+                    self.hbbft_peers_service
+                        .send_message(HbbftConnectToPeersMessage::AnnounceAvailability)?;
+                    self.hbbft_peers_service
+                        .send_message(HbbftConnectToPeersMessage::AnnounceOwnInternetAddress)?;
+                }
 
                 if self.should_connect_to_validator_set() {
                     // we just keep those variables here, because we need them in the early_epoch_end_manager.

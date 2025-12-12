@@ -209,10 +209,7 @@ impl HbbftState {
         // apply DAO updates here.
         // update the current minimum gas price.
 
-        match get_minimum_gas_from_permission_contract(
-            client.as_ref(),
-            BlockId::Number(self.current_posdao_epoch_start_block),
-        ) {
+        match get_minimum_gas_from_permission_contract(client.as_ref(), BlockId::Latest) {
             Ok(min_gas) => {
                 *current_minimum_gas_price.lock() = Some(min_gas);
             }
@@ -222,10 +219,29 @@ impl HbbftState {
         }
 
         if sks.is_none() {
-            info!(target: "engine", "We are not part of the HoneyBadger validator set - running as regular node.");
+            info!(target: "engine", "We are not part of the HoneyBadger validator set - Running as regular node.");
             peers_service
                 .send_message(HbbftConnectToPeersMessage::DisconnectAllValidators)
                 .ok()?;
+
+            if self.is_validator() {
+                let is_syncing = if let Some(full) = client.as_full_client() {
+                    full.is_major_syncing()
+                } else {
+                    info!(target: "engine", "Node was a validator: cannot be determinated, because client is not a full client. (https://github.com/DMDcoin/diamond-node/issues/322.)");
+                    return Some(());
+                };
+
+                if is_syncing {
+                    debug!(target: "engine", "Node was a validator, and became regular node, but we are syncing, not shutting down Node as defined in https://github.com/DMDcoin/diamond-node/issues/322.");
+                } else {
+                    info!(target: "engine", "Node was a validator, and became regular node. shutting down Node as defined in https://github.com/DMDcoin/diamond-node/issues/322.");
+                    // for unit tests no problem, demand shutddown won't to anything if its a unit test.
+                    // e2e tests needs adaptation.
+                    // this gracefully shuts down a node, if it was a validator before, but now it is not anymore.
+                    client.demand_shutdown();
+                }
+            }
             return Some(());
         }
 

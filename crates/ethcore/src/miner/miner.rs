@@ -420,6 +420,17 @@ impl Miner {
         self.service_transaction_checker.clone()
     }
 
+    /// Performs garbage collection of the pool for free service transactions.
+    /// Removes transactions that are not valid anymore.
+    /// The process executes listener calls.
+    pub fn collect_garbage<F: Fn(&VerifiedTransaction) -> bool>(
+        &self,
+        service_transaction_filter: F,
+    ) {
+        self.transaction_queue
+            .garbage_collect(service_transaction_filter);
+    }
+
     /// Retrieves an existing pending block iff it's not older than given block number.
     ///
     /// NOTE: This will not prepare a new pending block if it's not existing.

@@ -35,11 +35,6 @@ pub fn get_posdao_epoch_start(
     call_const_staking!(c, staking_epoch_start_block)
 }
 
-pub fn start_time_of_next_phase_transition(client: &dyn EngineClient) -> Result<U256, CallError> {
-    let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
-    call_const_staking!(c, start_time_of_next_phase_transition)
-}
-
 pub fn candidate_min_stake(client: &dyn EngineClient) -> Result<U256, CallError> {
     let c = BoundContract::bind(client, BlockId::Latest, *STAKING_CONTRACT_ADDRESS);
     call_const_staking!(c, candidate_min_stake)
