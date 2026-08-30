@@ -29,6 +29,7 @@ use crate::{
     },
 };
 use crypto::publickey::Signature;
+use crate::engines::hbbft::dao_hardfork;
 use ethereum_types::{Address, H256, H512, Public, U256};
 use ethjson::spec::HbbftParams;
 use hbbft::{NetworkInfo, Target};
@@ -1816,6 +1817,19 @@ impl Engine<EthereumMachine> for HoneyBadgerBFT {
                 trace!(target: "consensus", "calling reward function for block {} isEpochEnd? {} on address: {} (latest block: {}", header_number,  is_epoch_end, address, latest_block_number);
                 let contract = BlockRewardContract::new_from_address(address);
                 let _total_reward = contract.reward(&mut call, is_epoch_end)?;
+            }
+        }
+
+        if !self.params.dao_hardforks.is_empty() {
+            if let Some(client) = self.client_arc() {
+                dao_hardfork::apply_dao_hardfork(
+                    &self.params.dao_hardforks,
+                    &*client,
+                    block,
+                )?;
+            } else {
+                error!(target: "engine",
+            "DAO fork transfers configured but no client available in on_close_block.");
             }
         }
 
