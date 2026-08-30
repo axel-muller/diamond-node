@@ -1,0 +1,61 @@
+[
+    {
+        "type": "function",
+        "name": "proposals",
+        "inputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "proposer",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "votingDaoEpoch",
+                "type": "uint64",
+                "internalType": "uint64"
+            },
+            {
+                "name": "state",
+                "type": "uint8",
+                "internalType": "enum ProposalState"
+            },
+            {
+                "name": "title",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "description",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "discussionUrl",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "daoPhaseCount",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "proposalFee",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "proposalType",
+                "type": "uint8",
+                "internalType": "enum ProposalType"
+            }
+        ],
+        "stateMutability": "view"
+    }
+]
