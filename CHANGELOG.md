@@ -1,3 +1,13 @@
+## Diamond Node Software 4.0.3
+
+This update is **mandatory** and intended for **all participants** of the DMD Diamond mainnet.
+
+### Changelog
+v4.0.3 is for DMD Diamond mainnet [Scintilla hardfork](https://github.com/DMDcoin/diamond-node/issues/343), target time is 2026-09-07 23:39:01 UTC
+
+**Motivation**: [DAO Proposal #1](https://ui.bit.diamonds/dao/details/60382970513162227449299363758281166051722261173835893616717849441603185185066)  
+**Proposal for activation approval**: [DAO Proposal #2](https://ui.bit.diamonds/dao/details/44809146921904380823530087570119481899349762830518490675033291652987077108330)
+
 ## Diamond Node Software 4.0.2
 
 
