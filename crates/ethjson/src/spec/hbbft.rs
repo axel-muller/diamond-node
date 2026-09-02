@@ -16,6 +16,7 @@
 
 //! Hbbft parameter deserialization.
 
+use crate::uint::Uint;
 use ethereum_types::Address;
 use serde_with::serde_as;
 
@@ -64,6 +65,26 @@ impl HbbftNetworkFork {
     }
 }
 
+/// DAO vote based hardfork: at the first block whose timestamp reaches
+/// `executionTimestamp`, if the DAO proposal was accepted, the full balance
+/// of `transferFrom` is moved to `transferTo`.
+#[derive(Debug, PartialEq, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct HbbftDaoHardforkTransfer {
+    /// Hardfork codename.
+    pub codename: String,
+    /// DiamondDao proposal id, uint256 type.
+    pub proposal_id: Uint,
+    /// Unix timestamp T; the fork triggers at the unique block where
+    /// parent.timestamp < T <= block.timestamp.
+    pub execution_timestamp: u64,
+    /// Source EOA's whose entire balance is moved.
+    pub hardfork_accounts: Vec<Address>,
+    /// Recipient of the balances.
+    pub beneficiary: Address,
+}
+
 /// Hbbft parameters.
 #[derive(Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -93,6 +114,9 @@ pub struct HbbftParams {
     /// no block verifications are done.
     #[serde(default)]
     pub forks: Vec<HbbftNetworkFork>,
+    /// List of DAO-voting based hardforks.
+    #[serde(default)]
+    pub dao_hardforks: Vec<HbbftDaoHardforkTransfer>,
 }
 
 /// Hbbft engine config.
@@ -267,6 +291,61 @@ mod tests {
                 .params
                 .should_do_block_reward_contract_call(100_000),
             false
+        );
+    }
+
+    #[test]
+    fn hbbft_deserialization_dao_hardforks() {
+        let s = r#"{
+            "params": {
+                "minimumBlockTime": 0,
+                "maximumBlockTime": 600,
+                "transactionQueueSizeTrigger": 1,
+                "daoHardforks": [
+                    {
+                        "codename": "Scintilla",
+                        "proposalId": "44809146921904380823530087570119481899349762830518490675033291652987077108330",
+                        "executionTimestamp": 1790000000,
+                        "hardforkAccounts": [
+                            "0x1111111111111111111111111111111111111111",
+                            "0x2222222222222222222222222222222222222222"
+                        ],
+                        "beneficiary": "0x3333333333333333333333333333333333333333"
+                    }
+                ]
+            }
+        }"#;
+
+        let deserialized: Hbbft = serde_json::from_str(s).unwrap();
+
+        assert_eq!(deserialized.params.dao_hardforks.len(), 1);
+
+        let hardfork = deserialized
+            .params
+            .dao_hardforks
+            .get(0)
+            .expect("fork config parses");
+
+        assert_eq!(hardfork.execution_timestamp, 1790000000);
+        assert_eq!(hardfork.codename, "Scintilla");
+        assert_eq!(
+            hardfork.beneficiary,
+            Address::from_str("3333333333333333333333333333333333333333")
+                .ok()
+                .unwrap()
+        );
+        assert_eq!(hardfork.hardfork_accounts.len(), 2);
+        assert_eq!(
+            hardfork.hardfork_accounts.get(0),
+            Address::from_str("1111111111111111111111111111111111111111")
+                .ok()
+                .as_ref()
+        );
+        assert_eq!(
+            hardfork.hardfork_accounts.get(1),
+            Address::from_str("2222222222222222222222222222222222222222")
+                .ok()
+                .as_ref()
         );
     }
 

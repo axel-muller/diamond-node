@@ -1,6 +1,7 @@
 mod block_reward_hbbft;
 mod contracts;
 mod contribution;
+mod dao_hardfork;
 mod hbbft_early_epoch_end_manager;
 mod hbbft_engine;
 mod hbbft_engine_cache;
